@@ -62,15 +62,16 @@ typedef struct {
   DeviceManager *man;
 } QPair;
 
-  /**
-   * @brief 
-   *  inits SPDK and the general device manager, always call before ANY other function.
-   * @param manager 
-   * @return int
-   *  - 0 if success
-   *  - 1 if manager is null
-   *  - 2 if spdk fails
-   */
+/**
+ * @brief
+ *  inits SPDK and the general device manager, always call before ANY other
+ * function.
+ * @param manager
+ * @return int
+ *  - 0 if success
+ *  - 1 if manager is null
+ *  - 2 if spdk fails
+ */
 int z_init(DeviceManager **man, bool reset);
 
 int z_reinit(DeviceManager **man);

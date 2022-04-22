@@ -1,2 +1,4 @@
-OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/doc_doxygen/
-INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/include/ @CMAKE_CURRENT_SOURCE_DIR@/docs
+OUTPUT_DIRECTORY       = @DOCS_DIR@/generated/
+INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/include/ @DOCS_DIR@
+GENERATE_HTML          = YES
+GENERATE_MAN           = YES

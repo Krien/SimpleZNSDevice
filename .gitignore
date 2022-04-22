@@ -3,7 +3,9 @@ bin/
 lib/
 build/
 out/
-doc_doxygen/
+# Documentation will waste our git space
+docs/generated/* 
+Doxyfile
 
 #ninja
 *.ninja*
