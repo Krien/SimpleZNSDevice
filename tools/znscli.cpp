@@ -9,7 +9,7 @@
 
 extern "C" {
 
-int min_zns(int l1, int l2) { return l1 < l2 ? l1 : l2; }
+int min_zns(uint64_t l1, uint64_t l2) { return l1 < l2 ? l1 : l2; }
 
 int print_help_util() {
   fprintf(

@@ -18,8 +18,9 @@ In principal only CMake and SPDK and its dependencies (DPDK, etc...) are needed.
 ## Setup dependencies
  The project already has SPDK as a submodule. SPDK itself also has submodules, so be sure to install those as well. For example by calling `git submodule update --init --recursive`. This should automatically use the version of SPDK that is tested with this project. This dependency then needs to be built as well, see [SPDK: Getting started](https://spdk.io/doc/getting_started.html). We do not use any additional configuration options. It is also possible to use a custom SPDK installation. To do this,  please set the SPDK dir path in an environment variable `SPDK_DIR`, otherwise the dir is not found, since there is no standard SPDK location.
 
-## Build the project itself
-After dependencies are installed, it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. For example:
+
+## Example of building the project with CMake
+After dependencies are installed, it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. The next line is a minimal setup with CMake and make:
 ```bash
 rm -f CMakeCache.txt
 cmake .
@@ -29,7 +30,10 @@ if the output does not change, try cleaning the build first with:
 ```bash
 make clean
 ```
-## Faster builds
+
+<details>
+  <summary>Faster builds</summary>
+  
 Builds can be slow, especially on old laptops or behind a VM. Therefore, we use some tricks ourself to speed up compilation, which might aid in your development as well. To further speed up compilation, we advise to use alternative build tools such as `Ninja` instead of plain old `Makefiles` and to use faster linkers such as [`mold`](https://github.com/rui314/mold) (other linkers such as GNU Gold and LDD might work as well at an increased speed, but not tested). For example:
 ```bash
 # Remove old build artifacts first if changing build tools.
@@ -41,6 +45,18 @@ mold -run ninja build.ninja clean
 # Actual build, generally only this command needs to be run incrementally during development.
 mold -run ninja build.ninja <TARGET>
 ```
+</details>
+
+<details>
+    <summary> What to do about linking errors? </summary>
+
+It is possible that even after the code is compiled without errors, the applications that use this project do not run and complain about missing SPDK libraries. This is at least true for our setup on Qemu.
+This has to do with the "LD_LIBRARY_PATH" not always properly transferring when using sudo. Mold as a linker automatically solved this issue, otherwise the following might work (at your own risk):
+```bash
+export LD_LIBRARY_PATH="LD_LIBRARY_PATH:/<installation_directory_of_spdk>/spdk/dpdk/build/lib"
+alias sudo='sudo PATH="$PATH" HOME="$HOME" LD_LIBRARY_PATH="$LD_LIBRARY_PATH"'
+```
+</details>
 
 # Code guidelines
 ## Where to put code
