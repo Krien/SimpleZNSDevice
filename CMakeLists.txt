@@ -55,7 +55,7 @@ setup_spdk_project_structure(znsdevice_lib)
 
 # Standalone CLI
 add_executable(znsdevice
-    scripts/znscli.cpp
+    tools/znscli.cpp
 )
 target_link_libraries(znsdevice znsdevice_lib)
 setup_spdk_project_structure(znsdevice)
