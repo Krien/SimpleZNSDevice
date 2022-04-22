@@ -13,10 +13,14 @@ It can at the moment be used as a:
 
 # How to build
 There are multiple ways to built this project.
-In principal only CMake and SPDK and its dependencies are needed. However, please do set the SPDK dir with an environment variable `SPDK_DIR`, otherwise the dir is not found, since there is no standard SPDK location.
-Then it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. For example:
+In principal only CMake and SPDK and its dependencies (DPDK, etc...) are needed.
+
+## Setup dependencies
+ The project already has SPDK as a submodule. SPDK itself also has submodules, so be sure to install those as well. For example by calling `git submodule update --init --recursive`. This should automatically use the version of SPDK that is tested with this project. This dependency then needs to be built as well, see [SPDK: Getting started](https://spdk.io/doc/getting_started.html). We do not use any additional configuration options. It is also possible to use a custom SPDK installation. To do this,  please set the SPDK dir path in an environment variable `SPDK_DIR`, otherwise the dir is not found, since there is no standard SPDK location.
+
+## Build the project itself
+After dependencies are installed, it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. For example:
 ```bash
-export SPDK_DIR=/home/$USER/local/spdk
 rm -f CMakeCache.txt
 cmake .
 make <TARGET>
@@ -26,7 +30,7 @@ if the output does not change, try cleaning the build first with:
 make clean
 ```
 ## Faster builds
-Builds can be slow, especially on old laptops or behind a VM. Therefore, we use some tricks ourself to speed up compilation, which might aid your development as well. To further speed up compilation, we advise to use alternative build tools such as `Ninja` instead of plain old `Makefiles` and to use faster linkers such as [`mold`](https://github.com/rui314/mold) (other linkers such as GNU Gold and LDD might work as well at an increased speed, but not tested). For example:
+Builds can be slow, especially on old laptops or behind a VM. Therefore, we use some tricks ourself to speed up compilation, which might aid in your development as well. To further speed up compilation, we advise to use alternative build tools such as `Ninja` instead of plain old `Makefiles` and to use faster linkers such as [`mold`](https://github.com/rui314/mold) (other linkers such as GNU Gold and LDD might work as well at an increased speed, but not tested). For example:
 ```bash
 # Remove old build artifacts first if changing build tools.
 rm -f CMakeCache.txt
