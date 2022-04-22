@@ -88,8 +88,13 @@ add_custom_target(
     "-style=file"
 )
 
-set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
-set(SPDK_LIBRARY_DEPENDENCIES "${SPDK_LIBRARY_DEPENDENCIES}" PARENT_SCOPE)
+# Only set these vars, when it is included
+if(${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME})
+else()
+    set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
+    set(SPDK_LIBRARY_DEPENDENCIES "${SPDK_LIBRARY_DEPENDENCIES}" PARENT_SCOPE)
+endif()
+
 # necessary to prevent issues when the upstream CMakeList.txt uses -Werror.
 string(REPLACE " -Werror" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 

@@ -1,9 +1,8 @@
 if(DEFINED $ENV{SPDK_DIR})
     set(SPDK_DIR "$ENV{SPDK_DIR}")
 else()
-    set(SPDK_DIR "/home/$ENV{USER}/local/spdk")
+    set(SPDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/spdk")
 endif()
-set(SPDK_DIR "/home/user/spdk")
 set(DPDK_LIB_DIR "${SPDK_DIR}/dpdk/build/lib")
 message("looking for SPDK in ${SPDK_DIR}")
 
@@ -29,4 +28,4 @@ set(SPDK_LIBRARY_DEPENDENCIES
     "${SYS_STATIC_LIBRARIES}" 
     -pthread
 )
-message("SPDK ${SPDK_LIBRARY_DEPENDENCIES}")
+message("SPDK directory: ${SPDK_DIR}")
