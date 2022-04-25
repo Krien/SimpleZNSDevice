@@ -10,14 +10,20 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), min_lba_(min_lba), max_lba_(max_lba),
-      backed_memory_(nullptr), backed_memory_size_(0), can_access_all_(true) {}
+      can_access_all_(true), backed_memory_(nullptr), backed_memory_size_(0) {
+  assert(min_lba_ <= max_lba_);
+  // If true, there is a creeping bug not catched during debug? block all IO.
+  if (min_lba_ > max_lba) {
+    min_lba_ = max_lba_;
+  }
+}
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
     : SZDChannel(std::move(qpair), info, 0, info.lba_cap) {
   can_access_all_ = false;
 }
 
 SZDChannel::~SZDChannel() {
-  if (backed_memory_size_ > 0) {
+  if (backed_memory_size_ > 0 && backed_memory_ != nullptr) {
     z_free(qpair_, backed_memory_);
     backed_memory_ = nullptr;
   }
@@ -27,7 +33,7 @@ SZDChannel::~SZDChannel() {
 }
 
 SZDStatus SZDChannel::GetBuffer(void **buffer) {
-  if (backed_memory_size_ == 0) {
+  if (backed_memory_size_ == 0 || backed_memory_ == nullptr) {
     return SZDStatus::InvalidArguments;
   }
   *buffer = backed_memory_;
@@ -46,11 +52,12 @@ SZDStatus SZDChannel::FreeBuffer() {
 SZDStatus SZDChannel::ReserveBuffer(uint64_t size) {
   SZDStatus s = SZDStatus::Success;
   uint64_t alligned_size = allign_size(size);
-  // nothing to do (if you want less, do clean first)
+  // nothing to do (if you want to reduce memory of the buffer, instead clean
+  // first)
   if (backed_memory_size_ > 0 && backed_memory_size_ > alligned_size) {
     return s;
   }
-  // realloc
+  // realloc, we need more space
   if (backed_memory_size_ > 0) {
     if ((s = FreeBuffer()) != SZDStatus::Success) {
       return s;
@@ -100,7 +107,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t size, size_t addr,
 }
 
 std::string SZDChannel::DebugBufferString() {
-  return std::string((char *)backed_memory_, backed_memory_size_);
+  return std::string((const char *)backed_memory_, backed_memory_size_);
 }
 
 SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
@@ -123,8 +130,13 @@ SZDStatus SZDChannel::DirectRead(void *buffer, uint64_t lba, uint64_t size,
                                  bool alligned) const {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   void *buffer_dma = z_calloc(qpair_, 1, alligned_size);
+  if (buffer_dma == nullptr) {
+    return SZDStatus::IOError;
+  }
   SZDStatus s = FromStatus(z_read(qpair_, lba, buffer_dma, alligned_size));
-  memcpy(buffer, buffer_dma, size);
+  if (s == SZDStatus::Success) {
+    memcpy(buffer, buffer_dma, size);
+  }
   z_free(qpair_, buffer_dma);
   return s;
 }
