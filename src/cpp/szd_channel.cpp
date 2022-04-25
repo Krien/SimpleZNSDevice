@@ -1,6 +1,6 @@
-#include "szd_channel.h"
-#include "szd.h"
-#include "szd_utils.h"
+#include "szd/cpp/szd_channel.h"
+#include "szd/szd.h"
+#include "szd/szd_utils.h"
 
 #include <string>
 

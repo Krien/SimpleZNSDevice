@@ -1,8 +1,11 @@
-#include "szd.h"
-#include "szd_utils.h"
+#include "szd/szd.h"
+#include "szd/szd_utils.h"
 
+#ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
+#endif
+
 int z_init(DeviceManager **manager, DeviceOptions *options) {
   RETURN_CODE_ON_NULL(options, ZNS_STATUS_NOT_ALLOCATED);
   RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
@@ -474,5 +477,8 @@ void z_print_zns_status(int status) {
     break;
   }
 }
+
+#ifdef __cplusplus
 }
 } // namespace SimpleZNSDeviceNamespace
+#endif

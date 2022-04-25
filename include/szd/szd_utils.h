@@ -1,6 +1,10 @@
 #include "spdk/nvme.h"
+
+#ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
+#endif
+
 #define RETURN_CODE_ON_NULL(x, err)                                            \
   do {                                                                         \
     if ((x) == nullptr) {                                                      \
@@ -19,5 +23,8 @@ extern "C" {
 #define ZNS_STATUS_NOT_ALLOCATED 0x01
 #define ZNS_STATUS_SPDK_ERROR 0x02
 #define ZNS_STATUS_UNKNOWN 0x03
+
+#ifdef __cplusplus
 }
 } // namespace SimpleZNSDeviceNamespace
+#endif

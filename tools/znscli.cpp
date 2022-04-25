@@ -1,13 +1,15 @@
-#include "szd.h"
-#include "szd_utils.h"
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <szd/szd.h>
+#include <szd/szd_utils.h>
 #include <vector>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 int min_zns(uint64_t l1, uint64_t l2) { return l1 < l2 ? l1 : l2; }
 
@@ -528,4 +530,7 @@ int main(int argc, char **argv) {
   free(manager);
   return rc;
 }
+
+#ifdef __cplusplus
 }
+#endif

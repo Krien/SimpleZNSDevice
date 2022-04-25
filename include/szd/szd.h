@@ -1,7 +1,7 @@
 #ifndef SZD_H
 #define SZD_H
 
-#include "szd_namespace.h"
+#include "szd/szd_namespace.h"
 
 #include "spdk/endian.h"
 #include "spdk/env.h"
@@ -18,8 +18,11 @@
 #include "spdk/uuid.h"
 #include "spdk/vmd.h"
 
+#ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
+#endif
+
 #define MAX_TRADDR_LENGTH 0x100
 #define MAX_DEVICE_COUNT 0x100
 /**
@@ -231,6 +234,9 @@ void __reset_zone_complete(void *arg, const struct spdk_nvme_cpl *completion);
 
 void __get_zone_head_complete(void *arg,
                               const struct spdk_nvme_cpl *completion);
+
+#ifdef __cplusplus
 }
 } // namespace SimpleZNSDeviceNamespace
+#endif
 #endif

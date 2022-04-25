@@ -1,8 +1,8 @@
 #ifndef SZD_CHANNEL_H
 #define SZD_CHANNEL_H
 
-#include "szd.h"
-#include "szd_utils.h"
+#include "szd/szd.h"
+#include "szd/szd_utils.h"
 
 #include <memory>
 #include <string>

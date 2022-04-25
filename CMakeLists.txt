@@ -70,14 +70,15 @@ function(SETUP_SPDK_PROJECT_STRUCTURE project_name)
     )
 endfunction()
 
-set(include_dir "include")
+set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/include/szd")
+set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(common_sources
     "${include_dir}/szd_namespace.h"
     "${include_dir}/szd.h"
-    "${include_dir}/szd_channel.h"
     "${include_dir}/szd_utils.h"
-    src/szd.cpp
-    src/szd_channel.cpp
+    "${include_dir}/cpp/szd_channel.h"
+    "${src_dir}/szd.cpp"
+    "${src_dir}/cpp/szd_channel.cpp"
 )
 
 # Library
