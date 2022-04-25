@@ -1,10 +1,7 @@
-#ifndef LSM_ZNS_DEVICE_H
-#define LSM_ZNS_DEVICE H
+#ifndef SZD_H
+#define SZD_H
 
-// Set before include to allow for different namespace
-#ifndef SimpleZNSDeviceNamespace
-#define SimpleZNSDeviceNamespace SZD
-#endif
+#include "szd_namespace.h"
 
 #include "spdk/endian.h"
 #include "spdk/env.h"

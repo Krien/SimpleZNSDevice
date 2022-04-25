@@ -72,9 +72,12 @@ endfunction()
 
 set(include_dir "include")
 set(common_sources
+    "${include_dir}/szd_namespace.h"
     "${include_dir}/szd.h"
+    "${include_dir}/szd_channel.h"
     "${include_dir}/szd_utils.h"
     src/szd.cpp
+    src/szd_channel.cpp
 )
 
 # Library
@@ -120,7 +123,7 @@ add_custom_target(
     COMMAND ${CLANG_FORMAT_PATH}
     -i
     "-style=file"
-    "./src/*.cpp" "./include/*.h"
+    ${common_sources}
     "./tools/*.cpp"
     COMMENT "Formatting files"
 )
