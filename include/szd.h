@@ -179,11 +179,11 @@ int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
  * @brief Append z_calloced data synchronously to a zone.
  * @param qpair channel to use for I/O
  * @param lba logical block address to write to (UNVERIFIED, but must equal
- * write_head of zone)
+ * write_head of zone), will be updated after each succesful write.
  * @param buffer zcalloced data
  * @param size size of buffer
  */
-int z_append(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
+int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size);
 
 /**
  * @brief Resets a zone synchronously, allowing it to be reused.

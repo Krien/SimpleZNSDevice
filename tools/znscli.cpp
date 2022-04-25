@@ -327,7 +327,7 @@ int parse_write_zns(int argc, char **argv, SZD::DeviceManager **manager) {
     return rc;
   }
   snprintf(data_spdk, min_zns(data_size, size), "%s", data);
-  rc = SZD::z_append(*qpair, lba, data_spdk, size);
+  rc = SZD::z_append(*qpair, (uint64_t *)&lba, data_spdk, size);
   if (rc != 0) {
     fprintf(stderr, "Error appending %d\n", rc);
     SZD::z_free(*qpair, data_spdk);

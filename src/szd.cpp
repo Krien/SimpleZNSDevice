@@ -349,13 +349,13 @@ int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   return ZNS_STATUS_SUCCESS;
 }
 
-int z_append(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
+int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
   RETURN_CODE_ON_NULL(buffer, ZNS_STATUS_NOT_ALLOCATED);
   int rc = ZNS_STATUS_SUCCESS;
   DeviceInfo info = qpair->man->info;
 
-  uint64_t lba_start = (lba / info.zone_size) * info.zone_size;
+  uint64_t lba_start = (*lba / info.zone_size) * info.zone_size;
   uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
   uint64_t lbas_processed = 0;
   // If lba_size > zasl, we have a big problem, but not because of the append.
@@ -365,12 +365,12 @@ int z_append(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
 
   while (lbas_processed < lbas_to_process) {
     // Append across a zone border.
-    if ((lba + lbas_processed + step_size) / info.zone_size >
-        (lba + lbas_processed) / info.zone_size) {
+    if ((*lba + lbas_processed + step_size) / info.zone_size >
+        (*lba + lbas_processed) / info.zone_size) {
       current_step_size =
-          ((lba + lbas_processed + step_size) / info.zone_size) *
+          ((*lba + lbas_processed + step_size) / info.zone_size) *
               info.zone_size -
-          lbas_processed - lba;
+          lbas_processed - *lba;
     } else {
       current_step_size = step_size;
     }
@@ -393,11 +393,13 @@ int z_append(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
+      *lba = *lba + lbas_processed;
       return ZNS_STATUS_SPDK_ERROR;
     }
     lbas_processed += current_step_size;
-    lba_start = ((lba + lbas_processed) / info.zone_size) * info.zone_size;
+    lba_start = ((*lba + lbas_processed) / info.zone_size) * info.zone_size;
   }
+  *lba = *lba + lbas_processed;
   return ZNS_STATUS_SUCCESS;
 }
 
