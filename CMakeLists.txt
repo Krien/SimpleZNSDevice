@@ -73,7 +73,7 @@ endfunction()
 set(include_dir "include")
 set(common_sources
     "${include_dir}/szd.h"
-    "${include_dir}/utils.h"
+    "${include_dir}/szd_utils.h"
     src/szd.cpp
 )
 
