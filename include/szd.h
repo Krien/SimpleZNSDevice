@@ -38,12 +38,13 @@ typedef struct {
  * @brief Holds general information about a ZNS device.
  */
 typedef struct {
-  uint64_t lba_size;  // Size of one block, also known as logical block address.
-  uint64_t zone_size; // Size of one zone in lbas.
-  uint64_t mdts;      // Maximum data transfer size in bytes.
-  uint64_t zasl;      // Maximum size of one append command in bytes.
-  uint64_t lba_cap;   // Amount of lbas available on the device.
-  const char *name;   // Name used by SPDK to identify device.
+  uint64_t
+      lba_size; /**< Size of one block, also known as logical block address.*/
+  uint64_t zone_size; /**<  Size of one zone in lbas.*/
+  uint64_t mdts;      /**<  Maximum data transfer size in bytes.*/
+  uint64_t zasl;      /**<  Maximum size of one append command in bytes.*/
+  uint64_t lba_cap;   /**<  Amount of lbas available on the device.*/
+  const char *name;   /**< Name used by SPDK to identify device.*/
 } DeviceInfo;
 
 /**
@@ -51,10 +52,11 @@ typedef struct {
  * The core structure in SimpleZnsDevice.
  */
 typedef struct {
-  struct spdk_nvme_transport_id g_trid = {};
-  struct spdk_nvme_ctrlr *ctrlr;
-  spdk_nvme_ns *ns;
-  DeviceInfo info = {};
+  struct spdk_nvme_transport_id g_trid =
+      {}; /**< transport id used to communicate with SSD*/
+  struct spdk_nvme_ctrlr *ctrlr; /**< Controller of the selected SSD*/
+  spdk_nvme_ns *ns;              /**< Selected namespace of the selected SSD*/
+  DeviceInfo info = {};          /**< Information of selected SSD*/
 } DeviceManager;
 
 /**
@@ -62,8 +64,8 @@ typedef struct {
  * Can be used for writing and reading of data.
  */
 typedef struct {
-  spdk_nvme_qpair *qpair;
-  DeviceManager *man;
+  spdk_nvme_qpair *qpair; /**< internal I/O channel */
+  DeviceManager *man;     /**< Manager of the channel*/
 } QPair;
 
 /**
@@ -71,35 +73,35 @@ typedef struct {
  * callbacks).
  */
 typedef struct {
-  bool done = false; // Synchronous call is done.
-  int err = 0;       // return code after call is done.
+  bool done = false; /**< Synchronous call is done.*/
+  int err = 0;       /**< return code after call is done.*/
 } Completion;
 
 /**
  * @brief Structure used for identifying devices.
  */
 typedef struct {
-  char **traddr;                  // transport ids of all probed devices.
-  bool *zns;                      // Foreach probed device, is it a ZNS device?
-  struct spdk_nvme_ctrlr **ctrlr; // The controller(s) of the devices.
-  uint8_t devices;                // Used to identify global device count.
-  pthread_mutex_t *mut; // Ensures that probe information is thread safe.
+  char **traddr; /**< transport ids of all probed devices.*/
+  bool *zns;     /**< Foreach probed device, is it a ZNS device?*/
+  struct spdk_nvme_ctrlr **ctrlr; /**< The controller(s) of the devices.*/
+  uint8_t devices;                /**< Used to identify global device count.*/
+  pthread_mutex_t *mut; /**< Ensures that probe information is thread safe.*/
 } ProbeInformation;
 
 /**
  * @brief Structure that is used when looking for a device by trid.
  */
 typedef struct {
-  DeviceManager *manager; // The manager associated with the probing.
-  const char *traddr;     // The transport id of the device that is targeted.
+  DeviceManager *manager; /**< The manager associated with the probing.*/
+  const char *traddr; /**< The transport id of the device that is targeted.*/
   const size_t
-      traddr_len; // Length in bytes to check for the target id (long ids).
-  bool found;     // Whether the device is found or not.
+      traddr_len; /**< Length in bytes to check for the target id (long ids).*/
+  bool found;     /**< Whether the device is found or not.*/
 } DeviceTarget;
 
 /**
- * @brief inits SPDK and the general device manager, always call ONCE before ANY
- * other function is called.
+ * @brief inits SPDK and the general device manager, always call ONCE before
+ * ANY other function is called.
  * @param manager pointer to manager that will be initialised.
  */
 int z_init(DeviceManager **manager, DeviceOptions *options);
@@ -130,13 +132,14 @@ int z_probe(DeviceManager *manager, ProbeInformation **probe_info);
 int z_open(DeviceManager *manager, const char *traddr);
 
 /**
- * @brief  If the manager holds a device, shut it down and free associated data.
+ * @brief  If the manager holds a device, shut it down and free associated
+ * data.
  */
 int z_close(DeviceManager *man);
 
 /**
- * @brief If a device is attached to manager, gets its information and store it
- * in info.
+ * @brief If a device is attached to manager, gets its information and store
+ * it in info.
  */
 int z_get_device_info(DeviceInfo *info, DeviceManager *manager);
 
@@ -165,7 +168,8 @@ void z_free(QPair *qpair, void *buffer);
 /**
  * @brief Reads n bytes synchronously from the ZNS device.
  * @param qpair channel to use for I/O
- * @param lba logical block address to read from (can read in non-written areas)
+ * @param lba logical block address to read from (can read in non-written
+ * areas)
  * @param buffer zcalloced buffer to store the read data in.
  * @param size Amount of data to read in bytes (lba_size alligned)
  */
@@ -190,8 +194,8 @@ int z_append(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
 int z_reset(QPair *qpair, uint64_t slba, bool all);
 
 /**
- * @brief Gets the write head of a zone synchronously as a logical block address
- * (lba).
+ * @brief Gets the write head of a zone synchronously as a logical block
+ * address (lba).
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to get the write head
  * from.
