@@ -12,7 +12,7 @@ namespace SimpleZNSDeviceNamespace {
 SZDChannelFactory::SZDChannelFactory(DeviceManager *device_manager,
                                      size_t max_channel_count)
     : max_channel_count_(max_channel_count), channel_count_(0),
-      device_manager_(device_manager) {}
+      device_manager_(device_manager), refs_(0) {}
 SZDChannelFactory::~SZDChannelFactory() { assert(channel_count_ == 0); }
 
 SZDStatus SZDChannelFactory::register_raw_qpair(QPair **qpair) {
