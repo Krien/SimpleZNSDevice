@@ -1,5 +1,5 @@
 #include "szd.h"
-#include "utils.h"
+#include "szd_utils.h"
 
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
