@@ -23,6 +23,15 @@ public:
   SZDChannelFactory(const SZDChannelFactory &) = delete;
   SZDChannelFactory &operator=(const SZDChannelFactory &) = delete;
 
+  inline void Ref() { ++refs_; }
+  inline void Unref() {
+    assert(refs_ >= 1);
+    if (--refs_ <= 0) {
+      delete this;
+    }
+  }
+  inline size_t Getref() { return refs_; }
+
   SZDStatus register_raw_qpair(QPair **qpair);
   SZDStatus unregister_raw_qpair(QPair *qpair);
   SZDStatus register_channel(SZDChannel **channel);
@@ -34,6 +43,7 @@ private:
   size_t max_channel_count_;
   size_t channel_count_;
   DeviceManager *device_manager_;
+  size_t refs_;
 };
 } // namespace SimpleZNSDeviceNamespace
 

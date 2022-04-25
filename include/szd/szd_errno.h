@@ -1,10 +1,12 @@
 #pragma once
 #ifndef SZD_ERRNO_H
 #define SZD_ERRNO_H
-#ifdef __cplusplus
 
 #include "szd/szd_namespace.h"
+
+#ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
+extern "C" {
 #endif
 
 /**
@@ -30,6 +32,7 @@ extern const char *szd_status_code_msg(int status);
 extern bool szd_is_valid_code(int status);
 
 #ifdef __cplusplus
+}
 }
 #endif
 #endif

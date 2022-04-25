@@ -3,12 +3,13 @@
 
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
+extern "C" {
 #endif
 
 const char *szd_status_code_msg(int status) {
   switch (status) {
   case SZD_SC_SUCCESS:
-    return "succes\n";
+    return "Succes";
     break;
   case SZD_SC_NOT_ALLOCATED:
     return "structure not allocated";
@@ -41,7 +42,7 @@ const char *szd_status_code_msg(int status) {
     return "Error when calling the Qpair";
     break;
   default:
-    return "unknown status";
+    return "Unknown status";
     break;
   }
 }
@@ -51,5 +52,6 @@ bool szd_is_valid_code(int status) {
 }
 
 #ifdef __cplusplus
+}
 } // namespace SimpleZNSDeviceNamespace
 #endif
