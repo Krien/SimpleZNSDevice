@@ -1,4 +1,5 @@
 #include "szd/szd.h"
+#include "szd/szd_errno.h"
 #include "szd/szd_utils.h"
 
 #ifdef __cplusplus
@@ -7,10 +8,10 @@ extern "C" {
 #endif
 
 int z_init(DeviceManager **manager, DeviceOptions *options) {
-  RETURN_CODE_ON_NULL(options, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(options);
+  RETURN_ERR_ON_NULL(manager);
   *manager = (DeviceManager *)calloc(1, sizeof(DeviceManager));
-  RETURN_CODE_ON_NULL(*manager, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(*manager);
   // Setup options
   struct spdk_env_opts opts;
   if (options->setup_spdk) {
@@ -23,7 +24,7 @@ int z_init(DeviceManager **manager, DeviceOptions *options) {
                                     SPDK_NVME_TRANSPORT_PCIE);
   if (spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0) {
     free(*manager);
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_INIT;
   }
   // setup stub info, we do not want to create extra UB.
   (*manager)->info = {.lba_size = 0,
@@ -32,14 +33,14 @@ int z_init(DeviceManager **manager, DeviceOptions *options) {
                       .zasl = 0,
                       .lba_cap = 0,
                       .name = options->name};
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 int z_get_device_info(DeviceInfo *info, DeviceManager *manager) {
-  RETURN_CODE_ON_NULL(info, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(manager->ctrlr, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(manager->ns, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(info);
+  RETURN_ERR_ON_NULL(manager);
+  RETURN_ERR_ON_NULL(manager->ctrlr);
+  RETURN_ERR_ON_NULL(manager->ns);
   const struct spdk_nvme_ns_data *ns_data = spdk_nvme_ns_get_data(manager->ns);
   const struct spdk_nvme_zns_ns_data *ns_data_zns =
       spdk_nvme_zns_ns_get_data(manager->ns);
@@ -58,7 +59,7 @@ int z_get_device_info(DeviceInfo *info, DeviceManager *manager) {
                    ? info->mdts
                    : (uint64_t)1 << (12U + cap.bits.mpsmin + info->zasl);
   info->lba_cap = ns_data->ncap;
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 bool __z_open_probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
@@ -126,17 +127,17 @@ int z_open(DeviceManager *manager, const char *traddr) {
                               (spdk_nvme_attach_cb)__z_open_attach_cb,
                               (spdk_nvme_remove_cb)__z_open_remove_cb);
   if (probe_ctx != 0) {
-    return ZNS_STATUS_NOT_ALLOCATED;
+    return SZD_SC_SPDK_ERROR_OPEN;
   }
   if (!prober.found) {
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_OPEN;
   }
   return z_get_device_info(&manager->info, manager);
 }
 
 int z_close(DeviceManager *manager) {
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(manager->ctrlr, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(manager);
+  RETURN_ERR_ON_NULL(manager->ctrlr);
   int rc = spdk_nvme_detach(manager->ctrlr);
   manager->ctrlr = nullptr;
   manager->ns = nullptr;
@@ -147,12 +148,12 @@ int z_close(DeviceManager *manager) {
                    .zasl = 0,
                    .lba_cap = 0,
                    .name = "\xef\xbe\xad\xde"};
-  return rc != 0 ? ZNS_STATUS_SPDK_ERROR : ZNS_STATUS_SUCCESS;
+  return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
 }
 
 int z_destroy(DeviceManager *manager) {
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
-  int rc = ZNS_STATUS_SUCCESS;
+  RETURN_ERR_ON_NULL(manager);
+  int rc = SZD_SC_SUCCESS;
   if (manager->ctrlr != NULL) {
     rc = z_close(manager);
   }
@@ -162,12 +163,12 @@ int z_destroy(DeviceManager *manager) {
 }
 
 int z_reinit(DeviceManager **manager) {
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(*manager, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(manager);
+  RETURN_ERR_ON_NULL(*manager);
   const char *name = (*manager)->info.name;
   int rc = z_destroy(*manager);
   if (rc != 0 || manager != NULL) {
-    return rc | ZNS_STATUS_UNKNOWN;
+    return rc | SZD_SC_SPDK_ERROR_CLOSE;
   }
   DeviceOptions options = {.name = name, .setup_spdk = false};
   return z_init(manager, &options);
@@ -209,24 +210,24 @@ void __z_probe_attach_cb(void *cb_ctx,
 }
 
 int z_probe(DeviceManager *manager, ProbeInformation **probe) {
-  RETURN_CODE_ON_NULL(manager, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(probe, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(manager);
+  RETURN_ERR_ON_NULL(probe);
   *probe = (ProbeInformation *)calloc(1, sizeof(ProbeInformation));
-  RETURN_CODE_ON_NULL(*probe, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(*probe);
   (*probe)->traddr = (char **)calloc(MAX_DEVICE_COUNT, sizeof(char *));
   (*probe)->ctrlr = (struct spdk_nvme_ctrlr **)calloc(
       MAX_DEVICE_COUNT, sizeof(spdk_nvme_ctrlr *));
   (*probe)->zns = (bool *)calloc(MAX_DEVICE_COUNT, sizeof(bool));
   (*probe)->mut = (pthread_mutex_t *)calloc(1, sizeof(pthread_mutex_t));
   if (pthread_mutex_init((*probe)->mut, NULL) != 0) {
-    return ZNS_STATUS_NOT_ALLOCATED;
+    return SZD_SC_SPDK_ERROR_PROBE;
   }
   int rc;
   rc = spdk_nvme_probe(&manager->g_trid, *probe,
                        (spdk_nvme_probe_cb)__z_probe_probe_cb,
                        (spdk_nvme_attach_cb)__z_probe_attach_cb, NULL);
   if (rc != 0) {
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_PROBE;
   }
   // Thread safe removing of devices, they have already been probed.
   pthread_mutex_lock((*probe)->mut);
@@ -235,26 +236,26 @@ int z_probe(DeviceManager *manager, ProbeInformation **probe) {
     rc = spdk_nvme_detach((*probe)->ctrlr[i]) | rc;
   }
   pthread_mutex_unlock((*probe)->mut);
-  return rc != 0 ? ZNS_STATUS_SPDK_ERROR : ZNS_STATUS_SUCCESS;
+  return rc != 0 ? SZD_SC_SPDK_ERROR_PROBE : SZD_SC_SUCCESS;
 }
 
 int z_create_qpair(DeviceManager *man, QPair **qpair) {
-  RETURN_CODE_ON_NULL(man, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(man);
+  RETURN_ERR_ON_NULL(qpair);
   *qpair = (QPair *)calloc(1, sizeof(QPair));
   (*qpair)->qpair = spdk_nvme_ctrlr_alloc_io_qpair(man->ctrlr, NULL, 0);
   (*qpair)->man = man;
-  RETURN_CODE_ON_NULL((*qpair)->qpair, ZNS_STATUS_NOT_ALLOCATED);
-  return ZNS_STATUS_SUCCESS;
+  RETURN_ERR_ON_NULL((*qpair)->qpair);
+  return SZD_SC_SUCCESS;
 }
 
 int z_destroy_qpair(QPair *qpair) {
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(qpair->qpair, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(qpair->qpair);
   spdk_nvme_ctrlr_free_io_qpair(qpair->qpair);
   qpair->man = NULL;
   free(qpair);
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 void *__reserve_dma(uint64_t size) {
@@ -302,9 +303,9 @@ void __get_zone_head_complete(void *arg,
 }
 
 int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(buffer, ZNS_STATUS_NOT_ALLOCATED);
-  int rc = ZNS_STATUS_SUCCESS;
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(buffer);
+  int rc = SZD_SC_SUCCESS;
   DeviceInfo info = qpair->man->info;
 
   uint64_t lba_start = lba;
@@ -339,23 +340,23 @@ int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
     if (rc != 0) {
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_READ;
     }
     // Synchronous reads, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_READ;
     }
     lbas_processed += current_step_size;
     lba_start = lba + lbas_processed;
   }
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(buffer, ZNS_STATUS_NOT_ALLOCATED);
-  int rc = ZNS_STATUS_SUCCESS;
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(buffer);
+  int rc = SZD_SC_SUCCESS;
   DeviceInfo info = qpair->man->info;
 
   uint64_t lba_start = (*lba / info.zone_size) * info.zone_size;
@@ -391,23 +392,23 @@ int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
                                    current_step_size, /* number of LBAs */
                                    __append_complete, &completion, 0);
     if (rc != 0) {
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_APPEND;
     }
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
       *lba = *lba + lbas_processed;
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_APPEND;
     }
     lbas_processed += current_step_size;
     lba_start = ((*lba + lbas_processed) / info.zone_size) * info.zone_size;
   }
   *lba = *lba + lbas_processed;
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 int z_reset(QPair *qpair, uint64_t slba, bool all) {
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
+  RETURN_ERR_ON_NULL(qpair);
   Completion completion = {.done = false, .err = 0x00};
   int rc =
       spdk_nvme_zns_reset_zone(qpair->man->ns, qpair->qpair,
@@ -415,20 +416,20 @@ int z_reset(QPair *qpair, uint64_t slba, bool all) {
                                all,  /* don't reset all zones */
                                __reset_zone_complete, &completion);
   if (rc != 0) {
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_RESET;
   }
   // Busy wait
   POLL_QPAIR(qpair->qpair, completion.done);
   if (completion.err != 0) {
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_RESET;
   }
   return rc;
 }
 
 int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
-  RETURN_CODE_ON_NULL(qpair, ZNS_STATUS_NOT_ALLOCATED);
-  RETURN_CODE_ON_NULL(qpair->man, ZNS_STATUS_NOT_ALLOCATED);
-  int rc = ZNS_STATUS_SUCCESS;
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(qpair->man);
+  int rc = SZD_SC_SUCCESS;
 
   // Get information from a zone.
   size_t report_bufsize = spdk_nvme_ns_get_max_io_xfer_size(qpair->man->ns);
@@ -440,13 +441,13 @@ int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
         SPDK_NVME_ZRA_LIST_ALL, true, __get_zone_head_complete, &completion);
     if (rc != 0) {
       free(report_buf);
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
     // Busy wait for the head.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
       free(report_buf);
-      return ZNS_STATUS_SPDK_ERROR;
+      return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
   }
   // Retrieve write head from zone information.
@@ -456,26 +457,13 @@ int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   *write_head = desc->wp;
   free(report_buf);
   if (*write_head < slba) {
-    return ZNS_STATUS_SPDK_ERROR;
+    return SZD_SC_SPDK_ERROR_REPORT_ZONES;
   }
-  return ZNS_STATUS_SUCCESS;
+  return SZD_SC_SUCCESS;
 }
 
 void z_print_zns_status(int status) {
-  switch (status) {
-  case ZNS_STATUS_SUCCESS:
-    printf("succes\n");
-    break;
-  case ZNS_STATUS_NOT_ALLOCATED:
-    printf("structure not allocated\n");
-    break;
-  case ZNS_STATUS_SPDK_ERROR:
-    printf("spdk error\n");
-    break;
-  default:
-    printf("unknown status\n");
-    break;
-  }
+  printf("SZS STATUS: %s\n", szd_status_code_msg(status));
 }
 
 #ifdef __cplusplus

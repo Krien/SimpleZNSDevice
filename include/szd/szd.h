@@ -1,6 +1,7 @@
 #ifndef SZD_H
 #define SZD_H
 
+#include "szd/szd_errno.h"
 #include "szd/szd_namespace.h"
 
 #include "spdk/endian.h"

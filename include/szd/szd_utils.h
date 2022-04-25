@@ -1,14 +1,20 @@
+#pragma once
+#ifndef SZD_UTILS_H
+#define SZD_UTILS_H
+
 #include "spdk/nvme.h"
+#include "szd/szd_errno.h"
+#include "szd/szd_namespace.h"
 
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
 #endif
 
-#define RETURN_CODE_ON_NULL(x, err)                                            \
+#define RETURN_ERR_ON_NULL(x)                                                  \
   do {                                                                         \
     if ((x) == nullptr) {                                                      \
-      return (err);                                                            \
+      return (SZD_SC_NOT_ALLOCATED);                                           \
     }                                                                          \
   } while (0)
 
@@ -18,13 +24,8 @@ extern "C" {
       spdk_nvme_qpair_process_completions((qpair), 0);                         \
     }                                                                          \
   } while (0)
-
-#define ZNS_STATUS_SUCCESS 0x00
-#define ZNS_STATUS_NOT_ALLOCATED 0x01
-#define ZNS_STATUS_SPDK_ERROR 0x02
-#define ZNS_STATUS_UNKNOWN 0x03
-
 #ifdef __cplusplus
 }
 } // namespace SimpleZNSDeviceNamespace
+#endif
 #endif

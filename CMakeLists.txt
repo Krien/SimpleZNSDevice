@@ -74,11 +74,15 @@ set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/include/szd")
 set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(common_sources
     "${include_dir}/szd_namespace.h"
-    "${include_dir}/szd.h"
+    "${include_dir}/szd_errno.h"
     "${include_dir}/szd_utils.h"
+    "${include_dir}/szd.h"
     "${include_dir}/cpp/szd_channel.h"
     "${src_dir}/szd.cpp"
+    "${src_dir}/szd_errno.cpp"
     "${src_dir}/cpp/szd_channel.cpp"
+    "${src_dir}/cpp/szd_channel_factory.cpp"
+    "${src_dir}/cpp/szd_status.cpp"
 )
 
 # Library

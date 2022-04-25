@@ -1,0 +1,40 @@
+#ifndef SZD_CPP_CHANNEL_FACTORY_H
+#define SZD_CPP_CHANNEL_FACTORY_H
+
+#include "szd/cpp/szd_channel.h"
+#include "szd/cpp/szd_status.h"
+#include "szd/szd.h"
+#include "szd/szd_utils.h"
+
+#include <memory>
+#include <string>
+
+namespace SimpleZNSDeviceNamespace {
+/**
+ * @brief Simple class meant to ensure that SZD channels are created at one
+ * point. Allowing limiting the amount of channels and abstracting away
+ * complexity.
+ */
+class SZDChannelFactory {
+public:
+  SZDChannelFactory(DeviceManager *device_manager, size_t max_channel_count);
+  ~SZDChannelFactory();
+  // No copying or implicits
+  SZDChannelFactory(const SZDChannelFactory &) = delete;
+  SZDChannelFactory &operator=(const SZDChannelFactory &) = delete;
+
+  SZDStatus register_raw_qpair(QPair **qpair);
+  SZDStatus unregister_raw_qpair(QPair *qpair);
+  SZDStatus register_channel(SZDChannel **channel);
+  SZDStatus register_channel(SZDChannel **channel, uint64_t min_zone_head,
+                             uint64_t max_zone_head);
+  SZDStatus unregister_channel(SZDChannel *channel);
+
+private:
+  size_t max_channel_count_;
+  size_t channel_count_;
+  DeviceManager *device_manager_;
+};
+} // namespace SimpleZNSDeviceNamespace
+
+#endif

@@ -1,6 +1,7 @@
-#ifndef SZD_CHANNEL_H
-#define SZD_CHANNEL_H
+#ifndef SZD_CPP_CHANNEL_H
+#define SZD_CPP_CHANNEL_H
 
+#include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
 #include "szd/szd_utils.h"
 
@@ -8,27 +9,6 @@
 #include <string>
 
 namespace SimpleZNSDeviceNamespace {
-enum class SZDStatus { Success, InvalidArguments, IOError, Unknown };
-constexpr static SZDStatus FromStatus(int status) {
-  switch (status) {
-  case ZNS_STATUS_SUCCESS:
-    return SZDStatus::Success;
-    break;
-  case ZNS_STATUS_NOT_ALLOCATED:
-    return SZDStatus::InvalidArguments;
-    break;
-  case ZNS_STATUS_SPDK_ERROR:
-    break;
-    return SZDStatus::IOError;
-  default:
-    return SZDStatus::Unknown;
-    break;
-  }
-  // -Wreturn-type has no knowledge of switch default??
-  return SZDStatus::Unknown;
-}
-// Forces -Werror-unused function to be happy
-static_assert(FromStatus(0) == SZDStatus::Success);
 /**
  * @brief Simple abstraction on top of a QPair to make the code more Cxx like.
  * Comes with helper functions and performance optimisations.

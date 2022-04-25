@@ -1,4 +1,5 @@
 #include "szd/cpp/szd_channel.h"
+#include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
 #include "szd/szd_utils.h"
 
