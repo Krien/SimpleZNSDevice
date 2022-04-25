@@ -72,9 +72,9 @@ endfunction()
 
 set(include_dir "include")
 set(common_sources
-    "${include_dir}/device.h"
+    "${include_dir}/szd.h"
     "${include_dir}/utils.h"
-    src/device.cpp
+    src/szd.cpp
 )
 
 # Library
@@ -89,11 +89,11 @@ setup_spdk_project_structure(znsdevice_lib)
 #setup_spdk_project_structure(znsdevice_lib_shared)
 
 # Standalone CLI
-add_executable(znsdevice
+add_executable(znscli
     tools/znscli.cpp
 )
-target_link_libraries(znsdevice znsdevice_lib)
-setup_spdk_project_structure(znsdevice)
+target_link_libraries(znscli znsdevice_lib)
+setup_spdk_project_structure(znscli)
 
 # Tests
 add_executable(device_initial_test

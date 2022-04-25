@@ -1,4 +1,4 @@
-#include "device.h"
+#include "szd.h"
 #include "utils.h"
 #include <cstdint>
 #include <cstdlib>
@@ -49,7 +49,7 @@ int print_help_util() {
   return 0;
 }
 
-int parse_reset_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_reset_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   int op;
   char *trid = (char *)calloc(0x100, sizeof(char *));
   bool trid_set = false;
@@ -60,6 +60,8 @@ int parse_reset_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
     case 'l':
       slba = (int64_t)spdk_strtol(optarg, 10);
       if (slba < 0) {
+        free(*manager);
+        free(trid);
         fprintf(stderr, "Invalid slba\n");
         return slba;
       }
@@ -72,31 +74,39 @@ int parse_reset_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
       reset_all = true;
       break;
     default:
+      free(*manager);
+      free(trid);
       return 1;
     }
   }
   if (!trid_set || slba < 0) {
     fprintf(stderr, "Not all required arguments are set for reset\n");
     print_help_util();
+    free(*manager);
+    free(trid);
     return 1;
   }
-  int rc = ZnsDevice::z_open(*manager, trid);
+  int rc = SZD::z_open(*manager, trid);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
+    free(*manager);
+    free(trid);
     return 1;
   }
-  ZnsDevice::DeviceInfo info = (*manager)->info;
+  SZD::DeviceInfo info = (*manager)->info;
   if (info.lba_cap < (uint64_t)slba || (uint64_t)slba % info.zone_size != 0) {
     fprintf(stderr, "Invalid slba \n");
+    SZD::z_destroy(*manager);
+    free(trid);
     return 1;
   }
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  SZD::QPair **qpair = (SZD::QPair **)calloc(1, sizeof(SZD::QPair *));
+  rc = SZD::z_create_qpair(*manager, qpair);
   if (rc != 0) {
     free(qpair);
-    ZnsDevice::z_shutdown(*manager);
+    SZD::z_destroy(*manager);
+    free(trid);
     return rc;
   }
   if (reset_all) {
@@ -104,15 +114,17 @@ int parse_reset_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
   } else {
     fprintf(stdout, "Resetting device %s at %lu \n", trid, (uint64_t)slba);
   }
-  rc = ZnsDevice::z_reset(*qpair, (uint64_t)slba, reset_all);
+  rc = SZD::z_reset(*qpair, (uint64_t)slba, reset_all);
+  SZD::z_destroy_qpair(*qpair);
   free(qpair);
-  ZnsDevice::z_shutdown(*manager);
+  SZD::z_destroy(*manager);
+  free(trid);
   return rc;
 }
 
-int parse_read_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_read_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   int op;
-  char *trid = (char *)calloc(0x100, sizeof(char *));
+  char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char *));
   bool trid_set = false;
   bool reset_all = false;
   int64_t lba = -1;
@@ -124,67 +136,83 @@ int parse_read_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
       if (lba < 0) {
         fprintf(stderr, "Invalid lba %s\n", optarg);
         print_help_util();
+        free(*manager);
+        free(trid);
         return lba;
       }
       break;
     case 't':
       trid_set = true;
-      snprintf(trid, 0x100, "%s", optarg);
+      snprintf(trid, MAX_TRADDR_LENGTH - 1, "%s", optarg);
       break;
     case 's':
       size = (int64_t)spdk_strtol(optarg, 10);
       if (size < 0) {
+        free(*manager);
+        free(trid);
         fprintf(stderr, "Invalid size %s\n", optarg);
         print_help_util();
         return size;
       }
       break;
     default:
+      free(*manager);
+      free(trid);
       return 1;
     }
   }
   if (!trid_set || lba < 0 || size < 0) {
     fprintf(stderr, "Not all required arguments are set for a read\n");
     print_help_util();
+    free(*manager);
+    free(trid);
     return 1;
   }
-  int rc = ZnsDevice::z_open(*manager, trid);
+  int rc = SZD::z_open(*manager, trid);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
+    free(trid);
     return 1;
   }
-  ZnsDevice::DeviceInfo info = (*manager)->info;
+  SZD::DeviceInfo info = (*manager)->info;
   if (info.lba_cap < (uint64_t)lba || (uint64_t)size % info.lba_size != 0) {
     fprintf(stderr,
             "Invalid slba or size \n"
             " requested lba:%lu <-CHECK-> lba capacity: %lu\n"
             " requested size:%lu <-CHECK-> lba size %lu",
             (uint64_t)lba, info.lba_cap, (uint64_t)size, info.lba_size);
+    free(trid);
+    SZD::z_destroy(*manager);
     return 1;
   }
   size = min_zns(size, (info.lba_cap - lba) * info.lba_size);
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  SZD::QPair **qpair = (SZD::QPair **)calloc(1, sizeof(SZD::QPair *));
+  rc = SZD::z_create_qpair(*manager, qpair);
   if (rc != 0) {
     fprintf(stderr, "Error creating qpair\n");
     free(qpair);
-    ZnsDevice::z_shutdown(*manager);
+    SZD::z_destroy(*manager);
+    free(trid);
     return rc;
   }
-  char *data = (char *)ZnsDevice::z_calloc(*qpair, size, sizeof(char *));
+  char *data = (char *)SZD::z_calloc(*qpair, size, sizeof(char *));
   if (!data) {
     fprintf(stderr, "Error allocating with SPDKs malloc\n");
+    SZD::z_destroy_qpair(*qpair);
     free(qpair);
-    ZnsDevice::z_shutdown(*manager);
+    SZD::z_destroy(*manager);
+    free(trid);
     return rc;
   }
-  rc = ZnsDevice::z_read(*qpair, lba, data, size);
+  rc = SZD::z_read(*qpair, lba, data, size);
   if (rc != 0) {
     fprintf(stderr, "Error reading %d\n", rc);
+    SZD::z_free(*qpair, data);
+    SZD::z_destroy_qpair(*qpair);
     free(qpair);
-    rc = ZnsDevice::z_shutdown(*manager);
+    rc = SZD::z_destroy(*manager);
+    free(trid);
     return rc;
   }
   fprintf(stdout, "Read data from device %s, location %lu, size %lu:\n", trid,
@@ -194,25 +222,30 @@ int parse_read_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
     fprintf(stdout, "%c", data[i]);
   }
   fprintf(stdout, "\n");
+  SZD::z_free(*qpair, data);
+  SZD::z_destroy_qpair(*qpair);
   free(qpair);
-  rc = ZnsDevice::z_shutdown(*manager);
+  rc = SZD::z_destroy(*manager);
+  free(trid);
   return rc;
 }
 
-int parse_write_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_write_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   int op;
-  char *trid = (char *)calloc(0x100, sizeof(char));
+  char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char));
   bool trid_set = false;
   bool reset_all = false;
   int64_t lba = -1;
   int64_t size = -1;
   int64_t data_size = -1;
-  char *data;
+  char *data = NULL;
   while ((op = getopt(argc, argv, "t:l:s:d:")) != -1) {
     switch (op) {
     case 'l':
       lba = (int64_t)spdk_strtol(optarg, 10);
       if (lba < 0) {
+        free(*manager);
+        free(trid);
         fprintf(stderr, "Invalid lba %s\n", optarg);
         print_help_util();
         return lba;
@@ -220,11 +253,13 @@ int parse_write_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
       break;
     case 't':
       trid_set = true;
-      snprintf(trid, 0x100, "%s", optarg);
+      snprintf(trid, MAX_TRADDR_LENGTH - 1, "%s", optarg);
       break;
     case 's':
       size = (int64_t)spdk_strtol(optarg, 10);
       if (size < 0) {
+        free(*manager);
+        free(trid);
         fprintf(stderr, "Invalid size %s\n", optarg);
         print_help_util();
         return size;
@@ -236,22 +271,30 @@ int parse_write_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
       snprintf(data, data_size, "%s", optarg);
       break;
     default:
+      free(*manager);
+      free(trid);
       return 1;
     }
   }
   if (!trid_set || lba < 0 || size < 0 || !data) {
+    free(trid);
+    if (data != NULL) {
+      free(data);
+    }
+    free(*manager);
     fprintf(stderr, "Not all required arguments are set for a write\n");
     print_help_util();
     return 1;
   }
-  int rc = ZnsDevice::z_open(*manager, trid);
+  int rc = SZD::z_open(*manager, trid);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
     free(data);
+    free(trid);
     return 1;
   }
-  ZnsDevice::DeviceInfo info = (*manager)->info;
+  SZD::DeviceInfo info = (*manager)->info;
   if (info.lba_cap < (uint64_t)lba || (uint64_t)size % info.lba_size != 0 ||
       (uint64_t)lba % info.zone_size != 0) {
     fprintf(stderr,
@@ -262,49 +305,55 @@ int parse_write_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
             info.lba_size);
     print_help_util();
     free(data);
+    free(trid);
+    SZD::z_destroy(*manager);
     return 1;
   }
   size = min_zns(size, (info.lba_cap - lba) * info.lba_size);
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  SZD::QPair **qpair = (SZD::QPair **)calloc(1, sizeof(SZD::QPair *));
+  rc = SZD::z_create_qpair(*manager, qpair);
   if (rc != 0) {
     fprintf(stderr, "Error creating qpair %d\n", rc);
     free(qpair);
-    ZnsDevice::z_shutdown(*manager);
+    SZD::z_destroy(*manager);
     free(data);
+    free(trid);
     return rc;
   }
-  char *data_spdk = (char *)ZnsDevice::z_calloc(*qpair, size, sizeof(char *));
+  char *data_spdk = (char *)SZD::z_calloc(*qpair, size, sizeof(char *));
   if (!data_spdk) {
     fprintf(stderr, "Error allocating with SPDKs malloc\n");
-    free(qpair);
-    ZnsDevice::z_shutdown(*manager);
-    free(data);
+    goto destroy_context;
     return rc;
   }
   snprintf(data_spdk, min_zns(data_size, size), "%s", data);
-  rc = ZnsDevice::z_append(*qpair, lba, data_spdk, size);
+  rc = SZD::z_append(*qpair, lba, data_spdk, size);
   if (rc != 0) {
     fprintf(stderr, "Error appending %d\n", rc);
-    free(qpair);
-    ZnsDevice::z_shutdown(*manager);
-    free(data);
+    SZD::z_free(*qpair, data_spdk);
+    goto destroy_context;
     return rc;
   }
   fprintf(stdout, "write data to device %s, location %lu, size %lu\n", trid,
           lba, size);
+  SZD::z_free(*qpair, data_spdk);
+  goto destroy_context;
+  return rc;
+
+destroy_context:
+  SZD::z_destroy_qpair(*qpair);
   free(qpair);
-  rc = ZnsDevice::z_shutdown(*manager);
+  rc = SZD::z_destroy(*manager);
   free(data);
+  free(trid);
   return rc;
 }
 
-int parse_probe_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
-  ZnsDevice::ProbeInformation **prober = (ZnsDevice::ProbeInformation **)calloc(
-      1, sizeof(ZnsDevice::ProbeInformation *));
+int parse_probe_zns(int argc, char **argv, SZD::DeviceManager **manager) {
+  SZD::ProbeInformation **prober =
+      (SZD::ProbeInformation **)calloc(1, sizeof(SZD::ProbeInformation *));
   printf("Looking for devices:\n");
-  int rc = ZnsDevice::z_probe(*manager, prober);
+  int rc = SZD::z_probe(*manager, prober);
   if (rc != 0) {
     printf("Fatal error during probing %d\n Are you sure you are running as "
            "root?\n",
@@ -321,37 +370,42 @@ int parse_probe_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
   (*prober)->devices = 0;
   // dangerous! we must be absolutely sure that no other process is using this
   // anymore.
+  free((*prober)->traddr);
   free((*prober)->mut);
   free((*prober)->ctrlr);
   free((*prober)->zns);
   free(*prober);
   free(prober);
+  SZD::z_destroy(*manager);
   return 0;
 }
 
-int parse_info_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_info_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   int op;
-  char *trid = (char *)calloc(0x100, sizeof(char));
+  char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char));
   bool trid_set = false;
   while ((op = getopt(argc, argv, "t:")) != -1) {
     switch (op) {
     case 't':
       trid_set = true;
-      snprintf(trid, 0x100, "%s", optarg);
+      snprintf(trid, MAX_TRADDR_LENGTH - 1, "%s", optarg);
       break;
     default:
+      free(trid);
       return 1;
     }
   }
   if (!trid_set) {
+    free(trid);
     return 1;
   }
-  int rc = ZnsDevice::z_open(*manager, trid);
+  int rc = SZD::z_open(*manager, trid);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
+    free(trid);
     return 1;
   }
-  ZnsDevice::DeviceInfo info = (*manager)->info;
+  SZD::DeviceInfo info = (*manager)->info;
   fprintf(stdout,
           "Getting information from device %s:\n"
           "\t*lba size (in bytes)    :%lu\n"
@@ -362,46 +416,50 @@ int parse_info_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
           "\t*zasl (in bytes)        :%lu\n",
           trid, info.lba_size, info.zone_size, info.lba_cap / info.zone_size,
           info.lba_cap, info.mdts, info.zasl);
+  free(trid);
+  SZD::z_destroy(*manager);
   return rc;
 }
 
-int parse_zones_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_zones_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   int op;
-  char *trid = (char *)calloc(0x100, sizeof(char));
+  char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char));
   bool trid_set = false;
   while ((op = getopt(argc, argv, "t:")) != -1) {
     switch (op) {
     case 't':
       trid_set = true;
-      snprintf(trid, 0x100, "%s", optarg);
+      snprintf(trid, MAX_TRADDR_LENGTH - 1, "%s", optarg);
       break;
     default:
+      free(trid);
       return 1;
     }
   }
   if (!trid_set) {
     return 1;
   }
-  int rc = ZnsDevice::z_open(*manager, trid);
+  int rc = SZD::z_open(*manager, trid);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
+    free(trid);
     print_help_util();
     return 1;
   }
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  SZD::QPair **qpair = (SZD::QPair **)calloc(1, sizeof(SZD::QPair *));
+  rc = SZD::z_create_qpair(*manager, qpair);
   if (rc != 0) {
     fprintf(stderr, "Error allocating with SPDKs malloc %d\n", rc);
+    free(trid);
     free(qpair);
-    ZnsDevice::z_shutdown(*manager);
+    SZD::z_destroy(*manager);
     return rc;
   }
-  ZnsDevice::DeviceInfo info = (*manager)->info;
+  SZD::DeviceInfo info = (*manager)->info;
   printf("Printing zone writeheads for device %s:\n", trid);
   uint64_t zone_head;
   for (uint64_t i = 0; i < info.lba_cap; i += info.zone_size) {
-    rc = ZnsDevice::z_get_zone_head(*qpair, i, &zone_head);
+    rc = SZD::z_get_zone_head(*qpair, i, &zone_head);
     if (rc != 0) {
       fprintf(stderr, "Error during getting zonehead %d\n", rc);
       return 1;
@@ -409,14 +467,18 @@ int parse_zones_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
     printf("\tslba:%6lu - wp:%6lu - %lu/%lu\n", i, zone_head, zone_head - i,
            info.zone_size);
   }
+  free(trid);
+  SZD::z_destroy_qpair(*qpair);
+  free(qpair);
+  SZD::z_destroy(*manager);
   return rc;
 }
 
-int parse_help_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_help_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   return print_help_util();
 }
 
-int parse_args_zns(int argc, char **argv, ZnsDevice::DeviceManager **manager) {
+int parse_args_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   if (!argc) {
     return 1;
   }
@@ -448,10 +510,12 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  ZnsDevice::DeviceManager **manager =
-      (ZnsDevice::DeviceManager **)calloc(1, sizeof(ZnsDevice::DeviceManager));
-  rc = ZnsDevice::z_init(manager, false);
+  SZD::DeviceManager **manager =
+      (SZD::DeviceManager **)calloc(1, sizeof(SZD::DeviceManager));
+  SZD::DeviceOptions options = {.name = "znscli", .setup_spdk = true};
+  rc = SZD::z_init(manager, &options);
   if (rc != 0) {
+    free(manager);
     return rc;
   }
 

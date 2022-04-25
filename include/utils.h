@@ -1,18 +1,5 @@
-#include "spdk/endian.h"
-#include "spdk/env.h"
-#include "spdk/log.h"
 #include "spdk/nvme.h"
-#include "spdk/nvme_intel.h"
-#include "spdk/nvme_ocssd.h"
-#include "spdk/nvme_zns.h"
-#include "spdk/nvmf_spec.h"
-#include "spdk/pci_ids.h"
-#include "spdk/stdinc.h"
-#include "spdk/string.h"
-#include "spdk/util.h"
-#include "spdk/uuid.h"
-#include "spdk/vmd.h"
-
+namespace SimpleZNSDeviceNamespace {
 extern "C" {
 #define RETURN_CODE_ON_NULL(x, err)                                            \
   do {                                                                         \
@@ -27,4 +14,10 @@ extern "C" {
       spdk_nvme_qpair_process_completions((qpair), 0);                         \
     }                                                                          \
   } while (0)
+
+#define ZNS_STATUS_SUCCESS 0x00
+#define ZNS_STATUS_NOT_ALLOCATED 0x01
+#define ZNS_STATUS_SPDK_ERROR 0x02
+#define ZNS_STATUS_UNKNOWN 0x03
 }
+} // namespace SimpleZNSDeviceNamespace
