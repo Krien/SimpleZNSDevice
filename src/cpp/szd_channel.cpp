@@ -72,7 +72,8 @@ SZDStatus SZDChannel::ReserveBuffer(uint64_t size) {
   return SZDStatus::Success;
 }
 
-SZDStatus SZDChannel::Append(void *data, size_t size, size_t *write_head) {
+SZDStatus SZDChannel::AppendToBuffer(void *data, size_t *write_head,
+                                     size_t size) {
   if (*write_head + size > backed_memory_size_) {
     return SZDStatus::InvalidArguments;
   }
@@ -81,7 +82,7 @@ SZDStatus SZDChannel::Append(void *data, size_t size, size_t *write_head) {
   return SZDStatus::Success;
 }
 
-SZDStatus SZDChannel::Write(void *data, size_t size, size_t addr) {
+SZDStatus SZDChannel::WriteToBuffer(void *data, size_t addr, size_t size) {
   if (addr + size > backed_memory_size_) {
     return SZDStatus::InvalidArguments;
   }
@@ -89,15 +90,22 @@ SZDStatus SZDChannel::Write(void *data, size_t size, size_t addr) {
   return SZDStatus::Success;
 }
 
-SZDStatus SZDChannel::FlushBuffer(uint64_t *lba) {
-  if (backed_memory_size_ == 0 ||
-      *lba + backed_memory_size_ / lba_size_ > max_lba_) {
+SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, uint64_t addr,
+                                         uint64_t size, bool alligned) {
+  uint64_t alligned_size = alligned ? size : allign_size(size);
+  if (addr + alligned_size > backed_memory_size_ ||
+      *lba + size / lba_size_ > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(z_append(qpair_, lba, backed_memory_, backed_memory_size_));
+  return FromStatus(
+      z_append(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
 }
 
-SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t size, size_t addr,
+SZDStatus SZDChannel::FlushBuffer(uint64_t *lba) {
+  return FlushBufferSection(lba, 0, backed_memory_size_, true);
+}
+
+SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t addr, size_t size,
                                      bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   if (addr + alligned_size > backed_memory_size_ ||
@@ -162,6 +170,13 @@ SZDStatus SZDChannel::ResetAllZones() const {
   } else {
     return FromStatus(SZD::z_reset(qpair_, 0, true));
   }
+}
+
+SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) const {
+  if (slba < min_lba_ || slba > max_lba_) {
+    return SZDStatus::InvalidArguments;
+  }
+  return FromStatus(z_get_zone_head(qpair_, slba, zone_head));
 }
 
 } // namespace SimpleZNSDeviceNamespace
