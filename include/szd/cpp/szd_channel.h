@@ -24,6 +24,13 @@ public:
   ~SZDChannel();
 
   /**
+   * @brief Get block-alligned size (ceiling).
+   */
+  constexpr uint64_t allign_size(uint64_t size) const {
+    return ((size + lba_size_ - 1) / lba_size_) * lba_size_;
+  }
+
+  /**
    * @brief Reserve a DMA backed buffer for SPDK.
    * Reducing overhead of reallocating memory for each I/O operation.
    */
@@ -62,9 +69,6 @@ public:
   SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head) const;
 
 private:
-  constexpr uint64_t allign_size(uint64_t size) const {
-    return ((size + lba_size_ - 1) / lba_size_) * lba_size_;
-  }
   QPair *qpair_;
   uint64_t lba_size_;
   uint64_t zone_size_;
