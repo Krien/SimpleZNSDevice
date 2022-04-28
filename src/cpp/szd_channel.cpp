@@ -112,7 +112,8 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t addr, size_t size,
       lba + size / lba_size_ > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(z_read(qpair_, lba, backed_memory_, alligned_size));
+  return FromStatus(
+      z_read(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
 }
 
 std::string SZDChannel::DebugBufferString() {
