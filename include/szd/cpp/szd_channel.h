@@ -77,6 +77,7 @@ private:
   bool can_access_all_;
   void *backed_memory_;
   size_t backed_memory_size_;
+  void *backed_memory_spill_;
 };
 } // namespace SimpleZNSDeviceNamespace
 

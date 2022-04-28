@@ -11,13 +11,16 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), min_lba_(min_lba), max_lba_(max_lba),
-      can_access_all_(true), backed_memory_(nullptr), backed_memory_size_(0) {
+      can_access_all_(true), backed_memory_(nullptr), backed_memory_size_(0),
+      backed_memory_spill_(nullptr) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
     min_lba_ = max_lba_;
   }
+  backed_memory_spill_ = z_calloc(qpair_, 1, lba_size_);
 }
+
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
     : SZDChannel(std::move(qpair), info, 0, info.lba_cap) {
   can_access_all_ = false;
@@ -27,6 +30,10 @@ SZDChannel::~SZDChannel() {
   if (backed_memory_size_ > 0 && backed_memory_ != nullptr) {
     z_free(qpair_, backed_memory_);
     backed_memory_ = nullptr;
+  }
+  if (backed_memory_spill_ != nullptr) {
+    z_free(qpair_, backed_memory_spill_);
+    backed_memory_spill_ = nullptr;
   }
   if (qpair_ != nullptr) {
     z_destroy_qpair(qpair_);
@@ -97,8 +104,23 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, uint64_t addr,
       *lba + size / lba_size_ > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(
-      z_append(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
+  if (alligned_size != size) {
+    uint64_t postfix_size = lba_size_ - (alligned_size - size);
+    alligned_size -= lba_size_;
+    int rc = 0;
+    if (alligned_size > 0) {
+      rc = z_append(qpair_, lba, (char *)backed_memory_ + addr, alligned_size);
+    }
+    memset((char *)backed_memory_spill_ + postfix_size, '\0',
+           lba_size_ - postfix_size);
+    memcpy(backed_memory_spill_, (char *)backed_memory_ + addr + alligned_size,
+           postfix_size);
+    rc = rc | z_append(qpair_, lba, backed_memory_spill_, lba_size_);
+    return FromStatus(rc);
+  } else {
+    return FromStatus(
+        z_append(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
+  }
 }
 
 SZDStatus SZDChannel::FlushBuffer(uint64_t *lba) {
@@ -112,8 +134,25 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t addr, size_t size,
       lba + size / lba_size_ > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(
-      z_read(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
+  if (alligned_size != size) {
+    uint64_t postfix_size = lba_size_ - (alligned_size - size);
+    alligned_size -= lba_size_;
+    int rc = 0;
+    if (alligned_size > 0) {
+      rc = z_read(qpair_, lba, (char *)backed_memory_ + addr, alligned_size);
+    }
+    rc = rc | z_read(qpair_, lba + alligned_size / lba_size_,
+                     (char *)backed_memory_spill_, lba_size_);
+    SZDStatus s = FromStatus(rc);
+    if (s == SZDStatus::Success) {
+      memcpy((char *)backed_memory_ + addr + alligned_size,
+             backed_memory_spill_, postfix_size);
+    }
+    return s;
+  } else {
+    return FromStatus(
+        z_read(qpair_, lba, (char *)backed_memory_ + addr, alligned_size));
+  }
 }
 
 std::string SZDChannel::DebugBufferString() {
