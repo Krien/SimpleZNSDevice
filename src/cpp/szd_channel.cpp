@@ -105,6 +105,9 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, uint64_t addr,
     return SZDStatus::InvalidArguments;
   }
   if (alligned_size != size) {
+    if (backed_memory_spill_ == nullptr) {
+      return SZDStatus::IOError;
+    }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
     alligned_size -= lba_size_;
     int rc = 0;
@@ -135,6 +138,9 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, size_t addr, size_t size,
     return SZDStatus::InvalidArguments;
   }
   if (alligned_size != size) {
+    if (backed_memory_spill_ == nullptr) {
+      return SZDStatus::IOError;
+    }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
     alligned_size -= lba_size_;
     int rc = 0;
