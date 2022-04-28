@@ -200,7 +200,7 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) const {
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(SZD::z_reset(qpair_, slba, false));
+  return FromStatus(SZD::z_reset(qpair_, slba));
 }
 
 SZDStatus SZDChannel::ResetAllZones() const {
@@ -214,7 +214,7 @@ SZDStatus SZDChannel::ResetAllZones() const {
     }
     return s;
   } else {
-    return FromStatus(SZD::z_reset(qpair_, 0, true));
+    return FromStatus(SZD::z_reset_all(qpair_));
   }
 }
 

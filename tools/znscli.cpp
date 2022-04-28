@@ -88,7 +88,8 @@ int parse_reset_zns(int argc, char **argv, SZD::DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  int rc = SZD::z_open(*manager, trid);
+  SZD::DeviceOpenOptions ooptions;
+  int rc = SZD::z_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
@@ -116,7 +117,11 @@ int parse_reset_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   } else {
     fprintf(stdout, "Resetting device %s at %lu \n", trid, (uint64_t)slba);
   }
-  rc = SZD::z_reset(*qpair, (uint64_t)slba, reset_all);
+  if (reset_all) {
+    rc = SZD::z_reset_all(*qpair);
+  } else {
+    rc = SZD::z_reset(*qpair, (uint64_t)slba);
+  }
   SZD::z_destroy_qpair(*qpair);
   free(qpair);
   SZD::z_destroy(*manager);
@@ -170,7 +175,8 @@ int parse_read_zns(int argc, char **argv, SZD::DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  int rc = SZD::z_open(*manager, trid);
+  SZD::DeviceOpenOptions ooptions;
+  int rc = SZD::z_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
@@ -288,7 +294,8 @@ int parse_write_zns(int argc, char **argv, SZD::DeviceManager **manager) {
     print_help_util();
     return 1;
   }
-  int rc = SZD::z_open(*manager, trid);
+  SZD::DeviceOpenOptions ooptions;
+  int rc = SZD::z_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     print_help_util();
@@ -401,7 +408,8 @@ int parse_info_zns(int argc, char **argv, SZD::DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  int rc = SZD::z_open(*manager, trid);
+  SZD::DeviceOpenOptions ooptions;
+  int rc = SZD::z_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     free(trid);
@@ -441,7 +449,8 @@ int parse_zones_zns(int argc, char **argv, SZD::DeviceManager **manager) {
   if (!trid_set) {
     return 1;
   }
-  int rc = SZD::z_open(*manager, trid);
+  SZD::DeviceOpenOptions ooptions;
+  int rc = SZD::z_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
     free(trid);

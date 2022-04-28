@@ -31,6 +31,8 @@ int z_init(DeviceManager **manager, DeviceOptions *options) {
                       .zone_size = 0,
                       .mdts = 0,
                       .zasl = 0,
+                      .min_lba = 0,
+                      .max_lba = 0,
                       .lba_cap = 0,
                       .name = options->name};
   return SZD_SC_SUCCESS;
@@ -115,7 +117,35 @@ void __z_open_remove_cb(void *cb_ctx, struct spdk_nvme_ctrlr *ctrlr) {
   (void)ctrlr;
 }
 
-int z_open(DeviceManager *manager, const char *traddr) {
+int __z_open_create_private(DeviceManager *manager,
+                            DeviceOpenOptions *options) {
+  uint64_t zone_min = options->min_zone;
+  uint64_t zone_max = options->max_zone;
+  uint64_t zone_max_allowed = manager->info.lba_cap / manager->info.zone_size;
+  if (zone_min != 0 && zone_min > zone_max_allowed) {
+    return SZD_SC_SPDK_ERROR_OPEN;
+  }
+  if (zone_max == 0) {
+    zone_max = zone_max_allowed;
+  } else {
+    zone_max = zone_max > zone_max_allowed ? zone_max_allowed : zone_max;
+  }
+  if (zone_min > zone_max) {
+    return SZD_SC_SPDK_ERROR_OPEN;
+  }
+  DeviceManagerInternal *private_ =
+      (DeviceManagerInternal *)calloc(1, sizeof(DeviceManagerInternal));
+  if (private_ == nullptr) {
+    return SZD_SC_NOT_ALLOCATED;
+  }
+  private_->zone_min_ = zone_min;
+  private_->zone_max_ = zone_max;
+  manager->private_ = (void *)private_;
+  return SZD_SC_SUCCESS;
+}
+
+int z_open(DeviceManager *manager, const char *traddr,
+           DeviceOpenOptions *options) {
   DeviceTarget prober = {.manager = manager,
                          .traddr = traddr,
                          .traddr_len = strlen(traddr),
@@ -132,7 +162,19 @@ int z_open(DeviceManager *manager, const char *traddr) {
   if (!prober.found) {
     return SZD_SC_SPDK_ERROR_OPEN;
   }
-  return z_get_device_info(&manager->info, manager);
+  int rc = z_get_device_info(&manager->info, manager);
+  if (rc != 0) {
+    return rc;
+  }
+  rc = __z_open_create_private(manager, options);
+  if (rc != 0) {
+    return rc;
+  }
+  // Create a container.
+  DeviceManagerInternal *private_ = (DeviceManagerInternal *)manager->private_;
+  manager->info.min_lba = private_->zone_min_ * manager->info.min_lba;
+  manager->info.max_lba = private_->zone_max_ * manager->info.lba_size;
+  return rc;
 }
 
 int z_close(DeviceManager *manager) {
@@ -146,8 +188,13 @@ int z_close(DeviceManager *manager) {
                    .zone_size = 0,
                    .mdts = 0,
                    .zasl = 0,
+                   .min_lba = 0,
+                   .max_lba = 0,
                    .lba_cap = 0,
                    .name = "\xef\xbe\xad\xde"};
+  if (manager->private_ != nullptr) {
+    free(manager->private_);
+  }
   return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
 }
 
@@ -316,6 +363,11 @@ int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   uint64_t current_step_size = step_size;
   Completion completion = {};
 
+  // Otherwise we have an out of range.
+  if (lba < info.min_lba || lba + lbas_to_process > info.max_lba) {
+    return SZD_SC_SPDK_ERROR_READ;
+  }
+
   while (lbas_processed < lbas_to_process) {
     // Read accross a zone border.
     if ((lba + lbas_processed + step_size) / info.zone_size >
@@ -367,6 +419,11 @@ int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   uint64_t current_step_size = step_size;
   Completion completion = {};
 
+  // Otherwise we have an out of range.
+  if (*lba < info.min_lba || *lba + lbas_to_process > info.max_lba) {
+    return SZD_SC_SPDK_ERROR_READ;
+  }
+
   while (lbas_processed < lbas_to_process) {
     // Append across a zone border.
     if ((*lba + lbas_processed + step_size) / info.zone_size >
@@ -407,13 +464,18 @@ int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   return SZD_SC_SUCCESS;
 }
 
-int z_reset(QPair *qpair, uint64_t slba, bool all) {
+int z_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.lba_cap) {
+    return SZD_SC_SPDK_ERROR_READ;
+  }
   Completion completion = {.done = false, .err = 0x00};
   int rc =
       spdk_nvme_zns_reset_zone(qpair->man->ns, qpair->qpair,
-                               slba, /* starting LBA of the zone to reset */
-                               all,  /* don't reset all zones */
+                               slba,  /* starting LBA of the zone to reset */
+                               false, /* don't reset all zones */
                                __reset_zone_complete, &completion);
   if (rc != 0) {
     return SZD_SC_SPDK_ERROR_RESET;
@@ -426,11 +488,51 @@ int z_reset(QPair *qpair, uint64_t slba, bool all) {
   return rc;
 }
 
+int z_reset_all(QPair *qpair) {
+  RETURN_ERR_ON_NULL(qpair);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  int rc = SZD_SC_SUCCESS;
+  // We can not do full reset, if we only "own" a  part.
+  if (info.min_lba > 0 || info.max_lba < info.lba_cap) {
+    // What are you doing?
+    if (info.min_lba > info.max_lba) {
+      return SZD_SC_SPDK_ERROR_RESET;
+    }
+    for (uint64_t slba = info.min_lba; slba < info.max_lba;
+         slba += info.zone_size) {
+      if ((rc = z_reset(qpair, slba)) != 0) {
+        return rc;
+      }
+    }
+  } else {
+    Completion completion = {.done = false, .err = 0x00};
+    rc = spdk_nvme_zns_reset_zone(qpair->man->ns, qpair->qpair,
+                                  0,    /* starting LBA of the zone to reset */
+                                  true, /* reset all zones */
+                                  __reset_zone_complete, &completion);
+    if (rc != 0) {
+      return SZD_SC_SPDK_ERROR_RESET;
+    }
+    // Busy wait
+    POLL_QPAIR(qpair->qpair, completion.done);
+    if (completion.err != 0) {
+      return SZD_SC_SPDK_ERROR_RESET;
+    }
+  }
+  return rc;
+}
+
 int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(qpair->man);
-  int rc = SZD_SC_SUCCESS;
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.max_lba) {
+    return SZD_SC_SPDK_ERROR_READ;
+  }
 
+  int rc = SZD_SC_SUCCESS;
   // Get information from a zone.
   size_t report_bufsize = spdk_nvme_ns_get_max_io_xfer_size(qpair->man->ns);
   uint8_t *report_buf = (uint8_t *)calloc(1, report_bufsize);

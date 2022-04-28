@@ -30,10 +30,19 @@ extern "C" {
  * @brief Options to pass to the ZNS device on initialisation.
  */
 typedef struct {
-  const char *name = "znsdevice"; // Name used by SPDK to identify application.
-  const bool setup_spdk = true;   // Set to false during reset.
-
+  const char *name =
+      "znsdevice"; /**< Name used by SPDK to identify application. */
+  const bool setup_spdk = true; /**< Set to false during reset. */
 } DeviceOptions;
+
+/**
+ * @brief Options to pick when opening a device.
+ */
+typedef struct {
+  const uint64_t min_zone = 0; /**< Minimum zone that is available to SZD. */
+  const uint64_t max_zone = 0; /**< Maximum zone that is available to SZD. 0
+                                  will default to maxzone. */
+} DeviceOpenOptions;
 
 /**
  * @brief Holds general information about a ZNS device.
@@ -44,9 +53,19 @@ typedef struct {
   uint64_t zone_size; /**<  Size of one zone in lbas.*/
   uint64_t mdts;      /**<  Maximum data transfer size in bytes.*/
   uint64_t zasl;      /**<  Maximum size of one append command in bytes.*/
+  uint64_t min_lba;   /**< Minumum lba that is allowed to be written to.*/
+  uint64_t max_lba;   /**< Maximum lba that is allowed to be written to.*/
   uint64_t lba_cap;   /**<  Amount of lbas available on the device.*/
   const char *name;   /**< Name used by SPDK to identify device.*/
 } DeviceInfo;
+
+/**
+ * @brief Do not touch, is to be used by Device Manager only
+ */
+typedef struct {
+  uint64_t zone_min_;
+  uint64_t zone_max_;
+} DeviceManagerInternal;
 
 /**
  * @brief General structure that aids in managing one ZNS namespace.
@@ -58,6 +77,7 @@ typedef struct {
   struct spdk_nvme_ctrlr *ctrlr; /**< Controller of the selected SSD*/
   spdk_nvme_ns *ns;              /**< Selected namespace of the selected SSD*/
   DeviceInfo info = {};          /**< Information of selected SSD*/
+  void *private_;                /**< To be used by SZD only */
 } DeviceManager;
 
 /**
@@ -130,7 +150,8 @@ int z_probe(DeviceManager *manager, ProbeInformation **probe_info);
  * @brief Opens a ZNS device, provided it exists and is a ZNS device.
  * This device is then set as the current device in the manager.
  */
-int z_open(DeviceManager *manager, const char *traddr);
+int z_open(DeviceManager *manager, const char *traddr,
+           DeviceOpenOptions *options);
 
 /**
  * @brief  If the manager holds a device, shut it down and free associated
@@ -190,9 +211,13 @@ int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size);
  * @brief Resets a zone synchronously, allowing it to be reused.
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to reset
- * @param all whether all zones should be reset or only the one at the slba
  */
-int z_reset(QPair *qpair, uint64_t slba, bool all);
+int z_reset(QPair *qpair, uint64_t slba);
+
+/**
+ * @brief Resets all zones within min and max lba.
+ */
+int z_reset_all(QPair *qpair);
 
 /**
  * @brief Gets the write head of a zone synchronously as a logical block
@@ -213,6 +238,8 @@ void __z_probe_attach_cb(void *cb_ctx,
                          const struct spdk_nvme_transport_id *trid,
                          struct spdk_nvme_ctrlr *ctrlr,
                          const struct spdk_nvme_ctrlr_opts *opts);
+
+int __z_open_create_private(DeviceManager *manager, DeviceOpenOptions *options);
 
 bool __z_open_probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
                        struct spdk_nvme_ctrlr_opts *opts);
