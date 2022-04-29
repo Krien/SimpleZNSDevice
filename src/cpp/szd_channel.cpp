@@ -12,7 +12,7 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), min_lba_(min_lba), max_lba_(max_lba),
       can_access_all_(true), backed_memory_(nullptr), backed_memory_size_(0),
-      backed_memory_spill_(nullptr) {
+      backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {

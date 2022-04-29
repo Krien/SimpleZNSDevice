@@ -23,11 +23,24 @@ public:
   SZDChannel &operator=(const SZDChannel &) = delete;
   ~SZDChannel();
 
+  constexpr uint8_t msb(uint64_t lba_size) const {
+    for (uint8_t bit = 0; bit < 64; bit++) {
+      if ((2 << bit) & lba_size) {
+        return bit + 1;
+      }
+    }
+    // Illegal, lba_size is always a power of 2 right?
+    return 0;
+  }
+
   /**
    * @brief Get block-alligned size (ceiling).
    */
   constexpr uint64_t allign_size(uint64_t size) const {
-    return ((size + lba_size_ - 1) / lba_size_) * lba_size_;
+    // Probably not a performance concern, but it sure is fun to program.
+    // If it does not work, use ((size + lba_size_-1)/lba_size_)*lba_size_))
+    uint64_t alligned = (size >> lba_msb_) << lba_msb_;
+    return alligned + !!(alligned ^ size) * lba_size_;
   }
 
   /**
@@ -78,6 +91,7 @@ private:
   void *backed_memory_;
   size_t backed_memory_size_;
   void *backed_memory_spill_;
+  uint64_t lba_msb_;
 };
 } // namespace SimpleZNSDeviceNamespace
 
