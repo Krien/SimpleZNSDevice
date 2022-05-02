@@ -6,7 +6,6 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <szd/szd_namespace.h> 
 #include <szd/szd.h>
 #include <unistd.h>
 

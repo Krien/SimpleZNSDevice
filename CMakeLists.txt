@@ -73,8 +73,8 @@ set(include_files_core
     "${include_dir}/szd.h"
 )
 set(src_files_core
-    "${src_dir}/szd_status_code.cpp"
-    "${src_dir}/szd.cpp"
+    "${src_dir}/szd_status_code.c"
+    "${src_dir}/szd.c"
 )
 set(include_dir_cpp "${include_dir}/cpp")
 set(src_dir_cpp "${src_dir}/cpp")
