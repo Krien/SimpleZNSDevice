@@ -101,7 +101,6 @@ add_library(szd_lib STATIC
     "${common_sources}"
 )
 target_include_directories(szd_lib PRIVATE "${SPDK_INCLUDE_DIRS}")
-target_include_directories(szd_lib PUBLIC "${include_dir}")
 target_link_libraries(szd_lib ${SPDK_LIBRARY_DEPENDENCIES})
 setup_szd_project_structure(szd_lib)
 
