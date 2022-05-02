@@ -15,6 +15,7 @@ extern "C" {
 #include <cstdint>
 #include <cstdio>
 #else
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #endif
@@ -26,6 +27,10 @@ typedef struct spdk_nvme_ctrlr_opts t_spdk_nvme_ctrlr_opts;
 typedef struct spdk_nvme_ns t_spdk_nvme_ns;
 typedef struct spdk_nvme_qpair t_spdk_nvme_qpair;
 typedef struct spdk_nvme_cpl t_spdk_nvme_cpl;
+typedef struct spdk_nvme_zns_ns_data t_spdk_nvme_zns_ns_data;
+typedef struct spdk_nvme_ns_data t_spdk_nvme_ns_data;
+typedef struct spdk_nvme_zns_ctrlr_data t_spdk_nvme_zns_ctrlr_data;
+typedef struct spdk_nvme_ctrlr_data t_spdk_nvme_ctrlr_data;
 
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
@@ -38,19 +43,20 @@ namespace SimpleZNSDeviceNamespace {
  * @brief Options to pass to the ZNS device on initialisation.
  */
 typedef struct {
-  const char *name =
-      "znsdevice"; /**< Name used by SPDK to identify application. */
-  const bool setup_spdk = true; /**< Set to false during reset. */
+  const char *name;      /**< Name used by SPDK to identify application. */
+  const bool setup_spdk; /**< Set to false during reset. */
 } DeviceOptions;
+extern const DeviceOptions DeviceOptions_default;
 
 /**
  * @brief Options to pick when opening a device.
  */
 typedef struct {
-  const uint64_t min_zone = 0; /**< Minimum zone that is available to SZD. */
-  const uint64_t max_zone = 0; /**< Maximum zone that is available to SZD. 0
+  const uint64_t min_zone; /**< Minimum zone that is available to SZD. */
+  const uint64_t max_zone; /**< Maximum zone that is available to SZD. 0
                                   will default to maxzone. */
 } DeviceOpenOptions;
+extern const DeviceOpenOptions DeviceOpenOptions_default;
 
 /**
  * @brief Holds general information about a ZNS device.
@@ -66,6 +72,7 @@ typedef struct {
   uint64_t max_lba;   /**< Maximum lba that is allowed to be written to.*/
   const char *name;   /**< Name used by SPDK to identify device.*/
 } DeviceInfo;
+extern const DeviceInfo DeviceInfo_default;
 
 /**
  * @brief Do not touch, is to be used by Device Manager only
@@ -74,6 +81,7 @@ typedef struct {
   uint64_t zone_min_;
   uint64_t zone_max_;
 } DeviceManagerInternal;
+extern const DeviceManagerInternal DeviceManagerInternal_default;
 
 /**
  * @brief General structure that aids in managing one ZNS namespace.
@@ -84,7 +92,7 @@ typedef struct {
       *g_trid;              /**< transport id used to communicate with SSD*/
   t_spdk_nvme_ctrlr *ctrlr; /**< Controller of the selected SSD*/
   t_spdk_nvme_ns *ns;       /**< Selected namespace of the selected SSD*/
-  DeviceInfo info = {};     /**< Information of selected SSD*/
+  DeviceInfo info;          /**< Information of selected SSD*/
   void *private_;           /**< To be used by SZD only */
 } DeviceManager;
 
@@ -102,9 +110,10 @@ typedef struct {
  * callbacks).
  */
 typedef struct {
-  bool done = false; /**< Synchronous call is done.*/
-  int err = 0;       /**< return code after call is done.*/
+  bool done; /**< Synchronous call is done.*/
+  int err;   /**< return code after call is done.*/
 } Completion;
+extern const Completion Completion_default;
 
 /**
  * @brief Structure used for identifying devices.

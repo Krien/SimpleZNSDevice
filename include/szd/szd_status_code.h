@@ -10,6 +10,8 @@
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 extern "C" {
+#else
+#include <stdbool.h>
 #endif
 
 /**

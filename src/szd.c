@@ -36,6 +36,7 @@
 
 #include <spdk/env.h>
 #include <spdk/nvme.h>
+#include <spdk/nvme_spec.h>
 #include <spdk/nvme_zns.h>
 #include <spdk/string.h>
 #include <spdk/util.h>
@@ -44,20 +45,32 @@
 extern "C" {
 #endif
 
-typedef spdk_nvme_transport_id t_spdk_nvme_transport_id;
-typedef spdk_nvme_ctrlr t_spdk_nvme_ctrlr;
-typedef spdk_nvme_ctrlr_opts t_spdk_nvme_ctrlr_opts;
-typedef spdk_nvme_ns t_spdk_nvme_ns;
-typedef spdk_nvme_qpair t_spdk_nvme_qpair;
-typedef spdk_nvme_cpl t_spdk_nvme_cpl;
+typedef struct spdk_nvme_transport_id t_spdk_nvme_transport_id;
+typedef struct spdk_nvme_ctrlr t_spdk_nvme_ctrlr;
+typedef struct spdk_nvme_ctrlr_opts t_spdk_nvme_ctrlr_opts;
+typedef struct spdk_nvme_ns t_spdk_nvme_ns;
+typedef struct spdk_nvme_qpair t_spdk_nvme_qpair;
+typedef struct spdk_nvme_cpl t_spdk_nvme_cpl;
+typedef struct spdk_nvme_zns_ns_data t_spdk_nvme_zns_ns_data;
+typedef struct spdk_nvme_ns_data t_spdk_nvme_ns_data;
+typedef struct spdk_nvme_zns_ctrlr_data t_spdk_nvme_zns_ctrlr_data;
+typedef struct spdk_nvme_ctrlr_data t_spdk_nvme_ctrlr_data;
+
+
 
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 #endif
 
+const DeviceOptions DeviceOptions_default = {"znsdevice", true};
+const DeviceOpenOptions DeviceOpenOptions_default = {0, 0};
+const Completion Completion_default = {false, SZD_SC_SUCCESS};
+const DeviceManagerInternal DeviceManagerInternal_default = {0, 0};
+const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, "SZD"};
+
 #define RETURN_ERR_ON_NULL(x)                                                  \
   do {                                                                         \
-    if ((x) == nullptr) {                                                      \
+    if ((x) == NULL) {                                                         \
       return (SZD_SC_NOT_ALLOCATED);                                           \
     }                                                                          \
   } while (0)
@@ -75,7 +88,7 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   }
   // Setup SPDK
   (*manager)->g_trid =
-      (spdk_nvme_transport_id *)calloc(1, sizeof(spdk_nvme_transport_id));
+      (t_spdk_nvme_transport_id *)calloc(1, sizeof(t_spdk_nvme_transport_id));
   RETURN_ERR_ON_NULL((*manager)->g_trid);
   spdk_nvme_trid_populate_transport((*manager)->g_trid,
                                     SPDK_NVME_TRANSPORT_PCIE);
@@ -84,14 +97,8 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
     return SZD_SC_SPDK_ERROR_INIT;
   }
   // setup stub info, we do not want to create extra UB.
-  (*manager)->info = {.lba_size = 0,
-                      .zone_size = 0,
-                      .mdts = 0,
-                      .zasl = 0,
-                      .lba_cap = 0,
-                      .min_lba = 0,
-                      .max_lba = 0,
-                      .name = options->name};
+  (*manager)->info = DeviceInfo_default;
+  (*manager)->info.name = options->name;
   return SZD_SC_SUCCESS;
 }
 
@@ -101,11 +108,11 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager->ctrlr);
   RETURN_ERR_ON_NULL(manager->ns);
   const struct spdk_nvme_ns_data *ns_data = spdk_nvme_ns_get_data(manager->ns);
-  const struct spdk_nvme_zns_ns_data *ns_data_zns =
+  const t_spdk_nvme_zns_ns_data *ns_data_zns =
       spdk_nvme_zns_ns_get_data(manager->ns);
-  const struct spdk_nvme_ctrlr_data *ctrlr_data =
+  const t_spdk_nvme_ctrlr_data *ctrlr_data =
       spdk_nvme_ctrlr_get_data(manager->ctrlr);
-  const spdk_nvme_zns_ctrlr_data *ctrlr_data_zns =
+  const t_spdk_nvme_zns_ctrlr_data *ctrlr_data_zns =
       spdk_nvme_zns_ctrlr_get_data(manager->ctrlr);
   union spdk_nvme_cap_register cap =
       spdk_nvme_ctrlr_get_regs_cap(manager->ctrlr);
@@ -195,6 +202,7 @@ int __szd_open_create_private(DeviceManager *manager,
   }
   DeviceManagerInternal *private_ =
       (DeviceManagerInternal *)calloc(1, sizeof(DeviceManagerInternal));
+  *private_ = DeviceManagerInternal_default;
   RETURN_ERR_ON_NULL(private_);
   private_->zone_min_ = zone_min;
   private_->zone_max_ = zone_max;
@@ -239,21 +247,15 @@ int szd_close(DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(manager->ctrlr);
   int rc = spdk_nvme_detach(manager->ctrlr);
-  manager->ctrlr = nullptr;
-  manager->ns = nullptr;
+  manager->ctrlr = NULL;
+  manager->ns = NULL;
   // Prevents wrongly assuming a device is attached.
-  manager->info = {.lba_size = 0,
-                   .zone_size = 0,
-                   .mdts = 0,
-                   .zasl = 0,
-                   .lba_cap = 0,
-                   .min_lba = 0,
-                   .max_lba = 0,
-                   .name = "\xef\xbe\xad\xde"};
-  if (manager->private_ != nullptr) {
+  manager->info = DeviceInfo_default;
+  manager->info.name = "\xef\xbe\xad\xde";
+  if (manager->private_ != NULL) {
     free(manager->private_);
   }
-  if (manager->g_trid != nullptr) {
+  if (manager->g_trid != NULL) {
     free(manager->g_trid);
   }
   return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
@@ -325,7 +327,7 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
   RETURN_ERR_ON_NULL(*probe);
   (*probe)->traddr = (char **)calloc(MAX_DEVICE_COUNT, sizeof(char *));
   (*probe)->ctrlr = (struct spdk_nvme_ctrlr **)calloc(
-      MAX_DEVICE_COUNT, sizeof(spdk_nvme_ctrlr *));
+      MAX_DEVICE_COUNT, sizeof(t_spdk_nvme_ctrlr *));
   (*probe)->zns = (bool *)calloc(MAX_DEVICE_COUNT, sizeof(bool));
   (*probe)->mut = (pthread_mutex_t *)calloc(1, sizeof(pthread_mutex_t));
   if (pthread_mutex_init((*probe)->mut, NULL) != 0) {
@@ -430,7 +432,7 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   // If lba_size > mdts, we have a big problem, but not because of the read.
   uint64_t step_size = (info.mdts / info.lba_size);
   uint64_t current_step_size = step_size;
-  Completion completion = {};
+  Completion completion = Completion_default;
 
   // Otherwise we have an out of range.
   if (lba < info.min_lba || lba + lbas_to_process > info.max_lba) {
@@ -486,7 +488,7 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   // If lba_size > zasl, we have a big problem, but not because of the append.
   uint64_t step_size = (info.zasl / info.lba_size);
   uint64_t current_step_size = step_size;
-  Completion completion = {};
+  Completion completion = Completion_default;
 
   // Otherwise we have an out of range.
   if (*lba < info.min_lba || *lba + lbas_to_process > info.max_lba) {
@@ -540,7 +542,7 @@ int szd_reset(QPair *qpair, uint64_t slba) {
   if (slba < info.min_lba || slba > info.lba_cap) {
     return SZD_SC_SPDK_ERROR_READ;
   }
-  Completion completion = {.done = false, .err = 0x00};
+  Completion completion = Completion_default;
   int rc =
       spdk_nvme_zns_reset_zone(qpair->man->ns, qpair->qpair,
                                slba,  /* starting LBA of the zone to reset */
@@ -575,7 +577,7 @@ int szd_reset_all(QPair *qpair) {
       }
     }
   } else {
-    Completion completion = {.done = false, .err = 0x00};
+    Completion completion = Completion_default;
     rc = spdk_nvme_zns_reset_zone(qpair->man->ns, qpair->qpair,
                                   0,    /* starting LBA of the zone to reset */
                                   true, /* reset all zones */
@@ -606,7 +608,7 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   size_t report_bufsize = spdk_nvme_ns_get_max_io_xfer_size(qpair->man->ns);
   uint8_t *report_buf = (uint8_t *)calloc(1, report_bufsize);
   {
-    Completion completion = {.done = false, .err = 0};
+    Completion completion = Completion_default;
     rc = spdk_nvme_zns_report_zones(
         qpair->man->ns, qpair->qpair, report_buf, report_bufsize, slba,
         SPDK_NVME_ZRA_LIST_ALL, true, __get_zone_head_complete, &completion);
