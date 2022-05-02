@@ -56,8 +56,6 @@ typedef struct spdk_nvme_ns_data t_spdk_nvme_ns_data;
 typedef struct spdk_nvme_zns_ctrlr_data t_spdk_nvme_zns_ctrlr_data;
 typedef struct spdk_nvme_ctrlr_data t_spdk_nvme_ctrlr_data;
 
-
-
 #ifdef __cplusplus
 namespace SimpleZNSDeviceNamespace {
 #endif
