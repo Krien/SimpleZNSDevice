@@ -1,9 +1,12 @@
+/** \file
+ * C++ Wrapper around SZD QPairs that aids in interacting with the device.
+ * */
+#pragma once
 #ifndef SZD_CPP_CHANNEL_H
 #define SZD_CPP_CHANNEL_H
 
 #include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
-#include "szd/szd_utils.h"
 
 #include <memory>
 #include <string>

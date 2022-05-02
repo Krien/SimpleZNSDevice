@@ -1,13 +1,13 @@
+/** \file
+ * SZD channel factory, allowing channels to be created at one point only.
+ * */
+#pragma once
 #ifndef SZD_CPP_CHANNEL_FACTORY_H
 #define SZD_CPP_CHANNEL_FACTORY_H
 
 #include "szd/cpp/szd_channel.h"
 #include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
-#include "szd/szd_utils.h"
-
-#include <memory>
-#include <string>
 
 namespace SimpleZNSDeviceNamespace {
 /**
@@ -25,7 +25,6 @@ public:
 
   inline void Ref() { ++refs_; }
   inline void Unref() {
-    assert(refs_ >= 1);
     if (--refs_ <= 0) {
       delete this;
     }

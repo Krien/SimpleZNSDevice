@@ -1,8 +1,8 @@
 # Specific
-bin/
-lib/
 build/
 out/
+bin/
+lib/
 # Documentation will waste our git space
 docs/generated/* 
 Doxyfile

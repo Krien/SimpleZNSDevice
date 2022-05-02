@@ -1,13 +1,68 @@
+/*-
+ *   BSD LICENSE
+ *
+ *   Copyright (c) Intel Corporation. All rights reserved.
+ *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
+ *
+ *   Redistribution and use in source and binary forms, with or without
+ *   modification, are permitted provided that the following conditions
+ *   are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided with the
+ *       distribution.
+ *     * Neither the name of Intel Corporation nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ *   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "szd/szd.h"
-#include "szd/szd_errno.h"
-#include "szd/szd_utils.h"
+#include "szd/szd_status_code.h"
+
+#include <spdk/env.h>
+#include <spdk/nvme.h>
+#include <spdk/nvme_zns.h>
+#include <spdk/string.h>
+#include <spdk/util.h>
 
 #ifdef __cplusplus
-namespace SimpleZNSDeviceNamespace {
 extern "C" {
 #endif
 
-int z_init(DeviceManager **manager, DeviceOptions *options) {
+typedef spdk_nvme_transport_id t_spdk_nvme_transport_id;
+typedef spdk_nvme_ctrlr t_spdk_nvme_ctrlr;
+typedef spdk_nvme_ctrlr_opts t_spdk_nvme_ctrlr_opts;
+typedef spdk_nvme_ns t_spdk_nvme_ns;
+typedef spdk_nvme_qpair t_spdk_nvme_qpair;
+typedef spdk_nvme_cpl t_spdk_nvme_cpl;
+
+#ifdef __cplusplus
+namespace SimpleZNSDeviceNamespace {
+#endif
+
+#define RETURN_ERR_ON_NULL(x)                                                  \
+  do {                                                                         \
+    if ((x) == nullptr) {                                                      \
+      return (SZD_SC_NOT_ALLOCATED);                                           \
+    }                                                                          \
+  } while (0)
+
+int szd_init(DeviceManager **manager, DeviceOptions *options) {
   RETURN_ERR_ON_NULL(options);
   RETURN_ERR_ON_NULL(manager);
   *manager = (DeviceManager *)calloc(1, sizeof(DeviceManager));
@@ -19,8 +74,10 @@ int z_init(DeviceManager **manager, DeviceOptions *options) {
     spdk_env_opts_init(&opts);
   }
   // Setup SPDK
-  (*manager)->g_trid = {};
-  spdk_nvme_trid_populate_transport(&(*manager)->g_trid,
+  (*manager)->g_trid =
+      (spdk_nvme_transport_id *)calloc(1, sizeof(spdk_nvme_transport_id));
+  RETURN_ERR_ON_NULL((*manager)->g_trid);
+  spdk_nvme_trid_populate_transport((*manager)->g_trid,
                                     SPDK_NVME_TRANSPORT_PCIE);
   if (spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0) {
     free(*manager);
@@ -31,14 +88,14 @@ int z_init(DeviceManager **manager, DeviceOptions *options) {
                       .zone_size = 0,
                       .mdts = 0,
                       .zasl = 0,
+                      .lba_cap = 0,
                       .min_lba = 0,
                       .max_lba = 0,
-                      .lba_cap = 0,
                       .name = options->name};
   return SZD_SC_SUCCESS;
 }
 
-int z_get_device_info(DeviceInfo *info, DeviceManager *manager) {
+int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   RETURN_ERR_ON_NULL(info);
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(manager->ctrlr);
@@ -52,6 +109,7 @@ int z_get_device_info(DeviceInfo *info, DeviceManager *manager) {
       spdk_nvme_zns_ctrlr_get_data(manager->ctrlr);
   union spdk_nvme_cap_register cap =
       spdk_nvme_ctrlr_get_regs_cap(manager->ctrlr);
+
   info->lba_size = 1UL << ns_data->lbaf[ns_data->flbas.format].lbads;
   info->zone_size = ns_data_zns->lbafe[ns_data->flbas.format].zsze;
   info->mdts = (uint64_t)1 << (12U + cap.bits.mpsmin + ctrlr_data->mdts);
@@ -60,12 +118,13 @@ int z_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   info->zasl = info->zasl == 0UL
                    ? info->mdts
                    : (uint64_t)1 << (12U + cap.bits.mpsmin + info->zasl);
-  info->lba_cap = ns_data->ncap;
+  manager->info.lba_cap = ns_data->ncap;
   return SZD_SC_SUCCESS;
 }
 
-bool __z_open_probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
-                       struct spdk_nvme_ctrlr_opts *opts) {
+bool __szd_open_probe_cb(void *cb_ctx,
+                         const struct spdk_nvme_transport_id *trid,
+                         struct spdk_nvme_ctrlr_opts *opts) {
   DeviceTarget *prober = (DeviceTarget *)cb_ctx;
   if (!prober->traddr) {
     return false;
@@ -85,9 +144,10 @@ bool __z_open_probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
   return true;
 }
 
-void __z_open_attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
-                        struct spdk_nvme_ctrlr *ctrlr,
-                        const struct spdk_nvme_ctrlr_opts *opts) {
+void __szd_open_attach_cb(void *cb_ctx,
+                          const struct spdk_nvme_transport_id *trid,
+                          struct spdk_nvme_ctrlr *ctrlr,
+                          const struct spdk_nvme_ctrlr_opts *opts) {
   DeviceTarget *prober = (DeviceTarget *)cb_ctx;
   if (prober == NULL) {
     return;
@@ -112,13 +172,13 @@ void __z_open_attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
   return;
 }
 
-void __z_open_remove_cb(void *cb_ctx, struct spdk_nvme_ctrlr *ctrlr) {
+void __szd_open_remove_cb(void *cb_ctx, struct spdk_nvme_ctrlr *ctrlr) {
   (void)cb_ctx;
   (void)ctrlr;
 }
 
-int __z_open_create_private(DeviceManager *manager,
-                            DeviceOpenOptions *options) {
+int __szd_open_create_private(DeviceManager *manager,
+                              DeviceOpenOptions *options) {
   uint64_t zone_min = options->min_zone;
   uint64_t zone_max = options->max_zone;
   uint64_t zone_max_allowed = manager->info.lba_cap / manager->info.zone_size;
@@ -135,49 +195,47 @@ int __z_open_create_private(DeviceManager *manager,
   }
   DeviceManagerInternal *private_ =
       (DeviceManagerInternal *)calloc(1, sizeof(DeviceManagerInternal));
-  if (private_ == nullptr) {
-    return SZD_SC_NOT_ALLOCATED;
-  }
+  RETURN_ERR_ON_NULL(private_);
   private_->zone_min_ = zone_min;
   private_->zone_max_ = zone_max;
   manager->private_ = (void *)private_;
   return SZD_SC_SUCCESS;
 }
 
-int z_open(DeviceManager *manager, const char *traddr,
-           DeviceOpenOptions *options) {
+int szd_open(DeviceManager *manager, const char *traddr,
+             DeviceOpenOptions *options) {
   DeviceTarget prober = {.manager = manager,
                          .traddr = traddr,
                          .traddr_len = strlen(traddr),
                          .found = false};
   // Find and open device
   int probe_ctx;
-  probe_ctx = spdk_nvme_probe(&manager->g_trid, &prober,
-                              (spdk_nvme_probe_cb)__z_open_probe_cb,
-                              (spdk_nvme_attach_cb)__z_open_attach_cb,
-                              (spdk_nvme_remove_cb)__z_open_remove_cb);
+  probe_ctx = spdk_nvme_probe(manager->g_trid, &prober,
+                              (spdk_nvme_probe_cb)__szd_open_probe_cb,
+                              (spdk_nvme_attach_cb)__szd_open_attach_cb,
+                              (spdk_nvme_remove_cb)__szd_open_remove_cb);
   if (probe_ctx != 0) {
     return SZD_SC_SPDK_ERROR_OPEN;
   }
   if (!prober.found) {
     return SZD_SC_SPDK_ERROR_OPEN;
   }
-  int rc = z_get_device_info(&manager->info, manager);
+  int rc = szd_get_device_info(&manager->info, manager);
   if (rc != 0) {
     return rc;
   }
-  rc = __z_open_create_private(manager, options);
+  rc = __szd_open_create_private(manager, options);
   if (rc != 0) {
     return rc;
   }
   // Create a container.
   DeviceManagerInternal *private_ = (DeviceManagerInternal *)manager->private_;
   manager->info.min_lba = private_->zone_min_ * manager->info.min_lba;
-  manager->info.max_lba = private_->zone_max_ * manager->info.lba_size;
+  manager->info.max_lba = private_->zone_max_ * manager->info.zone_size;
   return rc;
 }
 
-int z_close(DeviceManager *manager) {
+int szd_close(DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(manager->ctrlr);
   int rc = spdk_nvme_detach(manager->ctrlr);
@@ -188,51 +246,55 @@ int z_close(DeviceManager *manager) {
                    .zone_size = 0,
                    .mdts = 0,
                    .zasl = 0,
+                   .lba_cap = 0,
                    .min_lba = 0,
                    .max_lba = 0,
-                   .lba_cap = 0,
                    .name = "\xef\xbe\xad\xde"};
   if (manager->private_ != nullptr) {
     free(manager->private_);
   }
+  if (manager->g_trid != nullptr) {
+    free(manager->g_trid);
+  }
   return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
 }
 
-int z_destroy(DeviceManager *manager) {
+int szd_destroy(DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
   int rc = SZD_SC_SUCCESS;
   if (manager->ctrlr != NULL) {
-    rc = z_close(manager);
+    rc = szd_close(manager);
   }
   free(manager);
   spdk_env_fini();
   return rc;
 }
 
-int z_reinit(DeviceManager **manager) {
+int szd_reinit(DeviceManager **manager) {
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(*manager);
   const char *name = (*manager)->info.name;
-  int rc = z_destroy(*manager);
+  int rc = szd_destroy(*manager);
   if (rc != 0 || manager != NULL) {
     return rc | SZD_SC_SPDK_ERROR_CLOSE;
   }
   DeviceOptions options = {.name = name, .setup_spdk = false};
-  return z_init(manager, &options);
+  return szd_init(manager, &options);
 }
 
-bool __z_probe_probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
-                        struct spdk_nvme_ctrlr_opts *opts) {
+bool __szd_probe_probe_cb(void *cb_ctx,
+                          const struct spdk_nvme_transport_id *trid,
+                          struct spdk_nvme_ctrlr_opts *opts) {
   (void)cb_ctx;
   (void)trid;
   (void)opts;
   return true;
 }
 
-void __z_probe_attach_cb(void *cb_ctx,
-                         const struct spdk_nvme_transport_id *trid,
-                         struct spdk_nvme_ctrlr *ctrlr,
-                         const struct spdk_nvme_ctrlr_opts *opts) {
+void __szd_probe_attach_cb(void *cb_ctx,
+                           const struct spdk_nvme_transport_id *trid,
+                           struct spdk_nvme_ctrlr *ctrlr,
+                           const struct spdk_nvme_ctrlr_opts *opts) {
   ProbeInformation *prober = (ProbeInformation *)cb_ctx;
   // Very important lock! We probe concurrently and alter one struct.
   pthread_mutex_lock(prober->mut);
@@ -256,7 +318,7 @@ void __z_probe_attach_cb(void *cb_ctx,
   (void)opts;
 }
 
-int z_probe(DeviceManager *manager, ProbeInformation **probe) {
+int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(probe);
   *probe = (ProbeInformation *)calloc(1, sizeof(ProbeInformation));
@@ -270,9 +332,9 @@ int z_probe(DeviceManager *manager, ProbeInformation **probe) {
     return SZD_SC_SPDK_ERROR_PROBE;
   }
   int rc;
-  rc = spdk_nvme_probe(&manager->g_trid, *probe,
-                       (spdk_nvme_probe_cb)__z_probe_probe_cb,
-                       (spdk_nvme_attach_cb)__z_probe_attach_cb, NULL);
+  rc = spdk_nvme_probe(manager->g_trid, *probe,
+                       (spdk_nvme_probe_cb)__szd_probe_probe_cb,
+                       (spdk_nvme_attach_cb)__szd_probe_attach_cb, NULL);
   if (rc != 0) {
     return SZD_SC_SPDK_ERROR_PROBE;
   }
@@ -286,7 +348,7 @@ int z_probe(DeviceManager *manager, ProbeInformation **probe) {
   return rc != 0 ? SZD_SC_SPDK_ERROR_PROBE : SZD_SC_SUCCESS;
 }
 
-int z_create_qpair(DeviceManager *man, QPair **qpair) {
+int szd_create_qpair(DeviceManager *man, QPair **qpair) {
   RETURN_ERR_ON_NULL(man);
   RETURN_ERR_ON_NULL(qpair);
   *qpair = (QPair *)calloc(1, sizeof(QPair));
@@ -296,7 +358,7 @@ int z_create_qpair(DeviceManager *man, QPair **qpair) {
   return SZD_SC_SUCCESS;
 }
 
-int z_destroy_qpair(QPair *qpair) {
+int szd_destroy_qpair(QPair *qpair) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(qpair->qpair);
   spdk_nvme_ctrlr_free_io_qpair(qpair->qpair);
@@ -309,7 +371,7 @@ void *__reserve_dma(uint64_t size) {
   return spdk_zmalloc(size, 0, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
 }
 
-void *z_calloc(QPair *qpair, size_t __nmemb, size_t __size) {
+void *szd_calloc(QPair *qpair, size_t __nmemb, size_t __size) {
   size_t expanded_size = __nmemb * __size;
   size_t allign = (size_t)qpair->man->info.lba_size;
   if (expanded_size % allign != 0 || allign == 0) {
@@ -319,7 +381,7 @@ void *z_calloc(QPair *qpair, size_t __nmemb, size_t __size) {
                       SPDK_MALLOC_DMA);
 }
 
-void z_free(QPair *qpair, void *buffer) {
+void szd_free(QPair *qpair, void *buffer) {
   spdk_free(buffer);
   (void)qpair;
 }
@@ -349,7 +411,14 @@ void __get_zone_head_complete(void *arg,
   __operation_complete(arg, completion);
 }
 
-int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
+#define POLL_QPAIR(qpair, target)                                              \
+  do {                                                                         \
+    while (!(target)) {                                                        \
+      spdk_nvme_qpair_process_completions((qpair), 0);                         \
+    }                                                                          \
+  } while (0)
+
+int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -405,7 +474,7 @@ int z_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   return SZD_SC_SUCCESS;
 }
 
-int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
+int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -464,7 +533,7 @@ int z_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   return SZD_SC_SUCCESS;
 }
 
-int z_reset(QPair *qpair, uint64_t slba) {
+int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
@@ -488,7 +557,7 @@ int z_reset(QPair *qpair, uint64_t slba) {
   return rc;
 }
 
-int z_reset_all(QPair *qpair) {
+int szd_reset_all(QPair *qpair) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
@@ -501,7 +570,7 @@ int z_reset_all(QPair *qpair) {
     }
     for (uint64_t slba = info.min_lba; slba < info.max_lba;
          slba += info.zone_size) {
-      if ((rc = z_reset(qpair, slba)) != 0) {
+      if ((rc = szd_reset(qpair, slba)) != 0) {
         return rc;
       }
     }
@@ -523,7 +592,7 @@ int z_reset_all(QPair *qpair) {
   return rc;
 }
 
-int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
+int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(qpair->man);
   // Otherwise we have an out of range.
@@ -564,8 +633,12 @@ int z_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   return SZD_SC_SUCCESS;
 }
 
-void z_print_zns_status(int status) {
+void szd_print_zns_status(int status) {
   printf("SZS STATUS: %s\n", szd_status_code_msg(status));
+}
+
+long int szd_spdk_strtol(const char *nptr, int base) {
+  return spdk_strtol(nptr, base);
 }
 
 #ifdef __cplusplus

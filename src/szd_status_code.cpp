@@ -1,4 +1,4 @@
-#include "szd/szd_errno.h"
+#include "szd/szd_status_code.h"
 #include "szd/szd_namespace.h"
 
 #ifdef __cplusplus

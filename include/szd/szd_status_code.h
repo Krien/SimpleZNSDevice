@@ -1,6 +1,9 @@
+/** \file
+ * Status codes that can be returned by the SZD interface.
+ */
 #pragma once
-#ifndef SZD_ERRNO_H
-#define SZD_ERRNO_H
+#ifndef SZD_STATUS_CODE_H
+#define SZD_STATUS_CODE_H
 
 #include "szd/szd_namespace.h"
 

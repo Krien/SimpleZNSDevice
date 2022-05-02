@@ -3,10 +3,8 @@
 #include "szd/cpp/szd_channel.h"
 #include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
-#include "szd/szd_utils.h"
 
 #include <cassert>
-#include <string>
 
 namespace SimpleZNSDeviceNamespace {
 SZDChannelFactory::SZDChannelFactory(DeviceManager *device_manager,
@@ -19,7 +17,7 @@ SZDStatus SZDChannelFactory::register_raw_qpair(QPair **qpair) {
   if (channel_count_ >= max_channel_count_) {
     return SZDStatus::InvalidArguments;
   }
-  SZDStatus s = FromStatus(z_create_qpair(device_manager_, qpair));
+  SZDStatus s = FromStatus(szd_create_qpair(device_manager_, qpair));
   if (s == SZDStatus::Success) {
     channel_count_++;
   }
@@ -27,7 +25,7 @@ SZDStatus SZDChannelFactory::register_raw_qpair(QPair **qpair) {
 }
 
 SZDStatus SZDChannelFactory::unregister_raw_qpair(QPair *qpair) {
-  SZDStatus s = FromStatus(SZD::z_destroy_qpair(qpair));
+  SZDStatus s = FromStatus(szd_destroy_qpair(qpair));
   if (s == SZDStatus::Success) {
     channel_count_--;
   }
@@ -40,7 +38,7 @@ SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel) {
   }
   SZDStatus s;
   QPair **qpair = new QPair *;
-  if ((s = FromStatus(z_create_qpair(device_manager_, qpair))) !=
+  if ((s = FromStatus(szd_create_qpair(device_manager_, qpair))) !=
       SZDStatus::Success) {
     return s;
   }
@@ -59,7 +57,7 @@ SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
   }
   SZDStatus s;
   QPair **qpair = new QPair *;
-  if ((s = FromStatus(z_create_qpair(device_manager_, qpair))) !=
+  if ((s = FromStatus(szd_create_qpair(device_manager_, qpair))) !=
       SZDStatus::Success) {
     return s;
   }

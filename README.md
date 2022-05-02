@@ -9,7 +9,7 @@ SPDK needs to bind the device. Therefore ensure that your device is actually bin
 # How to use the SimpleZNSDevice
 SimpleZNSDevice is an interface that we can use to interface with the ZNS device through SPDK. It comes with an interface that allows to write to zones without worrying about SPDK internals. There are functions for reading lbas, writing lbas, erasing zones, getting write heads of zones and getting general device information. Functions for now are synchronous, but asynchronous functions may be added in the future.
 It can at the moment be used as a:
-* Shared library called `znsdevicelib`. For examples on how to use this lib, look in tools.
+* Shared library called `szd_lib`. For examples on how to use this lib, look in tools.
 
 # How to build
 There are multiple ways to built this project.
@@ -17,7 +17,6 @@ In principal only CMake and SPDK and its dependencies (DPDK, etc...) are needed.
 
 ## Setup dependencies
  The project already has SPDK as a submodule. SPDK itself also has submodules, so be sure to install those as well. For example by calling `git submodule update --init --recursive`. This should automatically use the version of SPDK that is tested with this project. This dependency then needs to be built as well, see [SPDK: Getting started](https://spdk.io/doc/getting_started.html). We do not use any additional configuration options. It is also possible to use a custom SPDK installation. To do this,  please set the SPDK dir path in an environment variable `SPDK_DIR`, otherwise the dir is not found, since there is no standard SPDK location.
-
 
 ## Example of building the project with CMake
 After dependencies are installed, it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. The next line is a minimal setup with CMake and make:
@@ -29,6 +28,14 @@ make <TARGET>
 if the output does not change, try cleaning the build first with:
 ```bash
 make clean
+```
+## Build or add tools
+Tools are not built by default. To allow tools to be set, these all need to be individually set. 
+This can be done by providing a ";" seperated list of desired tool directories to the CMake flag `SZD_TOOLS`. This unfortunately requires removing the CMakeCache.txt if not done from the start. For example:
+```bash
+rm -f CMakeCache.txt
+cmake -DSZD_TOOLS="szdcli" .
+# The rest is as usual
 ```
 
 <details>

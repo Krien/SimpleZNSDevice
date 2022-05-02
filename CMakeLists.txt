@@ -34,7 +34,7 @@ if (FSANITIZE)
 endif()
 
 # Sets up SPDK
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/LinkSPDK.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSPDK.cmake")
 link_directories("${SPDK_LIB_DIRS}")
 
 # Only set these vars, when it is included in another CMake
@@ -42,24 +42,19 @@ if(${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME})
 else()
     set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
     set(SPDK_LIBRARY_DEPENDENCIES "${SPDK_LIBRARY_DEPENDENCIES}" PARENT_SCOPE)
+    set(SPDK_INCLUDE_DIRS "${SPDK_INCLUDE_DIRS}" PARENT_SCOPE)
     # necessary to prevent issues when the upstream CMakeList.txt uses -Werror.
     string(REPLACE " -Werror" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-# Use for each library and executable
-function(SETUP_SPDK_PROJECT_STRUCTURE project_name)
+# Use for each library and executable, it ensures more homogenous builds.
+function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     set_target_properties(${project_name} PROPERTIES LINKER_LANGUAGE CXX)
     target_include_directories(${project_name} PUBLIC 
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
     )
-    target_include_directories(${project_name} PRIVATE src)
-    target_link_libraries(${project_name} ${SPDK_LIBRARY_DEPENDENCIES})
     set_property(TARGET ${project_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
-    target_compile_options(
-        ${project_name}
-        PUBLIC "${SPDK_CFLAGS};${DPDK_CFLAGS}"
-    )
     target_compile_options(
         ${project_name}
         PRIVATE "${BUILD_FLAGS}"
@@ -72,43 +67,68 @@ endfunction()
 
 set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/include/szd")
 set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(common_sources
+set(include_files_core
     "${include_dir}/szd_namespace.h"
-    "${include_dir}/szd_errno.h"
-    "${include_dir}/szd_utils.h"
+    "${include_dir}/szd_status_code.h"
     "${include_dir}/szd.h"
-    "${include_dir}/cpp/szd_channel.h"
+)
+set(src_files_core
+    "${src_dir}/szd_status_code.cpp"
     "${src_dir}/szd.cpp"
-    "${src_dir}/szd_errno.cpp"
-    "${src_dir}/cpp/szd_channel.cpp"
-    "${src_dir}/cpp/szd_channel_factory.cpp"
-    "${src_dir}/cpp/szd_status.cpp"
+)
+set(include_dir_cpp "${include_dir}/cpp")
+set(src_dir_cpp "${src_dir}/cpp")
+set(include_files_cpp
+    "${include_dir_cpp}/szd_status.h"
+    "${include_dir_cpp}/szd_channel.h"
+    "${include_dir_cpp}/szd_channel_factory.h"
+)
+set(src_files_cpp
+    "${src_dir_cpp}/szd_status.cpp"
+    "${src_dir_cpp}/szd_channel.cpp"
+    "${src_dir_cpp}/szd_channel_factory.cpp"
 )
 
-# Library
-add_library(znsdevice_lib STATIC
+set(common_sources
+    "${include_files_core}"
+    "${src_files_core}"
+    "${include_files_cpp}"
+    "${src_files_cpp}"
+)
+
+# Libraries...
+add_library(szd_lib STATIC
     "${common_sources}"
 )
-setup_spdk_project_structure(znsdevice_lib)
+target_include_directories(szd_lib PRIVATE "${SPDK_INCLUDE_DIRS}")
+target_link_libraries(szd_lib ${SPDK_LIBRARY_DEPENDENCIES})
+setup_szd_project_structure(szd_lib)
 
-# add_library(znsdevice_lib_shared SHARED
+#TODO: add shared lib
+# add_library(szd_lib_shared SHARED
 #     "${common_sources}"
 # )
-#setup_spdk_project_structure(znsdevice_lib_shared)
+#setup_spdk_project_structure(szd_lib_shared)
 
-# Standalone CLI
-add_executable(znscli
-    tools/znscli.cpp
-)
-target_link_libraries(znscli znsdevice_lib)
-setup_spdk_project_structure(znscli)
+# Tooling....
+set(tool_files)
+if (SZD_TOOLS)
+    string(REPLACE " " ";" TOOLS ${SZD_TOOLS})
+    foreach (tool ${TOOLS})
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}")
+        add_executable(${tool} "${${tool}_sources}")
+        setup_szd_project_structure(${tool})
+        target_link_libraries(${tool} szd_lib)
+        LIST(APPEND tool_files "${${tool}_sources}")
+    endforeach()
+endif()
 
-# Tests
+# Tests...
 add_executable(device_initial_test
     tests/device_initial_test.cpp
 )
-target_link_libraries(device_initial_test znsdevice_lib)
-setup_spdk_project_structure(device_initial_test)
+target_link_libraries(device_initial_test szd_lib)
+setup_szd_project_structure(device_initial_test)
 
 enable_testing()
 add_test(
@@ -116,6 +136,7 @@ add_test(
     COMMAND device_initial_test
 )
 
+# Formatting...
 # Default to "default" location of clang-format, override if necessary
 if(DEFINED ENV{CLANG_FORMAT_PATH})
     set(CLANG_FORMAT_PATH "$ENV{CLANG_PATH}")
@@ -129,10 +150,11 @@ add_custom_target(
     -i
     "-style=file"
     ${common_sources}
-    "./tools/*.cpp"
+    ${tool_files}
     COMMENT "Formatting files"
 )
 
+# Documentation...
 # We do not force the installation of Doxygen
 option(DOXYGEN "Allow generating documentation" OFF)
 if(DOXYGEN)
