@@ -82,12 +82,18 @@ set(include_files_cpp
     "${include_dir_cpp}/datastructures/szd_buffer.h"
     "${include_dir_cpp}/szd_channel.h"
     "${include_dir_cpp}/szd_channel_factory.h"
+    "${include_dir_cpp}/datastructures/szd_log.h"
+    "${include_dir_cpp}/datastructures/szd_once_log.h"
+    "${include_dir_cpp}/datastructures/szd_circular_log.h"
 )
 set(src_files_cpp
     "${src_dir_cpp}/szd_status.cpp"
     "${src_dir_cpp}/datastructures/szd_buffer.cpp"
     "${src_dir_cpp}/szd_channel.cpp"
     "${src_dir_cpp}/szd_channel_factory.cpp"
+    "${src_dir_cpp}/datastructures/szd_log.cpp"
+    "${src_dir_cpp}/datastructures/szd_once_log.cpp"
+    "${src_dir_cpp}/datastructures/szd_circular_log.cpp"
 )
 
 set(common_sources

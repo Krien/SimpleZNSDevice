@@ -19,7 +19,7 @@ public:
   SZDBuffer &operator=(const SZDBuffer &) = delete;
   ~SZDBuffer();
 
-  inline uint64_t GetBufferSize() const { return backed_memory_size_; }
+  inline size_t GetBufferSize() const { return backed_memory_size_; }
   inline std::string DebugBufferString() const {
     return std::string((const char *)backed_memory_, backed_memory_size_);
   }

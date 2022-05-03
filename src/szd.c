@@ -380,9 +380,7 @@ void *szd_calloc(uint64_t __allign, size_t __nmemb, size_t __size) {
                       SPDK_MALLOC_DMA);
 }
 
-void szd_free(void *buffer) {
-  spdk_free(buffer);
-}
+void szd_free(void *buffer) { spdk_free(buffer); }
 
 void __operation_complete(void *arg, const struct spdk_nvme_cpl *completion) {
   Completion *completed = (Completion *)arg;
@@ -627,6 +625,9 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   free(report_buf);
   if (*write_head < slba) {
     return SZD_SC_SPDK_ERROR_REPORT_ZONES;
+  }
+  if (*write_head > slba + info.zone_size) {
+    *write_head = slba + info.zone_size;
   }
   return SZD_SC_SUCCESS;
 }
