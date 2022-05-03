@@ -79,11 +79,13 @@ set(include_dir_cpp "${include_dir}/cpp")
 set(src_dir_cpp "${src_dir}/cpp")
 set(include_files_cpp
     "${include_dir_cpp}/szd_status.h"
+    "${include_dir_cpp}/datastructures/szd_buffer.h"
     "${include_dir_cpp}/szd_channel.h"
     "${include_dir_cpp}/szd_channel_factory.h"
 )
 set(src_files_cpp
     "${src_dir_cpp}/szd_status.cpp"
+    "${src_dir_cpp}/datastructures/szd_buffer.cpp"
     "${src_dir_cpp}/szd_channel.cpp"
     "${src_dir_cpp}/szd_channel_factory.cpp"
 )

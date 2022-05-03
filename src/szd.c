@@ -371,19 +371,17 @@ void *__reserve_dma(uint64_t size) {
   return spdk_zmalloc(size, 0, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
 }
 
-void *szd_calloc(QPair *qpair, size_t __nmemb, size_t __size) {
+void *szd_calloc(uint64_t __allign, size_t __nmemb, size_t __size) {
   size_t expanded_size = __nmemb * __size;
-  size_t allign = (size_t)qpair->man->info.lba_size;
-  if (expanded_size % allign != 0 || allign == 0) {
+  if (expanded_size % __allign != 0 || __allign == 0) {
     return NULL;
   }
-  return spdk_zmalloc(expanded_size, allign, NULL, SPDK_ENV_SOCKET_ID_ANY,
+  return spdk_zmalloc(expanded_size, __allign, NULL, SPDK_ENV_SOCKET_ID_ANY,
                       SPDK_MALLOC_DMA);
 }
 
-void szd_free(QPair *qpair, void *buffer) {
+void szd_free(void *buffer) {
   spdk_free(buffer);
-  (void)qpair;
 }
 
 void __operation_complete(void *arg, const struct spdk_nvme_cpl *completion) {

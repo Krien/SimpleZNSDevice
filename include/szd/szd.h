@@ -197,12 +197,12 @@ int szd_destroy_qpair(QPair *qpair);
  * @brief Custom calloc that uses DMA logic necessary for SPDK.
  * Must be alligned with the device lba_size (see DeviceInfo).
  */
-void *szd_calloc(QPair *qpair, size_t __nmemb, size_t __size);
+void *szd_calloc(uint64_t __allign, size_t __nmemb, size_t __size);
 
 /**
  * @brief Custom free that can free memory from z_calloc.
  */
-void szd_free(QPair *qpair, void *buffer);
+void szd_free(void *buffer);
 
 /**
  * @brief Reads n bytes synchronously from the ZNS device.
