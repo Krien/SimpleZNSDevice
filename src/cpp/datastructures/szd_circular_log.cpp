@@ -29,7 +29,7 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
   if (!SpaceLeft(alligned_size)) {
     return SZDStatus::IOError;
   }
-  uint64_t lbas = size / lba_size_;
+  uint64_t lbas = alligned_size / lba_size_;
   // 2 phase
   if (write_head_ < write_tail_ && write_head_ + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
@@ -41,7 +41,7 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
     // Wraparound
     write_head_ = min_zone_head_;
     s = channel_->DirectAppend(&write_head_, (void *)(data + first_phase_size),
-                               first_phase_size, alligned);
+                               size - first_phase_size, alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   } else {
     s = channel_->DirectAppend(&write_head_, (void *)data, size, alligned);
@@ -75,9 +75,9 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
     }
     // Wraparound
     write_head_ = min_zone_head_;
-    s = channel_->FlushBufferSection(
-        buffer, &write_head_, addr + first_phase_size,
-        alligned_size - first_phase_size, alligned);
+    s = channel_->FlushBufferSection(buffer, &write_head_,
+                                     addr + first_phase_size,
+                                     size - first_phase_size, alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   } else {
     s = channel_->FlushBufferSection(buffer, &write_head_, addr, size,
@@ -175,7 +175,7 @@ SZDStatus SZDCircularLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
     }
     s = channel_->ReadIntoBuffer(buffer, min_zone_head_,
                                  addr + first_phase_size,
-                                 alligned_size - first_phase_size, alligned);
+                                 size - first_phase_size, alligned);
     return s;
   } else {
     return channel_->ReadIntoBuffer(buffer, lba, addr, size, alligned);
@@ -281,6 +281,21 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   zone_head_ = (log_head / zone_size_) * zone_size_;
   zone_tail_ = write_tail_ = log_tail;
   return SZDStatus::Success;
+}
+
+bool SZDCircularLog::SpaceLeft(const size_t size) const {
+  uint64_t space;
+  // head got ahead of tail :)
+  if (write_head_ >= write_tail_) {
+    // [vvvvTZ-WT----------WZ-WHvvvvv]
+    uint64_t space_end = max_zone_head_ - write_head_;
+    uint64_t space_begin = zone_tail_ - min_zone_head_;
+    space = space_begin + space_end;
+  } else {
+    // [--WZ--WHvvvvvvvvTZ----WT---]
+    space = zone_tail_ - write_head_;
+  }
+  return channel_->allign_size(size) <= lba_size_ * space;
 }
 
 } // namespace SimpleZNSDeviceNamespace

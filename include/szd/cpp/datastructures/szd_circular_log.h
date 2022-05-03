@@ -36,14 +36,7 @@ public:
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
   bool Empty() const override { return write_head_ == min_zone_head_; }
-  bool SpaceLeft(const size_t size) const override {
-    uint64_t space_end = write_head_ >= zone_tail_
-                             ? max_zone_head_ - write_head_
-                             : zone_tail_ - write_head_;
-    uint64_t space_begin =
-        write_head_ >= zone_tail_ ? zone_tail_ - min_zone_head_ : 0;
-    return channel_->allign_size(size) <= lba_size_ * (space_begin + space_end);
-  }
+  bool SpaceLeft(const size_t size) const override;
   bool IsValidReadAddress(const uint64_t addr, const uint64_t lbas) const;
 
 private:
