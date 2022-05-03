@@ -9,7 +9,7 @@
 namespace SimpleZNSDeviceNamespace {
 
 SZDBuffer::SZDBuffer(size_t size, uint64_t lba_size)
-    : lba_size_(lba_size), backed_memory_size_(size) {
+    : lba_size_(lba_size), backed_memory_(nullptr), backed_memory_size_(size) {
   backed_memory_size_ =
       ((backed_memory_size_ + lba_size_ - 1) / lba_size_) * lba_size_;
   if (backed_memory_size_ != 0) {
@@ -21,7 +21,7 @@ SZDBuffer::SZDBuffer(size_t size, uint64_t lba_size)
   }
 }
 SZDBuffer::~SZDBuffer() {
-  if (backed_memory_ != nullptr) {
+  if (backed_memory_ != nullptr && backed_memory_size_ > 0) {
     szd_free(backed_memory_);
   }
 }
@@ -76,6 +76,7 @@ SZDStatus SZDBuffer::ReallocBuffer(uint64_t size) {
   }
   backed_memory_ = szd_calloc(lba_size_, alligned_size, sizeof(char));
   if (backed_memory_ == nullptr) {
+    backed_memory_size_ = 0;
     return SZDStatus::IOError;
   }
   backed_memory_size_ = alligned_size;
