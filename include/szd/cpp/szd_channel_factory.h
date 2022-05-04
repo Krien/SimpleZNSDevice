@@ -34,8 +34,8 @@ public:
   SZDStatus register_raw_qpair(QPair **qpair);
   SZDStatus unregister_raw_qpair(QPair *qpair);
   SZDStatus register_channel(SZDChannel **channel);
-  SZDStatus register_channel(SZDChannel **channel, uint64_t min_zone_head,
-                             uint64_t max_zone_head);
+  SZDStatus register_channel(SZDChannel **channel, uint64_t min_zone_nr,
+                             uint64_t max_zone_nr);
   SZDStatus unregister_channel(SZDChannel *channel);
 
 private:

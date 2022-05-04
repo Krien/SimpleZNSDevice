@@ -33,8 +33,8 @@ SZDStatus SZDChannelFactory::unregister_raw_qpair(QPair *qpair) {
 }
 
 SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
-                                              uint64_t min_zone_head,
-                                              uint64_t max_zone_head) {
+                                              uint64_t min_zone_nr,
+                                              uint64_t max_zone_nr) {
   if (channel_count_ >= max_channel_count_) {
     return SZDStatus::InvalidArguments;
   }
@@ -46,8 +46,8 @@ SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
   }
   *channel =
       new SZDChannel(std::unique_ptr<QPair>(*qpair), device_manager_->info,
-                     min_zone_head * device_manager_->info.zone_size,
-                     max_zone_head * device_manager_->info.zone_size);
+                     min_zone_nr * device_manager_->info.zone_size,
+                     max_zone_nr * device_manager_->info.zone_size);
 
   channel_count_++;
   delete qpair;

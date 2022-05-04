@@ -11,7 +11,8 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
     : SZDLog(channel_factory, info, min_zone_head, max_zone_head),
       zone_head_(min_zone_head) {
   channel_factory_->Ref();
-  channel_factory_->register_channel(&channel_, min_zone_head_, max_zone_head_);
+  channel_factory_->register_channel(&channel_, min_zone_head / info.zone_size,
+                                     max_zone_head_ / info.zone_size);
 }
 
 SZDOnceLog::~SZDOnceLog() {
