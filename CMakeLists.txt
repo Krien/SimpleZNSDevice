@@ -131,16 +131,17 @@ if (SZD_TOOLS)
 endif()
 
 # Tests...
-add_executable(device_initial_test
-    tests/device_initial_test.cpp
+set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+add_executable(szd_full_path_test
+    "${test_dir}/szd_full_path_test.c"
 )
-target_link_libraries(device_initial_test szd_lib)
-setup_szd_project_structure(device_initial_test)
+target_link_libraries(szd_full_path_test szd_lib)
+setup_szd_project_structure(szd_full_path_test)
 
 enable_testing()
 add_test(
     NAME device_initial_test_runner
-    COMMAND device_initial_test
+    COMMAND szd_full_path_test
 )
 
 # Formatting...

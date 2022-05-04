@@ -1,13 +1,15 @@
-#include "device.h"
-#include "utils.h"
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef NDEBUG
+#undef NDBEBUG
+#endif
+
+#include <assert.h>
+#include <szd/szd_namespace.h>
+#include <szd/szd.h>
 
 #define DEBUG
 #ifdef DEBUG
@@ -28,12 +30,12 @@ extern "C" {
 #define VALID(rc) assert((rc) == 0)
 #define INVALID(rc) assert((rc) != 0)
 
-int write_pattern(char **pattern, ZnsDevice::QPair *qpair, int32_t size,
+int write_pattern(char **pattern, QPair *qpair, int32_t size,
                   int32_t jump) {
   // if (*pattern != NULL) {
-  //   ZnsDevice::z_free(qpair, *pattern);
+  //   szd_free(*pattern);
   // }
-  *pattern = (char *)ZnsDevice::z_calloc(qpair, size, sizeof(char *));
+  *pattern = (char *)szd_calloc(qpair->man->info.lba_size, size, sizeof(char));
   if (*pattern == NULL) {
     return 1;
   }
@@ -44,7 +46,7 @@ int write_pattern(char **pattern, ZnsDevice::QPair *qpair, int32_t size,
 }
 
 typedef struct {
-  ZnsDevice::DeviceManager **manager;
+  DeviceManager **manager;
   uint64_t write_slba_start;
   uint64_t alt_slba_start;
   int32_t data_offset;
@@ -59,16 +61,16 @@ static uint8_t thread_barrier;
   pthread_mutex_unlock(&mut);
 
 /* There will be 2 threads. One writes, reads and resets the first zone a 1000
-times. The second one, the second zone. Then the two will switch around to see if
-they interfere. Hence the need for a barrier and a mutex.
+times. The second one, the second zone. Then the two will switch around to see
+if they interfere. Hence the need for a barrier and a mutex.
 */
 void *worker_thread(void *arg) {
   thread_data *dat = (thread_data *)arg;
-  ZnsDevice::DeviceManager **manager = dat->manager;
+  DeviceManager **manager = dat->manager;
   int rc;
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  QPair **qpair =
+      (QPair **)calloc(1, sizeof(QPair *));
+  rc = szd_create_qpair(*manager, qpair);
   if (rc != 0) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
     pthread_exit((void *)rc);
@@ -82,20 +84,21 @@ void *worker_thread(void *arg) {
     pthread_exit((void *)rc);
   }
   char *pattern_read_1 =
-      (char *)ZnsDevice::z_calloc(*qpair, zone_size_bytes, sizeof(char *));
+      (char *)szd_calloc((*qpair)->man->info.lba_size, zone_size_bytes, sizeof(char *));
   if (pattern_read_1 == NULL) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
     pthread_exit((void *)1);
   }
   // hammering
+  uint64_t wstart = dat->write_slba_start;
   for (int i = 0; i < 1000; i++) {
-    rc = ZnsDevice::z_append(*qpair, dat->write_slba_start, *pattern_1,
+    rc = szd_append(*qpair, &wstart, *pattern_1,
                              zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
       pthread_exit((void *)rc);
     }
-    rc = ZnsDevice::z_read(*qpair, dat->write_slba_start, pattern_read_1,
+    rc = szd_read(*qpair, dat->write_slba_start, pattern_read_1,
                            zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
@@ -108,7 +111,7 @@ void *worker_thread(void *arg) {
         pthread_exit((void *)rc);
       }
     }
-    rc = ZnsDevice::z_reset(*qpair, dat->write_slba_start, false);
+    rc = szd_reset(*qpair, dat->write_slba_start);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
       pthread_exit((void *)rc);
@@ -123,7 +126,7 @@ void *worker_thread(void *arg) {
   }
   pthread_mutex_unlock(&mut);
   rc = write_pattern(pattern_1, *qpair, zone_size_bytes, dat->alt_offset);
-  rc = ZnsDevice::z_read(*qpair, dat->alt_slba_start, pattern_read_1,
+  rc = szd_read(*qpair, dat->alt_slba_start, pattern_read_1,
                          zone_size_bytes);
   if (rc != 0) {
     pthread_exit((void *)rc);
@@ -138,24 +141,23 @@ void *worker_thread(void *arg) {
 }
 
 int main(int argc, char **argv) {
-  printf("----------------------LINKING----------------------\n");
-  int rc = ZnsDevice::__TEST_interface();
-  DEBUG_TEST_PRINT("interface setup ", rc);
-  assert(rc == 2022);
-
+  int rc;
   printf("----------------------INIT----------------------\n");
-  ZnsDevice::DeviceManager **manager =
-      (ZnsDevice::DeviceManager **)calloc(1, sizeof(ZnsDevice::DeviceManager));
-  rc = ZnsDevice::z_init(manager);
+  uint64_t min_zone = 2, max_zone = 10;
+  DeviceOpenOptions open_opts = { min_zone, max_zone };
+  DeviceManager **manager =
+      (DeviceManager **)calloc(1, sizeof(DeviceManager));
+  DeviceOptions opts = DeviceOptions_default;
+  rc = szd_init(manager, &opts);
   DEBUG_TEST_PRINT("SPDK init ", rc);
   VALID(rc);
 
   // find devices
   printf("----------------------PROBE----------------------\n");
   char *device_to_use;
-  ZnsDevice::ProbeInformation **prober = (ZnsDevice::ProbeInformation **)calloc(
-      1, sizeof(ZnsDevice::ProbeInformation *));
-  rc = ZnsDevice::z_probe(*manager, prober);
+  ProbeInformation **prober = (ProbeInformation **)calloc(
+      1, sizeof(ProbeInformation *));
+  rc = szd_probe(*manager, prober);
   DEBUG_TEST_PRINT("probe return code ", rc);
   VALID(rc);
   for (int i = 0; i < (*prober)->devices; i++) {
@@ -171,11 +173,10 @@ int main(int argc, char **argv) {
       strncpy(device_to_use, (*prober)->traddr[i],
               strlen((*prober)->traddr[i]));
     }
-    free((*prober)->traddr[i]);
   }
   (*prober)->devices = 0;
   // dangerous! we must be absolutely sure that no other process is using this
-  // anymore.ctrlr
+  // anymore.
   free((*prober)->mut);
   free((*prober)->ctrlr);
   free((*prober)->zns);
@@ -189,19 +190,20 @@ int main(int argc, char **argv) {
   printf("ZNS device %s found. This device will be used for the rest of the "
          "test.\n",
          device_to_use);
-  rc = ZnsDevice::z_reinit(manager);
-  DEBUG_TEST_PRINT("reinitialising ", rc);
+
+  rc = szd_reinit(manager);
+  DEBUG_TEST_PRINT("reinit return code ", rc);
   VALID(rc);
 
   // init spdk
   printf("----------------------OPENING DEVICE----------------------\n");
   // try non-existent device
-  rc = ZnsDevice::z_open(*manager, "non-existent traddr");
+  rc = szd_open(*manager, "non-existent traddr", &open_opts);
   DEBUG_TEST_PRINT("non-existent return code ", rc);
   INVALID(rc);
 
   // try existing device
-  rc = ZnsDevice::z_open(*manager, device_to_use);
+  rc = szd_open(*manager, device_to_use, &open_opts);
   DEBUG_TEST_PRINT("existing return code ", rc);
   VALID(rc);
   free(device_to_use);
@@ -216,16 +218,16 @@ int main(int argc, char **argv) {
   assert((*manager)->info.lba_cap > 0);
 
   // create qpair
-  ZnsDevice::QPair **qpair =
-      (ZnsDevice::QPair **)calloc(1, sizeof(ZnsDevice::QPair *));
-  rc = ZnsDevice::z_create_qpair(*manager, qpair);
+  QPair **qpair =
+      (QPair **)calloc(1, sizeof(QPair *));
+  rc = szd_create_qpair(*manager, qpair);
   DEBUG_TEST_PRINT("Qpair creation code ", rc);
   VALID(rc);
-  assert(qpair != nullptr);
+  assert(qpair != NULL);
 
   // get and verify data (based on ZNS QEMU image)
-  ZnsDevice::DeviceInfo info = {};
-  rc = ZnsDevice::z_get_device_info(&info, *manager);
+  DeviceInfo info = {};
+  rc = szd_get_device_info(&info, *manager);
   DEBUG_TEST_PRINT("get info code ", rc);
   VALID(rc);
   printf("lba size is %d\n", info.lba_size);
@@ -233,181 +235,191 @@ int main(int argc, char **argv) {
   printf("mdts is %d\n", info.mdts);
   printf("zasl is %d\n", info.zasl);
   printf("lba_cap is %d\n", info.lba_cap);
+  printf("min lba is %d\n", info.min_lba);
+  printf("max lba is %d\n", info.max_lba);
 
   uint64_t write_head;
+  uint64_t append_head;
   printf("----------------------WORKLOAD SMALL----------------------\n");
   // make space by resetting the device zones
-  rc = ZnsDevice::z_reset(*qpair, 0, true);
+  rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all code ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
+  DEBUG_TEST_PRINT("min zone head ", rc);
   VALID(rc);
-  assert(write_head == 0);
+  assert(write_head == min_zone*info.zone_size);
   char **pattern_1 = (char **)calloc(1, sizeof(char **));
   rc = write_pattern(pattern_1, *qpair, info.lba_size, 10);
   VALID(rc);
-  rc = ZnsDevice::z_append(*qpair, 0, *pattern_1, info.lba_size);
+  append_head = min_zone*info.zone_size;
+  rc = szd_append(*qpair, &append_head, *pattern_1, info.lba_size);
   DEBUG_TEST_PRINT("append alligned ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == 1);
+  assert(write_head == min_zone*info.zone_size + 1);
   char **pattern_2 = (char **)calloc(1, sizeof(char **));
   rc = write_pattern(pattern_2, *qpair, info.zasl, 13);
   VALID(rc);
-  rc = ZnsDevice::z_append(*qpair, 0, *pattern_2, info.zasl);
+  rc = szd_append(*qpair, &append_head, *pattern_2, info.zasl);
   DEBUG_TEST_PRINT("append zasl ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == 1 + info.zasl / info.lba_size);
+  assert(write_head == min_zone*info.zone_size + 1 + info.zasl / info.lba_size);
   char *pattern_read_1 =
-      (char *)ZnsDevice::z_calloc(*qpair, info.lba_size, sizeof(char *));
-  rc = ZnsDevice::z_read(*qpair, 0, pattern_read_1, info.lba_size);
+      (char *)szd_calloc((*qpair)->man->info.lba_size, info.lba_size, sizeof(char *));
+  rc = szd_read(*qpair, min_zone*info.zone_size, pattern_read_1, info.lba_size);
   DEBUG_TEST_PRINT("read alligned ", rc);
   VALID(rc);
   for (int i = 0; i < info.lba_size; i++) {
     assert((char *)(pattern_read_1)[i] == (char *)(*pattern_1)[i]);
   }
-  ZnsDevice::z_free(*qpair, *pattern_1);
-  ZnsDevice::z_free(*qpair, pattern_read_1);
+  szd_free(*pattern_1);
+  szd_free(pattern_read_1);
   char *pattern_read_2 =
-      (char *)ZnsDevice::z_calloc(*qpair, info.zasl, sizeof(char *));
-  rc = ZnsDevice::z_read(*qpair, 1, pattern_read_2, info.zasl);
+      (char *)szd_calloc((*qpair)->man->info.lba_size, info.zasl, sizeof(char *));
+  rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
   DEBUG_TEST_PRINT("read zasl ", rc);
   VALID(rc);
   for (int i = 0; i < info.zasl; i++) {
     assert((char *)(pattern_read_2)[i] == (char *)(*pattern_2)[i]);
   }
-  ZnsDevice::z_free(*qpair, *pattern_2);
-  rc = ZnsDevice::z_reset(*qpair, 0, true);
+  szd_free(*pattern_2);
+  rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_read(*qpair, 1, pattern_read_2, info.zasl);
+  rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
   DEBUG_TEST_PRINT("verify empty first zone ", rc);
   VALID(rc);
   for (int i = 0; i < info.zasl; i++) {
     assert((char *)(pattern_read_2)[i] == 0);
   }
-  ZnsDevice::z_free(*qpair, pattern_read_2);
+  szd_free(pattern_read_2);
 
+  append_head = min_zone*info.zone_size;
   printf("----------------------WORKLOAD FILL----------------------\n");
   char **pattern_3 = (char **)calloc(1, sizeof(char **));
-  rc = write_pattern(pattern_3, *qpair, info.lba_size*info.lba_cap, 19);
+  rc = write_pattern(pattern_3, *qpair, info.lba_size * info.lba_cap, 19);
   VALID(rc);
-  rc = ZnsDevice::z_append(*qpair, 0, *pattern_3, info.lba_size*info.lba_cap);
+  rc = szd_append(*qpair, &append_head, *pattern_3, info.lba_size * (info.max_lba - info.min_lba));
   DEBUG_TEST_PRINT("fill entire device ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_cap / info.zone_size; i++) {
-    rc = ZnsDevice::z_get_zone_head(*qpair, i * info.zone_size, &write_head);
+  for (uint64_t i = info.min_lba; i < info.max_lba; i+=info.zone_size) {
+    rc = szd_get_zone_head(*qpair, i, &write_head);
     VALID(rc);
-    assert(write_head == ~0lu);
+    assert(write_head == i + info.zone_size);
   }
-  ZnsDevice::z_free(*qpair, *pattern_3);
-  char *pattern_read_3 = (char *)ZnsDevice::z_calloc(
-      *qpair, info.lba_size * info.lba_cap, sizeof(char *));
+  szd_free(*pattern_3);
+  char *pattern_read_3 = (char *)szd_calloc(
+      (*qpair)->man->info.lba_size, info.lba_size * (info.max_lba - info.min_lba), sizeof(char *));
   assert(pattern_read_3 != NULL);
-  rc = ZnsDevice::z_read(*qpair, 0, pattern_read_3,
-                         info.lba_size * info.lba_cap);
+  rc = szd_read(*qpair, min_zone * info.zone_size, pattern_read_3,
+                         info.lba_size * (info.max_lba - info.min_lba));
   DEBUG_TEST_PRINT("read entire device ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * info.lba_cap; i++) {
+  for (int i = 0; i < info.lba_size * (info.max_lba - info.min_lba); i++) {
     assert((char *)(pattern_read_3)[i] == (char *)(*pattern_3)[i]);
   }
-  ZnsDevice::z_free(*qpair, pattern_read_3);
-  rc = ZnsDevice::z_reset(*qpair, info.zone_size, false);
-  rc = ZnsDevice::z_reset(*qpair, info.zone_size * 2, false) | rc;
+  szd_free(pattern_read_3);
+  rc = szd_reset(*qpair, min_zone*info.zone_size + info.zone_size);
+  rc = szd_reset(*qpair, min_zone*info.zone_size + info.zone_size * 2) | rc;
   DEBUG_TEST_PRINT("reset zone 2,3 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == ~0lu);
-  rc = ZnsDevice::z_get_zone_head(*qpair, info.zone_size, &write_head);
+  assert(write_head == min_zone*info.zone_size + info.zone_size);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == info.zone_size);
-  rc = ZnsDevice::z_get_zone_head(*qpair, info.zone_size * 2, &write_head);
+  assert(write_head == min_zone*info.zone_size + info.zone_size);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size * 2, &write_head);
   VALID(rc);
-  assert(write_head == info.zone_size * 2);
-  char *pattern_read_4 = (char *)ZnsDevice::z_calloc(
-      *qpair, info.lba_size * info.zone_size, sizeof(char *));
-  rc = ZnsDevice::z_read(*qpair, 0, pattern_read_4,
+  assert(write_head == min_zone*info.zone_size + info.zone_size * 2);
+  char *pattern_read_4 = (char *)szd_calloc(
+      (*qpair)->man->info.lba_size, info.lba_size * info.zone_size, sizeof(char *));
+  rc = szd_read(*qpair, info.zone_size * min_zone, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 1 ", rc);
   VALID(rc);
   for (int i = 0; i < info.lba_size * info.zone_size; i++) {
     assert((char *)(pattern_read_4)[i] == (char *)(*pattern_3)[i]);
   }
-  rc = ZnsDevice::z_read(*qpair, info.zone_size, pattern_read_4,
+  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 2 ", rc);
   VALID(rc);
   for (int i = 0; i < info.lba_size * info.zone_size; i++) {
     assert((char *)(pattern_read_4)[i] == 0);
   }
-  rc = ZnsDevice::z_read(*qpair, info.zone_size * 2, pattern_read_4,
+  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 2, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 3 ", rc);
   VALID(rc);
   for (int i = 0; i < info.lba_size * info.zone_size; i++) {
     assert((char *)(pattern_read_4)[i] == 0);
   }
-  rc = ZnsDevice::z_read(*qpair, info.zone_size * 3, pattern_read_4,
+  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 3, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 4 ", rc);
   VALID(rc);
-  // This ugly loop is necessary to prevent over-allocating DMA. We only want one lba at a time.
-  rc = write_pattern(pattern_3, *qpair, info.lba_size, 19+info.zone_size * 3 * info.lba_size);
+  // This ugly loop is necessary to prevent over-allocating DMA. We only want
+  // one lba at a time.
+  rc = write_pattern(pattern_3, *qpair, info.lba_size,
+                     19 + info.zone_size * 3 * info.lba_size);
   for (int i = 0; i < info.lba_size * info.zone_size; i++) {
-      if (i % info.lba_size == 0 && i > 0) {
-        ZnsDevice::z_free(*qpair, *pattern_3);
-        rc = write_pattern(pattern_3, *qpair, info.lba_size, 19+i+info.zone_size * 3 * info.lba_size);
-        VALID(rc);
-      }
-      assert((char *)(pattern_read_4)[i] ==
-           (char *)(*pattern_3)[i%info.lba_size]);
+    if (i % info.lba_size == 0 && i > 0) {
+      szd_free(*pattern_3);
+      rc = write_pattern(pattern_3, *qpair, info.lba_size,
+                         19 + i + info.zone_size * 3 * info.lba_size);
+      VALID(rc);
+    }
+    assert((char *)(pattern_read_4)[i] ==
+           (char *)(*pattern_3)[i % info.lba_size]);
   }
-  rc = ZnsDevice::z_reset(*qpair, 0, true);
+  rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
   VALID(rc);
 
+  append_head = min_zone*info.zone_size;
   printf("----------------------WORKLOAD ZONE EDGE----------------------\n");
-    rc = write_pattern(pattern_3, *qpair, info.lba_size*info.zone_size*2, 19);
-  rc = ZnsDevice::z_append(*qpair, 0, *pattern_3,
+  rc = write_pattern(pattern_3, *qpair, info.lba_size * info.zone_size * 2, 19);
+  rc = szd_append(*qpair, &append_head, *pattern_3,
                            info.lba_size * (info.zone_size - 3));
   DEBUG_TEST_PRINT("zone friction part 1: append 1 zoneborder - 3 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == info.zone_size - 3);
-  rc = ZnsDevice::z_append(*qpair, info.zone_size - 3,
+  assert(write_head == min_zone*info.zone_size + info.zone_size - 3);
+  rc = szd_append(*qpair, &append_head,
                            *pattern_3 + info.lba_size * (info.zone_size - 3),
                            info.lba_size * 6);
   DEBUG_TEST_PRINT("zone friction part 2: append 1 zoneborder + 6 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, 0, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == ~0lu);
-  rc = ZnsDevice::z_get_zone_head(*qpair, info.zone_size, &write_head);
+  assert(write_head == min_zone * info.zone_size + info.zone_size);
+  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == info.zone_size + 3);
-  rc = ZnsDevice::z_append(*qpair, info.zone_size + 3,
+  assert(write_head == min_zone * info.zone_size + info.zone_size + 3);
+  rc = szd_append(*qpair, &append_head,
                            *pattern_3 + info.lba_size * (info.zone_size + 3),
                            info.lba_size * 13);
   DEBUG_TEST_PRINT("zone friction part 3: append 1 zoneborder + 16 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_get_zone_head(*qpair, info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == info.zone_size + 16);
-  rc = ZnsDevice::z_read(*qpair, 0, pattern_read_4,
+  assert(write_head == min_zone*info.zone_size + info.zone_size + 16);
+  rc = szd_read(*qpair, min_zone * info.zone_size, pattern_read_4,
                          info.lba_size * (info.zone_size - 3));
   DEBUG_TEST_PRINT("zone friction part 4: read 1 zoneborder - 3 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_read(*qpair, info.zone_size - 3,
+  rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_size - 3,
                          pattern_read_4 + info.lba_size * (info.zone_size - 3),
                          info.lba_size * 6);
   DEBUG_TEST_PRINT("zone friction part 5: read 1 zoneborder + 3 ", rc);
   VALID(rc);
-  rc = ZnsDevice::z_read(*qpair, info.zone_size + 3,
+  rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_size + 3,
                          pattern_read_4 + info.lba_size * (info.zone_size + 3),
                          info.lba_size * 13);
   DEBUG_TEST_PRINT("zone friction part 6: read 1 zoneborder + 16 ", rc);
@@ -415,9 +427,9 @@ int main(int argc, char **argv) {
   for (int i = 0; i < info.lba_size * (info.zone_size + 15); i++) {
     assert((char *)(pattern_read_4)[i] == (char *)(*pattern_3)[i]);
   }
-  ZnsDevice::z_free(*qpair, *pattern_3);
-  ZnsDevice::z_free(*qpair, pattern_read_4);
-  rc = ZnsDevice::z_reset(*qpair, 0, true);
+  szd_free(*pattern_3);
+  szd_free(pattern_read_4);
+  rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
   VALID(rc);
 
@@ -428,8 +440,8 @@ int main(int argc, char **argv) {
   pthread_t thread1;
   void *ret1;
   thread_data first_thread_dat = {.manager = manager,
-                                  .write_slba_start = 0,
-                                  .alt_slba_start = info.zone_size,
+                                  .write_slba_start = min_zone*info.zone_size,
+                                  .alt_slba_start = min_zone*info.zone_size + info.zone_size,
                                   .data_offset = 3,
                                   .alt_offset = 9};
   rc = pthread_create(&thread1, NULL, worker_thread, (void *)&first_thread_dat);
@@ -437,8 +449,8 @@ int main(int argc, char **argv) {
   pthread_t thread2;
   void *ret2;
   thread_data second_thread_dat = {.manager = manager,
-                                   .write_slba_start = info.zone_size,
-                                   .alt_slba_start = 0,
+                                   .write_slba_start = min_zone*info.zone_size + info.zone_size,
+                                   .alt_slba_start = min_zone*info.zone_size,
                                    .data_offset = 3,
                                    .alt_offset = 0};
   rc =
@@ -458,21 +470,21 @@ int main(int argc, char **argv) {
 
   // destroy qpair
   printf("----------------------CLOSE----------------------\n");
-  rc = ZnsDevice::z_destroy_qpair(*qpair);
+  rc = szd_destroy_qpair(*qpair);
   DEBUG_TEST_PRINT("valid destroy code ", rc);
   VALID(rc);
 
   // close device
-  rc = ZnsDevice::z_close(*manager);
+  rc = szd_close(*manager);
   DEBUG_TEST_PRINT("valid close code ", rc);
   VALID(rc);
 
   // can not close twice
-  rc = ZnsDevice::z_close(*manager);
+  rc = szd_close(*manager);
   DEBUG_TEST_PRINT("invalid close code ", rc);
   INVALID(rc);
 
-  rc = ZnsDevice::z_shutdown(*manager);
+  rc = szd_destroy(*manager);
   DEBUG_TEST_PRINT("valid shutdown code ", rc);
   VALID(rc);
 
@@ -484,4 +496,7 @@ int main(int argc, char **argv) {
   free(qpair);
   free(manager);
 }
+
+#ifdef __cplusplus
 }
+#endif

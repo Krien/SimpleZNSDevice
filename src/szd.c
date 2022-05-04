@@ -123,7 +123,9 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   info->zasl = info->zasl == 0UL
                    ? info->mdts
                    : (uint64_t)1 << (12U + cap.bits.mpsmin + info->zasl);
-  manager->info.lba_cap = ns_data->ncap;
+  info->lba_cap = ns_data->ncap;
+  info->min_lba = manager->info.min_lba;
+  info->max_lba = manager->info.max_lba;
   return SZD_SC_SUCCESS;
 }
 
@@ -236,7 +238,7 @@ int szd_open(DeviceManager *manager, const char *traddr,
   }
   // Create a container.
   DeviceManagerInternal *private_ = (DeviceManagerInternal *)manager->private_;
-  manager->info.min_lba = private_->zone_min_ * manager->info.min_lba;
+  manager->info.min_lba = private_->zone_min_ * manager->info.zone_size;
   manager->info.max_lba = private_->zone_max_ * manager->info.zone_size;
   return rc;
 }
@@ -275,8 +277,8 @@ int szd_reinit(DeviceManager **manager) {
   RETURN_ERR_ON_NULL(*manager);
   const char *name = (*manager)->info.name;
   int rc = szd_destroy(*manager);
-  if (rc != 0 || manager != NULL) {
-    return rc | SZD_SC_SPDK_ERROR_CLOSE;
+  if (rc != 0) {
+    return SZD_SC_SPDK_ERROR_CLOSE;
   }
   DeviceOptions options = {.name = name, .setup_spdk = false};
   return szd_init(manager, &options);
@@ -350,8 +352,10 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
 
 int szd_create_qpair(DeviceManager *man, QPair **qpair) {
   RETURN_ERR_ON_NULL(man);
+  RETURN_ERR_ON_NULL(man->ctrlr);
   RETURN_ERR_ON_NULL(qpair);
   *qpair = (QPair *)calloc(1, sizeof(QPair));
+  RETURN_ERR_ON_NULL(*qpair);
   (*qpair)->qpair = spdk_nvme_ctrlr_alloc_io_qpair(man->ctrlr, NULL, 0);
   (*qpair)->man = man;
   RETURN_ERR_ON_NULL((*qpair)->qpair);
