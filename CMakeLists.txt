@@ -161,7 +161,8 @@ if (TESTING)
     # C++ tests
     set(test_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp")
     set(cpp_tests
-        "szd_device_test"    
+        "szd_device_test"
+        "szd_channel_test"
     )
     function(add_cpp_test filename dir)
     message("TEST ${filename}")

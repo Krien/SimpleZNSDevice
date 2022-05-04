@@ -68,19 +68,19 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
   // 2 phase
   if (write_head_ < write_tail_ && write_head_ + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
-    s = channel_->FlushBufferSection(buffer, &write_head_, addr,
+    s = channel_->FlushBufferSection(&write_head_, buffer, addr,
                                      first_phase_size);
     if (s != SZDStatus::Success) {
       return s;
     }
     // Wraparound
     write_head_ = min_zone_head_;
-    s = channel_->FlushBufferSection(buffer, &write_head_,
+    s = channel_->FlushBufferSection(&write_head_, buffer,
                                      addr + first_phase_size,
                                      size - first_phase_size, alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   } else {
-    s = channel_->FlushBufferSection(buffer, &write_head_, addr, size,
+    s = channel_->FlushBufferSection(&write_head_, buffer, addr, size,
                                      alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   }
@@ -100,17 +100,17 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
   // 2 phase
   if (write_head_ < write_tail_ && write_head_ + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
-    s = channel_->FlushBufferSection(buffer, &write_head_, 0, first_phase_size);
+    s = channel_->FlushBufferSection(&write_head_, buffer, 0, first_phase_size);
     if (s != SZDStatus::Success) {
       return s;
     }
     // Wraparound
     write_head_ = min_zone_head_;
-    s = channel_->FlushBufferSection(buffer, &write_head_, first_phase_size,
+    s = channel_->FlushBufferSection(&write_head_, buffer, first_phase_size,
                                      size - first_phase_size);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   } else {
-    s = channel_->FlushBuffer(buffer, &write_head_);
+    s = channel_->FlushBuffer(&write_head_, buffer);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   }
   if (lbas_ != nullptr) {
@@ -146,15 +146,15 @@ SZDStatus SZDCircularLog::Read(char *data, uint64_t lba, uint64_t size,
   // 2 phase
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
-    SZDStatus s = channel_->DirectRead(data, lba, first_phase_size, alligned);
+    SZDStatus s = channel_->DirectRead(lba, data, first_phase_size, alligned);
     if (s != SZDStatus::Success) {
       return s;
     }
-    s = channel_->DirectRead(data, min_zone_head_,
+    s = channel_->DirectRead(min_zone_head_, data,
                              alligned_size - first_phase_size, alligned);
     return s;
   } else {
-    return channel_->DirectRead(data, lba, alligned_size, alligned);
+    return channel_->DirectRead(lba, data, alligned_size, alligned);
   }
 }
 
@@ -169,16 +169,16 @@ SZDStatus SZDCircularLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
     SZDStatus s =
-        channel_->ReadIntoBuffer(buffer, lba, addr, first_phase_size, alligned);
+        channel_->ReadIntoBuffer(lba, buffer, addr, first_phase_size, alligned);
     if (s != SZDStatus::Success) {
       return s;
     }
-    s = channel_->ReadIntoBuffer(buffer, min_zone_head_,
+    s = channel_->ReadIntoBuffer(min_zone_head_, buffer,
                                  addr + first_phase_size,
                                  size - first_phase_size, alligned);
     return s;
   } else {
-    return channel_->ReadIntoBuffer(buffer, lba, addr, size, alligned);
+    return channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
   }
 }
 

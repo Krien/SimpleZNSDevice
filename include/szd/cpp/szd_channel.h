@@ -49,16 +49,16 @@ public:
   }
 
   // Buffer I/O Operations
-  SZDStatus FlushBuffer(const SZDBuffer &buffer, uint64_t *lba);
-  SZDStatus FlushBufferSection(const SZDBuffer &buffer, uint64_t *lba,
-                               uint64_t addr, uint64_t size,
+  SZDStatus FlushBuffer(uint64_t *lba, const SZDBuffer &buffer);
+  SZDStatus FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
+                               uint64_t section_addr, uint64_t section_size,
                                bool alligned = true);
-  SZDStatus ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba, size_t addr,
-                           size_t size, bool alligned = true);
+  SZDStatus ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer, size_t section_addr,
+                           size_t section_size, bool alligned = true);
   // Direct I/O Operations
   SZDStatus DirectAppend(uint64_t *lba, void *buffer, const uint64_t size,
                          bool alligned = true);
-  SZDStatus DirectRead(void *buffer, uint64_t lba, uint64_t size,
+  SZDStatus DirectRead(uint64_t lba, void *buffer, uint64_t size,
                        bool alligned = true);
   // Management of zones
   SZDStatus ResetZone(uint64_t slba);

@@ -47,7 +47,7 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
-  s = channel_->FlushBufferSection(buffer, &write_head_, addr, size, alligned);
+  s = channel_->FlushBufferSection(&write_head_, buffer, addr, size, alligned);
   zone_head_ = (write_head_ / zone_size_) * zone_size_;
   if (lbas != nullptr) {
     *lbas = write_head_ - write_head_old;
@@ -62,7 +62,7 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
-  s = channel_->FlushBuffer(buffer, &write_head_);
+  s = channel_->FlushBuffer(&write_head_, buffer);
   zone_head_ = (write_head_ / zone_size_) * zone_size_;
   if (lbas != nullptr) {
     *lbas = write_head_ - write_head_old;
@@ -73,19 +73,19 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
 SZDStatus SZDOnceLog::Read(char *data, uint64_t lba, uint64_t size,
                            bool alligned) {
   // No need for bounds checks, this is already done by channel.
-  return channel_->DirectRead(data, lba, size, alligned);
+  return channel_->DirectRead(lba, data, size, alligned);
 }
 
 SZDStatus SZDOnceLog::Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
                            bool alligned) {
   // No need for bounds checks, this is already done by channel.
-  return channel_->ReadIntoBuffer(buffer, lba, 0, size, alligned);
+  return channel_->ReadIntoBuffer(lba, buffer, 0, size, alligned);
 }
 
 SZDStatus SZDOnceLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
                            uint64_t lba, bool alligned) {
   // No need for bounds checks, this is already done by channel.
-  return channel_->ReadIntoBuffer(buffer, lba, addr, size, alligned);
+  return channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
 }
 
 SZDStatus SZDOnceLog::ResetAll() {
@@ -111,7 +111,6 @@ SZDStatus SZDOnceLog::RecoverPointers() {
        slba += zone_size_) {
     s = channel_->ZoneHead(slba, &zone_head);
     if (s != SZDStatus::Success) {
-      printf("wat wat wat\n");
       return s;
     }
     // head is at last zone that is not empty

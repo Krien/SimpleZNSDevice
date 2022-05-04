@@ -12,7 +12,7 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), min_lba_(min_lba), max_lba_(max_lba),
-      can_access_all_(true), backed_memory_spill_(nullptr),
+      can_access_all_(false), backed_memory_spill_(nullptr),
       lba_msb_(msb(info.lba_size)) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
@@ -24,7 +24,7 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
     : SZDChannel(std::move(qpair), info, 0, info.lba_cap) {
-  can_access_all_ = false;
+  can_access_all_ = true;
 }
 
 SZDChannel::~SZDChannel() {
@@ -37,13 +37,14 @@ SZDChannel::~SZDChannel() {
   }
 }
 
-SZDStatus SZDChannel::FlushBufferSection(const SZDBuffer &buffer, uint64_t *lba,
+SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
                                          uint64_t addr, uint64_t size,
                                          bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer.GetBufferSize();
   if (addr + alligned_size > available_size ||
-      *lba + size / lba_size_ > max_lba_) {
+      *lba + size / lba_size_ > max_lba_ ||
+      (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
   }
   void *cbuffer;
@@ -80,16 +81,17 @@ SZDStatus SZDChannel::FlushBufferSection(const SZDBuffer &buffer, uint64_t *lba,
   }
 }
 
-SZDStatus SZDChannel::FlushBuffer(const SZDBuffer &buffer, uint64_t *lba) {
-  return FlushBufferSection(buffer, lba, 0, buffer.GetBufferSize(), true);
+SZDStatus SZDChannel::FlushBuffer(uint64_t *lba, const SZDBuffer &buffer) {
+  return FlushBufferSection(lba, buffer, 0, buffer.GetBufferSize(), true);
 }
 
-SZDStatus SZDChannel::ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba,
+SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
                                      size_t addr, size_t size, bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer->GetBufferSize();
   if (addr + alligned_size > available_size ||
-      lba + size / lba_size_ > max_lba_) {
+      lba + size / lba_size_ > max_lba_ ||
+      (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
   }
   void *cbuffer;
@@ -115,7 +117,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba,
     mutex_.unlock();
     s = FromStatus(rc);
     if (s == SZDStatus::Success) {
-      memcpy((char *)buffer + addr + alligned_size, backed_memory_spill_,
+      memcpy((char *)cbuffer + addr + alligned_size, backed_memory_spill_,
              postfix_size);
     }
     return s;
@@ -131,7 +133,8 @@ SZDStatus SZDChannel::ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba,
 SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
                                    const uint64_t size, bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
-  if (*lba + alligned_size / lba_size_ > max_lba_) {
+  if (*lba + alligned_size / lba_size_ > max_lba_ ||
+      (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
   }
   void *dma_buffer = szd_calloc(lba_size_, 1, alligned_size);
@@ -146,9 +149,13 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   return s;
 }
 
-SZDStatus SZDChannel::DirectRead(void *buffer, uint64_t lba, uint64_t size,
+SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
                                  bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
+  if (lba + alligned_size / lba_size_ > max_lba_ ||
+      (alligned && size != allign_size(size))) {
+    return SZDStatus::InvalidArguments;
+  }
   void *buffer_dma = szd_calloc(lba_size_, 1, alligned_size);
   if (buffer_dma == nullptr) {
     return SZDStatus::IOError;
@@ -178,18 +185,13 @@ SZDStatus SZDChannel::ResetAllZones() {
   // There is no partial reset, reset the partial zones one by one.
   if (!can_access_all_) {
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
-      mutex_.lock();
       if ((s = ResetZone(slba)) != SZDStatus::Success) {
-        mutex_.unlock();
         return s;
       }
-      mutex_.unlock();
     }
     return s;
   } else {
-    mutex_.lock();
     s = FromStatus(szd_reset_all(qpair_));
-    mutex_.unlock();
     return s;
   }
 }
