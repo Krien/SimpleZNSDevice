@@ -28,10 +28,11 @@ public:
   ~SZDDevice();
   SZDStatus Init();
   SZDStatus Reinit();
-  SZDStatus Probe(std::vector<DeviceOpenInfo> &info) const;
+  SZDStatus Probe(std::vector<DeviceOpenInfo> &info);
   SZDStatus Open(const std::string &device_name, uint64_t min_zone,
                  uint64_t max_zone);
   SZDStatus Open(const std::string &device_name);
+  SZDStatus Close();
   SZDStatus GetInfo(DeviceInfo *info) const;
   SZDStatus Destroy();
 
@@ -40,7 +41,7 @@ public:
 private:
   const std::string application_name_;
   // state
-  bool initialised_spdk_;
+  bool initialised_device_;
   bool device_opened_;
   SZD::DeviceManager *manager_;
   std::string opened_device_;

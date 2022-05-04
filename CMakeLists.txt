@@ -110,7 +110,7 @@ add_library(szd_lib STATIC
     "${common_sources}"
 )
 target_include_directories(szd_lib PRIVATE "${SPDK_INCLUDE_DIRS}")
-target_link_libraries(szd_lib ${SPDK_LIBRARY_DEPENDENCIES})
+target_link_libraries(szd_lib PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
 setup_szd_project_structure(szd_lib)
 
 #TODO: add shared lib
@@ -127,24 +127,57 @@ if (SZD_TOOLS)
         add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}")
         add_executable(${tool} "${${tool}_sources}")
         setup_szd_project_structure(${tool})
-        target_link_libraries(${tool} szd_lib)
+        target_link_libraries(${tool} PUBLIC szd_lib)
         LIST(APPEND tool_files "${${tool}_sources}")
     endforeach()
 endif()
 
 # Tests...
-set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-add_executable(szd_full_path_test
-    "${test_dir}/szd_full_path_test.c"
-)
-target_link_libraries(szd_full_path_test szd_lib)
-setup_szd_project_structure(szd_full_path_test)
+option(TESTING "Turn on tests" OFF)
+if (TESTING)
+    enable_testing()
+    
+    # C tests
+    set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    add_executable(szd_full_path_test
+        "${test_dir}/szd_full_path_test.c"
+    )
+    target_link_libraries(szd_full_path_test PUBLIC szd_lib)
+    setup_szd_project_structure(szd_full_path_test)
+    add_test(
+        NAME szd_full_path_test_runner
+        COMMAND szd_full_path_test
+    )
 
-enable_testing()
-add_test(
-    NAME device_initial_test_runner
-    COMMAND szd_full_path_test
-)
+    # Setup GTests
+    include(GoogleTest)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    # C++ tests
+    set(test_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp")
+    set(cpp_tests
+        "szd_device_test"    
+    )
+    function(add_cpp_test filename dir)
+    message("TEST ${filename}")
+        add_executable("${filename}" "${dir}/${filename}.cpp")
+        target_link_libraries("${filename}" PRIVATE szd_lib gtest_main)
+        setup_szd_project_structure("${filename}")
+        gtest_add_tests(TARGET "${filename}")
+        add_test(
+            NAME "${filename}_runner"
+            COMMAND "${filename}"
+        )
+    endfunction()
+    foreach(cpp_test ${cpp_tests})
+        ADD_CPP_TEST("${cpp_test}" "${test_dir_cpp}")
+    endforeach()
+endif()
 
 # Formatting...
 # Default to "default" location of clang-format, override if necessary

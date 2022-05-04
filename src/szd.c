@@ -66,6 +66,11 @@ const Completion Completion_default = {false, SZD_SC_SUCCESS};
 const DeviceManagerInternal DeviceManagerInternal_default = {0, 0};
 const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, "SZD"};
 
+// Needed because of DPDK and reattaching, we need to remember what we have seen...
+static char* found_devices[MAX_DEVICE_COUNT];
+static size_t found_devices_len[MAX_DEVICE_COUNT];
+static size_t found_devices_number = 0;
+
 #define RETURN_ERR_ON_NULL(x)                                                  \
   do {                                                                         \
     if ((x) == NULL) {                                                         \
@@ -97,6 +102,9 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   // setup stub info, we do not want to create extra UB.
   (*manager)->info = DeviceInfo_default;
   (*manager)->info.name = options->name;
+  (*manager)->ctrlr = NULL;
+  (*manager)->ns = NULL;
+  (*manager)->private_ = NULL;
   return SZD_SC_SUCCESS;
 }
 
@@ -215,19 +223,42 @@ int szd_open(DeviceManager *manager, const char *traddr,
   DeviceTarget prober = {.manager = manager,
                          .traddr = traddr,
                          .traddr_len = strlen(traddr),
-                         .found = false};
-  // Find and open device
+                         .found = false};  
+  // This is needed because of DPDK not properly recognising reattached devices. So force traddr.
+  bool already_found_once = false;
+  for (size_t i = 0; i< found_devices_number; i++) {
+    if (found_devices_len[i] == strlen(traddr) && 
+      memcmp(found_devices[i], traddr, found_devices_len[i])) {
+        already_found_once = true;
+      }
+  }
+  if (already_found_once) {
+    memset(manager->g_trid, 0, sizeof(*(manager->g_trid)));
+	  spdk_nvme_trid_populate_transport(manager->g_trid, SPDK_NVME_TRANSPORT_PCIE);
+    memcpy(manager->g_trid->traddr, traddr, spdk_max(strlen(traddr), sizeof(manager->g_trid->traddr)));
+  }
+  // Find controller.
   int probe_ctx;
   probe_ctx = spdk_nvme_probe(manager->g_trid, &prober,
                               (spdk_nvme_probe_cb)__szd_open_probe_cb,
                               (spdk_nvme_attach_cb)__szd_open_attach_cb,
                               (spdk_nvme_remove_cb)__szd_open_remove_cb);
+  // Dettach if broken.
   if (probe_ctx != 0) {
-    return SZD_SC_SPDK_ERROR_OPEN;
+    if (manager->ctrlr != NULL) {
+        return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
+    } else {
+      return SZD_SC_SPDK_ERROR_OPEN;
+    }  
   }
   if (!prober.found) {
-    return SZD_SC_SPDK_ERROR_OPEN;
+    if (manager->ctrlr != NULL) {
+        return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
+    } else {
+      return SZD_SC_SPDK_ERROR_OPEN;
+    }
   }
+  // Setup information immediately.
   int rc = szd_get_device_info(&manager->info, manager);
   if (rc != 0) {
     return rc;
@@ -254,9 +285,10 @@ int szd_close(DeviceManager *manager) {
   manager->info.name = "\xef\xbe\xad\xde";
   if (manager->private_ != NULL) {
     free(manager->private_);
+    manager->private_ = NULL;
   }
   if (manager->g_trid != NULL) {
-    free(manager->g_trid);
+    memset(manager->g_trid, 0, sizeof(*(manager->g_trid)));
   }
   return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
 }
@@ -266,6 +298,10 @@ int szd_destroy(DeviceManager *manager) {
   int rc = SZD_SC_SUCCESS;
   if (manager->ctrlr != NULL) {
     rc = szd_close(manager);
+  }
+  if (manager->g_trid != NULL) {
+    free(manager->g_trid);
+    manager->g_trid = NULL;
   }
   free(manager);
   spdk_env_fini();
@@ -315,6 +351,21 @@ void __szd_probe_attach_cb(void *cb_ctx,
           spdk_nvme_ns_get_csi(ns) == SPDK_NVME_CSI_ZNS;
     }
     prober->devices++;
+    // hidden global state...
+    bool found = false;
+    for (size_t i = 0; i< found_devices_number; i++) {
+      if (found_devices_len[i] == strlen(trid->traddr) && 
+        memcmp(found_devices[i], trid->traddr, found_devices_len[i])) {
+          found = true;
+        }
+    }
+    if (!found) {
+      found_devices_len[found_devices_number] = strlen(trid->traddr);
+      found_devices[found_devices_number] = (char*)calloc(found_devices_len[found_devices_number], 
+        sizeof(char));
+      memcpy(found_devices[found_devices_number], trid->traddr, found_devices_len[found_devices_number]);
+      found_devices_number++;
+    }
   }
   pthread_mutex_unlock(prober->mut);
   (void)opts;
@@ -342,7 +393,7 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
   }
   // Thread safe removing of devices, they have already been probed.
   pthread_mutex_lock((*probe)->mut);
-  for (int i = 0; i < (*probe)->devices; i++) {
+  for (size_t i = 0; i < (*probe)->devices; i++) {
     // keep error message.
     rc = spdk_nvme_detach((*probe)->ctrlr[i]) | rc;
   }
