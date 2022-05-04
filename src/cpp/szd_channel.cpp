@@ -170,6 +170,7 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   mutex_.lock();
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
   mutex_.unlock();
+  return s;
 }
 
 SZDStatus SZDChannel::ResetAllZones() {
@@ -187,7 +188,7 @@ SZDStatus SZDChannel::ResetAllZones() {
     return s;
   } else {
     mutex_.lock();
-    SZDStatus s = FromStatus(szd_reset_all(qpair_));
+    s = FromStatus(szd_reset_all(qpair_));
     mutex_.unlock();
     return s;
   }
