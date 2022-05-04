@@ -59,17 +59,24 @@ SZDStatus SZDChannel::FlushBufferSection(const SZDBuffer &buffer, uint64_t *lba,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
+      mutex_.lock();
       rc = szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size);
+      mutex_.unlock();
     }
     memset((char *)backed_memory_spill_ + postfix_size, '\0',
            lba_size_ - postfix_size);
     memcpy(backed_memory_spill_, (char *)cbuffer + addr + alligned_size,
            postfix_size);
+    mutex_.lock();
     rc = rc | szd_append(qpair_, lba, backed_memory_spill_, lba_size_);
+    mutex_.unlock();
     return FromStatus(rc);
   } else {
-    return FromStatus(
+    mutex_.lock();
+    s = FromStatus(
         szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size));
+    mutex_.unlock();
+    return s;
   }
 }
 
@@ -98,10 +105,14 @@ SZDStatus SZDChannel::ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
+      mutex_.lock();
       rc = szd_read(qpair_, lba, (char *)cbuffer + addr, alligned_size);
+      mutex_.unlock();
     }
+    mutex_.lock();
     rc = rc | szd_read(qpair_, lba + alligned_size / lba_size_,
                        (char *)backed_memory_spill_, lba_size_);
+    mutex_.unlock();
     s = FromStatus(rc);
     if (s == SZDStatus::Success) {
       memcpy((char *)buffer + addr + alligned_size, backed_memory_spill_,
@@ -109,13 +120,16 @@ SZDStatus SZDChannel::ReadIntoBuffer(SZDBuffer *buffer, uint64_t lba,
     }
     return s;
   } else {
-    return FromStatus(
+    mutex_.lock();
+    s = FromStatus(
         szd_read(qpair_, lba, (char *)cbuffer + addr, alligned_size));
+    mutex_.unlock();
+    return s;
   }
 }
 
 SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
-                                   const uint64_t size, bool alligned) const {
+                                   const uint64_t size, bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   if (*lba + alligned_size / lba_size_ > max_lba_) {
     return SZDStatus::InvalidArguments;
@@ -125,19 +139,23 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     return SZDStatus::IOError;
   }
   memcpy(dma_buffer, buffer, size);
+  mutex_.lock();
   SZDStatus s = FromStatus(szd_append(qpair_, lba, dma_buffer, alligned_size));
+  mutex_.unlock();
   szd_free(dma_buffer);
   return s;
 }
 
 SZDStatus SZDChannel::DirectRead(void *buffer, uint64_t lba, uint64_t size,
-                                 bool alligned) const {
+                                 bool alligned) {
   uint64_t alligned_size = alligned ? size : allign_size(size);
   void *buffer_dma = szd_calloc(lba_size_, 1, alligned_size);
   if (buffer_dma == nullptr) {
     return SZDStatus::IOError;
   }
+  mutex_.lock();
   SZDStatus s = FromStatus(szd_read(qpair_, lba, buffer_dma, alligned_size));
+  mutex_.unlock();
   if (s == SZDStatus::Success) {
     memcpy(buffer, buffer_dma, size);
   }
@@ -145,33 +163,44 @@ SZDStatus SZDChannel::DirectRead(void *buffer, uint64_t lba, uint64_t size,
   return s;
 }
 
-SZDStatus SZDChannel::ResetZone(uint64_t slba) const {
+SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(szd_reset(qpair_, slba));
+  mutex_.lock();
+  SZDStatus s = FromStatus(szd_reset(qpair_, slba));
+  mutex_.unlock();
 }
 
-SZDStatus SZDChannel::ResetAllZones() const {
+SZDStatus SZDChannel::ResetAllZones() {
   SZDStatus s = SZDStatus::Success;
   // There is no partial reset, reset the partial zones one by one.
   if (!can_access_all_) {
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
+      mutex_.lock();
       if ((s = ResetZone(slba)) != SZDStatus::Success) {
+        mutex_.unlock();
         return s;
       }
+      mutex_.unlock();
     }
     return s;
   } else {
-    return FromStatus(szd_reset_all(qpair_));
+    mutex_.lock();
+    SZDStatus s = FromStatus(szd_reset_all(qpair_));
+    mutex_.unlock();
+    return s;
   }
 }
 
-SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) const {
+SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  return FromStatus(szd_get_zone_head(qpair_, slba, zone_head));
+  mutex_.lock();
+  SZDStatus s = FromStatus(szd_get_zone_head(qpair_, slba, zone_head));
+  mutex_.unlock();
+  return s;
 }
 
 } // namespace SimpleZNSDeviceNamespace

@@ -10,6 +10,7 @@
 #include "szd/szd.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace SimpleZNSDeviceNamespace {
@@ -56,13 +57,13 @@ public:
                            size_t size, bool alligned = true);
   // Direct I/O Operations
   SZDStatus DirectAppend(uint64_t *lba, void *buffer, const uint64_t size,
-                         bool alligned = true) const;
+                         bool alligned = true);
   SZDStatus DirectRead(void *buffer, uint64_t lba, uint64_t size,
-                       bool alligned = true) const;
+                       bool alligned = true);
   // Management of zones
-  SZDStatus ResetZone(uint64_t slba) const;
-  SZDStatus ResetAllZones() const;
-  SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head) const;
+  SZDStatus ResetZone(uint64_t slba);
+  SZDStatus ResetAllZones();
+  SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head);
 
 private:
   QPair *qpair_;
@@ -73,6 +74,7 @@ private:
   bool can_access_all_;
   void *backed_memory_spill_;
   uint64_t lba_msb_;
+  std::mutex mutex_;
 };
 } // namespace SimpleZNSDeviceNamespace
 
