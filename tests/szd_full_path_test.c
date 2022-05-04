@@ -1,16 +1,24 @@
 
+/**
+ * \file general tests for the core SZD source. 
+ * As it needs to deeply test state as well, the test is quite large and has unfortunately become messy.
+ * TODO: cleanup...
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// TODO: remove
 #ifdef NDEBUG
 #undef NDBEBUG
 #endif
 
+// TODO: use a testing framework or something else than raw assert
 #include <assert.h>
 #include <szd/szd_namespace.h>
 #include <szd/szd.h>
 
+// TODO: disable by default
 #define DEBUG
 #ifdef DEBUG
 #define DEBUG_TEST_PRINT(str, code)                                            \
@@ -468,8 +476,8 @@ int main(int argc, char **argv) {
   DEBUG_TEST_PRINT("thread 3 writes and reads ", ret2);
   VALID(ret2);
 
-  // destroy qpair
   printf("----------------------CLOSE----------------------\n");
+  // destroy qpair
   rc = szd_destroy_qpair(*qpair);
   DEBUG_TEST_PRINT("valid destroy code ", rc);
   VALID(rc);
