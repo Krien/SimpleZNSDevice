@@ -17,7 +17,7 @@ namespace SimpleZNSDeviceNamespace {
 class SZDLog {
 public:
   SZDLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-         const uint64_t min_zone_head, const uint64_t max_zone_head);
+         const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   SZDLog(const SZDLog &) = delete;
   SZDLog &operator=(const SZDLog &) = delete;
   virtual ~SZDLog() = default;
@@ -29,12 +29,12 @@ public:
                            uint64_t *lbas = nullptr) = 0;
   virtual SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                            uint64_t *lbas = nullptr, bool alligned = true) = 0;
-  virtual SZDStatus Read(char *data, uint64_t lba, uint64_t size,
+  virtual SZDStatus Read(uint64_t lba, char *data, uint64_t size,
                          bool alligned = true) = 0;
-  virtual SZDStatus Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
+  virtual SZDStatus Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                          bool alligned = true) = 0;
-  virtual SZDStatus Read(SZDBuffer *buffer, size_t addr, size_t size,
-                         uint64_t lba, bool alligned = true) = 0;
+  virtual SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
+                         size_t size, bool alligned = true) = 0;
   virtual SZDStatus ResetAll() = 0;
   virtual SZDStatus RecoverPointers() = 0;
   virtual bool Empty() const = 0;

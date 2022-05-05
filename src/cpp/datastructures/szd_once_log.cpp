@@ -6,13 +6,12 @@
 
 namespace SimpleZNSDeviceNamespace {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
-                       const DeviceInfo &info, const uint64_t min_zone_head,
-                       const uint64_t max_zone_head)
-    : SZDLog(channel_factory, info, min_zone_head, max_zone_head),
-      zone_head_(min_zone_head) {
+                       const DeviceInfo &info, const uint64_t min_zone_nr,
+                       const uint64_t max_zone_nr)
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+      zone_head_(min_zone_nr * info.zone_size) {
   channel_factory_->Ref();
-  channel_factory_->register_channel(&channel_, min_zone_head / info.zone_size,
-                                     max_zone_head_ / info.zone_size);
+  channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
 }
 
 SZDOnceLog::~SZDOnceLog() {
@@ -71,21 +70,27 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
   return s;
 }
 
-SZDStatus SZDOnceLog::Read(char *data, uint64_t lba, uint64_t size,
+SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
                            bool alligned) {
-  // No need for bounds checks, this is already done by channel.
+  if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
+    return SZDStatus::InvalidArguments;
+  }
   return channel_->DirectRead(lba, data, size, alligned);
 }
 
-SZDStatus SZDOnceLog::Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
+SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                            bool alligned) {
-  // No need for bounds checks, this is already done by channel.
+  if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
+    return SZDStatus::InvalidArguments;
+  }
   return channel_->ReadIntoBuffer(lba, buffer, 0, size, alligned);
 }
 
-SZDStatus SZDOnceLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
-                           uint64_t lba, bool alligned) {
-  // No need for bounds checks, this is already done by channel.
+SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
+                           size_t size, bool alligned) {
+  if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
+    return SZDStatus::InvalidArguments;
+  }
   return channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
 }
 
@@ -107,7 +112,7 @@ SZDStatus SZDOnceLog::ResetAll() {
 SZDStatus SZDOnceLog::RecoverPointers() {
   SZDStatus s;
   uint64_t write_head = min_zone_head_;
-  uint64_t zone_head = min_zone_head_, old_zone_head = min_zone_head_;
+  uint64_t zone_head = min_zone_head_;
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_size_) {
     s = channel_->ZoneHead(slba, &zone_head);
@@ -126,6 +131,10 @@ SZDStatus SZDOnceLog::RecoverPointers() {
   write_head_ = write_head;
   zone_head_ = (write_head_ / zone_size_) * zone_size_;
   return SZDStatus::Success;
+}
+
+bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
+  return lba >= min_zone_head_ && lba + lbas <= write_head_;
 }
 
 } // namespace SimpleZNSDeviceNamespace

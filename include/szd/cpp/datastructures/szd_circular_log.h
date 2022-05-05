@@ -18,7 +18,7 @@ namespace SimpleZNSDeviceNamespace {
 class SZDCircularLog : public SZDLog {
 public:
   SZDCircularLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-                 const uint64_t min_zone_head, const uint64_t max_zone_head);
+                 const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   ~SZDCircularLog() override;
   SZDStatus Append(const std::string string, uint64_t *lbas = nullptr) override;
   SZDStatus Append(const char *data, const size_t size,
@@ -26,11 +26,11 @@ public:
   SZDStatus Append(const SZDBuffer &buffer, uint64_t *lbas = nullptr) override;
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                    uint64_t *lbas = nullptr, bool alligned = true) override;
-  SZDStatus Read(char *data, uint64_t lba, uint64_t size,
+  SZDStatus Read(uint64_t lba, char *data, uint64_t size,
                  bool alligned = true) override;
-  SZDStatus Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
+  SZDStatus Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                  bool alligned = true) override;
-  SZDStatus Read(SZDBuffer *buffer, size_t addr, size_t size, uint64_t lba,
+  SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr, size_t size,
                  bool alligned = true) override;
   SZDStatus ConsumeTail(uint64_t begin_lba, uint64_t end_lba);
   SZDStatus ResetAll() override;

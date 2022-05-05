@@ -18,7 +18,7 @@ namespace SimpleZNSDeviceNamespace {
 class SZDOnceLog : public SZDLog {
 public:
   SZDOnceLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-             const uint64_t min_zone_head, const uint64_t max_zone_head);
+             const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   ~SZDOnceLog() override;
   SZDStatus Append(const std::string string, uint64_t *lbas = nullptr) override;
   SZDStatus Append(const char *data, const size_t size,
@@ -26,20 +26,21 @@ public:
   SZDStatus Append(const SZDBuffer &buffer, uint64_t *lbas = nullptr) override;
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                    uint64_t *lbas = nullptr, bool alligned = true) override;
-  SZDStatus Read(char *data, uint64_t lba, uint64_t size,
+  SZDStatus Read(uint64_t lba, char *data, uint64_t size,
                  bool alligned = true) override;
-  SZDStatus Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
+  SZDStatus Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                  bool alligned = true) override;
-  SZDStatus Read(SZDBuffer *buffer, size_t addr, size_t size, uint64_t lba,
+  SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr, size_t size,
                  bool alligned = true) override;
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
   bool Empty() const override { return write_head_ == min_zone_head_; }
   bool SpaceLeft(const size_t size) const override {
-    return write_head_ + size / lba_size_ < max_zone_head_;
+    return write_head_ + size / lba_size_ <= max_zone_head_;
   }
 
 private:
+  bool IsValidAddress(uint64_t lba, uint64_t lbas);
   // log
   uint64_t zone_head_;
   // references

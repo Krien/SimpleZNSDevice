@@ -163,9 +163,10 @@ if (TESTING)
     set(cpp_tests
         "szd_device_test"
         "szd_channel_test"
+        "szd_once_log_test"
+        "szd_circular_log_test"
     )
     function(add_cpp_test filename dir)
-    message("TEST ${filename}")
         add_executable("${filename}" "${dir}/${filename}.cpp")
         target_link_libraries("${filename}" PRIVATE szd_lib gtest_main)
         setup_szd_project_structure("${filename}")

@@ -1,3 +1,4 @@
+#include "szd_test_util.h"
 #include <gtest/gtest.h>
 #include <szd/cpp/szd_channel.h>
 #include <szd/cpp/szd_channel_factory.h>
@@ -12,32 +13,10 @@ namespace {
 
 class SZDChannelTest : public ::testing::Test {};
 
-void CreatePattern(char *arr, size_t range, uint64_t jump) {
-  for (size_t i = 0; i < range; i++) {
-    arr[i] = (i + jump) % 256;
-  }
-}
-
-static void szdsetup(uint64_t min_zone, uint64_t max_zone,
-                     SZD::SZDDevice *device, SZD::DeviceInfo *dinfo) {
-  ASSERT_EQ(device->Init(), SZD::SZDStatus::Success);
-  std::vector<SZD::DeviceOpenInfo> info;
-  ASSERT_EQ(device->Probe(info), SZD::SZDStatus::Success);
-  std::string device_to_use = "None";
-  for (auto it = info.begin(); it != info.end(); it++) {
-    if (it->is_zns) {
-      device_to_use.assign(it->traddr);
-    }
-  }
-  ASSERT_EQ(device->Open(device_to_use, min_zone, max_zone),
-            SZD::SZDStatus::Success);
-  ASSERT_EQ(device->GetInfo(dinfo), SZD::SZDStatus::Success);
-}
-
 TEST_F(SZDChannelTest, AllignmentTest) {
   SZD::SZDDevice dev("AllignmentTest");
   SZD::DeviceInfo info;
-  szdsetup(10, 15, &dev, &info);
+  SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
@@ -57,7 +36,7 @@ TEST_F(SZDChannelTest, AllignmentTest) {
 TEST_F(SZDChannelTest, DirectIO) {
   SZD::SZDDevice dev("DirectIO");
   SZD::DeviceInfo info;
-  szdsetup(10, 15, &dev, &info);
+  SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
@@ -70,7 +49,7 @@ TEST_F(SZDChannelTest, DirectIO) {
   uint64_t range = info.lba_size * info.zone_size + info.lba_size * 2;
   char bufferw[range + 1];
   char bufferr[range + 1];
-  CreatePattern(bufferw, range, 0);
+  SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
   uint64_t wslba = slba;
 
   ASSERT_EQ(channel->DirectAppend(&wslba, bufferw, range, true),
@@ -109,7 +88,7 @@ TEST_F(SZDChannelTest, DirectIO) {
 TEST_F(SZDChannelTest, DirectIONonAlligned) {
   SZD::SZDDevice dev("DirectIONonAlligned");
   SZD::DeviceInfo info;
-  szdsetup(10, 15, &dev, &info);
+  SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
@@ -121,7 +100,7 @@ TEST_F(SZDChannelTest, DirectIONonAlligned) {
   char bufferw[range + 1];
   char bufferr[range + 1];
   memset(bufferr, 0, range);
-  CreatePattern(bufferw, range, 0);
+  SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
 
   uint64_t wslba = 10 * info.zone_size;
   uint64_t slba = wslba;
@@ -151,7 +130,7 @@ TEST_F(SZDChannelTest, DirectIONonAlligned) {
 TEST_F(SZDChannelTest, BufferIO) {
   SZD::SZDDevice dev("BufferIO");
   SZD::DeviceInfo info;
-  szdsetup(10, 15, &dev, &info);
+  SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
@@ -167,7 +146,7 @@ TEST_F(SZDChannelTest, BufferIO) {
   ASSERT_EQ(buffer.GetBuffer((void **)&raw_buffer), SZD::SZDStatus::Success);
 
   uint64_t range = info.lba_size;
-  CreatePattern(raw_buffer + range, range, 0);
+  SZDTestUtil::CreateCyclicPattern(raw_buffer + range, range, 0);
 
   uint64_t wslba = 10 * info.zone_size;
   uint64_t slba = wslba;
@@ -215,7 +194,7 @@ TEST_F(SZDChannelTest, BufferIO) {
 TEST_F(SZDChannelTest, ResetRespectsRange) {
   SZD::SZDDevice dev("BufferIO");
   SZD::DeviceInfo info;
-  szdsetup(10, 15, &dev, &info);
+  SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 4);
   SZD::SZDChannel *channel, *channel1, *channel2, *channel3;
   factory.register_channel(&channel);
@@ -228,7 +207,7 @@ TEST_F(SZDChannelTest, ResetRespectsRange) {
   // Flood adjacent zones
   uint64_t range = info.lba_size * 2;
   char bufferw[range + 1];
-  CreatePattern(bufferw, range, 0);
+  SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
   uint64_t first_wslba = 10 * info.zone_size;
   u_int64_t first_slba = first_wslba;
   ASSERT_EQ(channel->DirectAppend(&first_wslba, bufferw,

@@ -7,10 +7,11 @@
 namespace SimpleZNSDeviceNamespace {
 SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                const DeviceInfo &info,
-                               const uint64_t min_zone_head,
-                               const uint64_t max_zone_head)
-    : SZDLog(channel_factory, info, min_zone_head, max_zone_head),
-      zone_head_(min_zone_head), zone_tail_(min_zone_head) {
+                               const uint64_t min_zone_nr,
+                               const uint64_t max_zone_nr)
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+      zone_head_(min_zone_nr * info.zone_size),
+      zone_tail_(min_zone_nr * info.zone_size) {
   channel_factory_->Ref();
   channel_factory_->register_channel(&channel_, min_zone_head_ / info.zone_size,
                                      max_zone_head_ / info.zone_size);
@@ -137,7 +138,7 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
   return true;
 }
 
-SZDStatus SZDCircularLog::Read(char *data, uint64_t lba, uint64_t size,
+SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
                                bool alligned) {
   uint64_t alligned_size = alligned ? size : channel_->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
@@ -159,8 +160,8 @@ SZDStatus SZDCircularLog::Read(char *data, uint64_t lba, uint64_t size,
   }
 }
 
-SZDStatus SZDCircularLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
-                               uint64_t lba, bool alligned) {
+SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
+                               size_t size, bool alligned) {
   uint64_t alligned_size = alligned ? size : channel_->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
   if (!IsValidReadAddress(lba, lbas)) {
@@ -183,9 +184,9 @@ SZDStatus SZDCircularLog::Read(SZDBuffer *buffer, size_t addr, size_t size,
   }
 }
 
-SZDStatus SZDCircularLog::Read(SZDBuffer *buffer, uint64_t lba, uint64_t size,
+SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                                bool alligned) {
-  return Read(buffer, 0, size, lba, alligned);
+  return Read(lba, buffer, 0, size, alligned);
 }
 
 SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
