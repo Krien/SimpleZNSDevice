@@ -199,6 +199,8 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
   ASSERT_EQ(log.ConsumeTail(11 * info.zone_size, 12 * info.zone_size),
             SZD::SZDStatus::Success);
 
+  char bufferr[6 * info.lba_size];
+
   // Repeatedly eat and append
   for (uint64_t slba = 0; slba < 5 * info.zone_size - 6; slba += 6) {
     uint64_t eat_address_first = 12 * info.zone_size + slba;
@@ -214,8 +216,16 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
 
     ASSERT_EQ(log.ConsumeTail(eat_address_first, eat_address_second),
               SZD::SZDStatus::Success);
+    uint64_t waddress = log.GetWriteHead();
     ASSERT_EQ(log.Append(buff, info.lba_size * 6, &blocks, true),
               SZD::SZDStatus::Success);
+
+    // Test if the data is consistent
+    {
+      ASSERT_EQ(log.Read(waddress, bufferr, 6 * info.lba_size, true),
+                SZD::SZDStatus::Success);
+      ASSERT_TRUE(memcmp(bufferr, buff, 6 * info.lba_size) == 0);
+    }
 
     // Try if pointers could be partially recovered on restart
     {
