@@ -37,7 +37,8 @@ public:
   SZDStatus RecoverPointers() override;
   bool Empty() const override { return write_head_ == min_zone_head_; }
   bool SpaceLeft(const size_t size) const override {
-    return write_head_ + size / lba_size_ <= max_zone_head_;
+    return write_head_ + (channel_->allign_size(size)) / lba_size_ <=
+           max_zone_head_;
   }
 
 private:
