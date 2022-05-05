@@ -50,7 +50,8 @@ endif()
 function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     set_target_properties(${project_name} PROPERTIES LINKER_LANGUAGE CXX)
     target_include_directories(${project_name} PUBLIC 
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
         "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     set_property(TARGET ${project_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -64,8 +65,8 @@ function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     )
 endfunction()
 
-set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/include/szd")
-set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include/szd")
+set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/src")
 set(include_files_core
     "${include_dir}/szd_namespace.h"
     "${include_dir}/szd_status_code.h"
@@ -75,8 +76,8 @@ set(src_files_core
     "${src_dir}/szd_status_code.c"
     "${src_dir}/szd.c"
 )
-set(include_dir_cpp "${include_dir}/cpp")
-set(src_dir_cpp "${src_dir}/cpp")
+set(include_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include/szd")
+set(src_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/src")
 set(include_files_cpp
     "${include_dir_cpp}/szd_status.hpp"
     "${include_dir_cpp}/szd_device.hpp"
@@ -138,7 +139,7 @@ if (TESTING)
     enable_testing()
     
     # C tests
-    set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/tests")
     add_executable(szd_full_path_test
         "${test_dir}/szd_full_path_test.c"
     )
@@ -159,7 +160,7 @@ if (TESTING)
     FetchContent_MakeAvailable(googletest)
 
     # C++ tests
-    set(test_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp")
+    set(test_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/tests")
     set(cpp_tests
         "szd_device_test"
         "szd_channel_test"

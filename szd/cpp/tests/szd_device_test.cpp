@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include <szd/cpp/szd_device.hpp>
-#include <szd/cpp/szd_status.hpp>
+#include <szd/szd_device.hpp>
+#include <szd/szd_status.hpp>
 
 #include <vector>
 

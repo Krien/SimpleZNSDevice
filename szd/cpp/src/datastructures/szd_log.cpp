@@ -1,6 +1,6 @@
-#include "szd/cpp/datastructures/szd_log.hpp"
-#include "szd/cpp/szd_channel_factory.hpp"
+#include "szd/datastructures/szd_log.hpp"
 #include "szd/szd.h"
+#include "szd/szd_channel_factory.hpp"
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDLog::SZDLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,

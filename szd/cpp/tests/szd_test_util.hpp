@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include <szd/cpp/szd_device.hpp>
-#include <szd/cpp/szd_status.hpp>
+#include <szd/szd_device.hpp>
+#include <szd/szd_status.hpp>
 
 namespace SZDTestUtil {
 static void SZDSetupDevice(uint64_t min_zone, uint64_t max_zone,

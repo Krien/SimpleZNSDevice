@@ -4,9 +4,9 @@
 #ifndef SZD_CPP_DEVICE_H
 #define SZD_CPP_DEVICE_H
 
-#include "szd/cpp/szd_status.hpp"
 #include "szd/szd.h"
 #include "szd/szd_namespace.h"
+#include "szd/szd_status.hpp"
 
 #include <string>
 #include <vector>

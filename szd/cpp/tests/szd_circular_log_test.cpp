@@ -1,10 +1,10 @@
 #include "szd_test_util.hpp"
 #include <gtest/gtest.h>
-#include <szd/cpp/datastructures/szd_circular_log.hpp>
-#include <szd/cpp/szd_channel.hpp>
-#include <szd/cpp/szd_channel_factory.hpp>
-#include <szd/cpp/szd_device.hpp>
-#include <szd/cpp/szd_status.hpp>
+#include <szd/datastructures/szd_circular_log.hpp>
+#include <szd/szd_channel.hpp>
+#include <szd/szd_channel_factory.hpp>
+#include <szd/szd_device.hpp>
+#include <szd/szd_status.hpp>
 
 #include <vector>
 

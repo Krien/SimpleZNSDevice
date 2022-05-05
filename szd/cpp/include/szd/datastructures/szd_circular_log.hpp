@@ -5,12 +5,12 @@
 #ifndef SZD_CIRCULAR_LOG_H
 #define SZD_CIRCULAR_LOG_H
 
-#include "szd/cpp/datastructures/szd_buffer.hpp"
-#include "szd/cpp/datastructures/szd_log.hpp"
-#include "szd/cpp/szd_channel.hpp"
-#include "szd/cpp/szd_channel_factory.hpp"
-#include "szd/cpp/szd_status.hpp"
+#include "szd/datastructures/szd_buffer.hpp"
+#include "szd/datastructures/szd_log.hpp"
 #include "szd/szd.h"
+#include "szd/szd_channel.hpp"
+#include "szd/szd_channel_factory.hpp"
+#include "szd/szd_status.hpp"
 
 #include <string>
 
