@@ -6,7 +6,7 @@
 #include <cstring>
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
@@ -206,4 +206,4 @@ SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
   return s;
 }
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

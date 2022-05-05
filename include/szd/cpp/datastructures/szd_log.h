@@ -13,7 +13,7 @@
 
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDLog {
 public:
   SZDLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
@@ -54,6 +54,6 @@ protected:
   // references
   SZD::SZDChannelFactory *channel_factory_;
 };
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 #endif

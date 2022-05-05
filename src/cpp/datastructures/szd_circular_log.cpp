@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                const DeviceInfo &info,
                                const uint64_t min_zone_nr,
@@ -316,4 +316,4 @@ bool SZDCircularLog::SpaceLeft(const size_t size) const {
   return channel_->allign_size(size) <= lba_size_ * space;
 }
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

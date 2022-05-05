@@ -1,7 +1,7 @@
 #include "szd/cpp/szd_status.h"
 #include "szd/szd_namespace.h"
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDStatus FromStatus(int status) {
   if (!szd_is_valid_code(status)) {
     return SZDStatus::Unknown;
@@ -25,4 +25,4 @@ SZDStatusDetailed FromStatusDetailed(int status) {
   return SZDStatusDetailed{.sc = FromStatus(status),
                            .msg = szd_status_code_msg(status)};
 }
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

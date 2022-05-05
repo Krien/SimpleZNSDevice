@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 // Necessary when SZDDevice is initialised, then deleted and a new SZDDevice is
 // created. This makes sure that the device is aware that DPDK is already
@@ -108,4 +108,4 @@ SZDStatus SZDDevice::Destroy() {
   initialised_device_ = false;
   return s;
 }
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

@@ -13,7 +13,7 @@
 #include <mutex>
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
  * @brief Simple abstraction on top of a QPair to make the code more Cxx like.
  * Comes with helper functions and performance optimisations.
@@ -76,6 +76,6 @@ private:
   uint64_t lba_msb_;
   std::mutex mutex_;
 };
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 #endif

@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDChannelFactory::SZDChannelFactory(DeviceManager *device_manager,
                                      size_t max_channel_count)
     : max_channel_count_(max_channel_count), channel_count_(0),
@@ -65,4 +65,4 @@ SZDStatus SZDChannelFactory::unregister_channel(SZDChannel *channel) {
   channel_count_--;
   return SZDStatus::Success;
 }
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

@@ -10,7 +10,7 @@
 
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDBuffer {
 public:
   SZDBuffer(size_t size, uint64_t lba_size);
@@ -50,6 +50,6 @@ private:
   void *backed_memory_;
   size_t backed_memory_size_;
 };
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 #endif

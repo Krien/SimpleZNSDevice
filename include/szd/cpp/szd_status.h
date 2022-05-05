@@ -7,7 +7,7 @@
 #include "szd/szd_namespace.h"
 #include "szd/szd_status_code.h"
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 enum class SZDStatus { Success, InvalidArguments, IOError, Unknown };
 struct SZDStatusDetailed {
   SZDStatus sc;
@@ -17,5 +17,5 @@ struct SZDStatusDetailed {
 SZDStatus FromStatus(int status);
 SZDStatusDetailed FromStatusDetailed(int status);
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 #endif

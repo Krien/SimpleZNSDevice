@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr)
@@ -138,4 +138,4 @@ bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
   return lba >= min_zone_head_ && lba + lbas <= write_head_;
 }
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

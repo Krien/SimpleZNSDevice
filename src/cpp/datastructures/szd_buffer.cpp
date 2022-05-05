@@ -6,7 +6,7 @@
 #include <cstring>
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 SZDBuffer::SZDBuffer(size_t size, uint64_t lba_size)
     : lba_size_(lba_size), backed_memory_(nullptr), backed_memory_size_(size) {
@@ -93,4 +93,4 @@ SZDStatus SZDBuffer::FreeBuffer() {
   return SZDStatus::Success;
 }
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 struct DeviceOpenInfo {
   std::string traddr;
@@ -49,5 +49,5 @@ private:
   std::string opened_device_;
 };
 
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 #endif

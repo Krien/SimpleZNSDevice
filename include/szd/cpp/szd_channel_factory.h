@@ -9,7 +9,7 @@
 #include "szd/cpp/szd_status.h"
 #include "szd/szd.h"
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
  * @brief Simple class meant to ensure that SZD channels are created at one
  * point. Allowing limiting the amount of channels and abstracting away
@@ -44,6 +44,6 @@ private:
   DeviceManager *device_manager_;
   size_t refs_;
 };
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 #endif

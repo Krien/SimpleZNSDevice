@@ -14,7 +14,7 @@
 
 #include <string>
 
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDCircularLog : public SZDLog {
 public:
   SZDCircularLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
@@ -47,6 +47,6 @@ private:
   // references
   SZDChannel *channel_;
 };
-} // namespace SimpleZNSDeviceNamespace
+} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 #endif

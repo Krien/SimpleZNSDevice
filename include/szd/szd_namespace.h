@@ -4,8 +4,6 @@
  * swapping.
  **/
 #pragma once
-#ifdef __cplusplus
-#ifndef SimpleZNSDeviceNamespace
-#define SimpleZNSDeviceNamespace SZD
-#endif
+#ifndef SIMPLE_ZNS_DEVICE_NAMESPACE
+#define SIMPLE_ZNS_DEVICE_NAMESPACE SZD
 #endif

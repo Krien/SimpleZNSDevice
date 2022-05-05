@@ -8,7 +8,7 @@
 #include "szd/szd_namespace.h"
 
 #ifdef __cplusplus
-namespace SimpleZNSDeviceNamespace {
+namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 extern "C" {
 #else
 #include <stdbool.h>
