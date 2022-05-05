@@ -78,14 +78,14 @@ set(src_files_core
 set(include_dir_cpp "${include_dir}/cpp")
 set(src_dir_cpp "${src_dir}/cpp")
 set(include_files_cpp
-    "${include_dir_cpp}/szd_status.h"
-    "${include_dir_cpp}/szd_device.h"
-    "${include_dir_cpp}/datastructures/szd_buffer.h"
-    "${include_dir_cpp}/szd_channel.h"
-    "${include_dir_cpp}/szd_channel_factory.h"
-    "${include_dir_cpp}/datastructures/szd_log.h"
-    "${include_dir_cpp}/datastructures/szd_once_log.h"
-    "${include_dir_cpp}/datastructures/szd_circular_log.h"
+    "${include_dir_cpp}/szd_status.hpp"
+    "${include_dir_cpp}/szd_device.hpp"
+    "${include_dir_cpp}/datastructures/szd_buffer.hpp"
+    "${include_dir_cpp}/szd_channel.hpp"
+    "${include_dir_cpp}/szd_channel_factory.hpp"
+    "${include_dir_cpp}/datastructures/szd_log.hpp"
+    "${include_dir_cpp}/datastructures/szd_once_log.hpp"
+    "${include_dir_cpp}/datastructures/szd_circular_log.hpp"
 )
 set(src_files_cpp
     "${src_dir_cpp}/szd_status.cpp"

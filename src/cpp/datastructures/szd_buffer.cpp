@@ -1,6 +1,6 @@
 
-#include "szd/cpp/datastructures/szd_buffer.h"
-#include "szd/cpp/szd_status.h"
+#include "szd/cpp/datastructures/szd_buffer.hpp"
+#include "szd/cpp/szd_status.hpp"
 #include "szd/szd.h"
 
 #include <cstring>

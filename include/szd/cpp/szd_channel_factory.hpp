@@ -5,8 +5,8 @@
 #ifndef SZD_CPP_CHANNEL_FACTORY_H
 #define SZD_CPP_CHANNEL_FACTORY_H
 
-#include "szd/cpp/szd_channel.h"
-#include "szd/cpp/szd_status.h"
+#include "szd/cpp/szd_channel.hpp"
+#include "szd/cpp/szd_status.hpp"
 #include "szd/szd.h"
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {

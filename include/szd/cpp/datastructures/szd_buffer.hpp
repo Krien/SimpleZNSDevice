@@ -5,7 +5,7 @@
 #ifndef SZD_CPP_BUFFER_H
 #define SZD_CPP_BUFFER_H
 
-#include "szd/cpp/szd_status.h"
+#include "szd/cpp/szd_status.hpp"
 #include "szd/szd.h"
 
 #include <string>

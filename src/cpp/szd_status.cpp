@@ -1,4 +1,4 @@
-#include "szd/cpp/szd_status.h"
+#include "szd/cpp/szd_status.hpp"
 #include "szd/szd_namespace.h"
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {

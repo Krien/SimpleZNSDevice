@@ -1,4 +1,4 @@
-#include "szd/cpp/szd_device.h"
+#include "szd/cpp/szd_device.hpp"
 #include "szd/szd_namespace.h"
 
 #include <cstring>

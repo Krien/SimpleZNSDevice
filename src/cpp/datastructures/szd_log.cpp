@@ -1,5 +1,5 @@
-#include "szd/cpp/datastructures/szd_log.h"
-#include "szd/cpp/szd_channel_factory.h"
+#include "szd/cpp/datastructures/szd_log.hpp"
+#include "szd/cpp/szd_channel_factory.hpp"
 #include "szd/szd.h"
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {

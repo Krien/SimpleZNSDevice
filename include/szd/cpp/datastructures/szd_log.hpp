@@ -5,10 +5,10 @@
 #ifndef SZD_LOG_H
 #define SZD_LOG_H
 
-#include "szd/cpp/datastructures/szd_buffer.h"
-#include "szd/cpp/szd_channel.h"
-#include "szd/cpp/szd_channel_factory.h"
-#include "szd/cpp/szd_status.h"
+#include "szd/cpp/datastructures/szd_buffer.hpp"
+#include "szd/cpp/szd_channel.hpp"
+#include "szd/cpp/szd_channel_factory.hpp"
+#include "szd/cpp/szd_status.hpp"
 #include "szd/szd.h"
 
 #include <string>

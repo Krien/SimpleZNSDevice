@@ -1,5 +1,5 @@
-#include "szd/cpp/datastructures/szd_once_log.h"
-#include "szd/cpp/szd_channel_factory.h"
+#include "szd/cpp/datastructures/szd_once_log.hpp"
+#include "szd/cpp/szd_channel_factory.hpp"
 #include "szd/szd.h"
 
 #include <cassert>
