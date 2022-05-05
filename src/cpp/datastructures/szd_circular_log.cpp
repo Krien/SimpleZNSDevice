@@ -55,8 +55,9 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
   return s;
 }
 
-SZDStatus SZDCircularLog::Append(const std::string string, uint64_t *lbas) {
-  return Append(string.data(), string.size());
+SZDStatus SZDCircularLog::Append(const std::string string, uint64_t *lbas,
+                                 bool alligned) {
+  return Append(string.data(), string.size(), lbas, alligned);
 }
 
 SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,

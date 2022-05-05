@@ -20,7 +20,8 @@ public:
   SZDCircularLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
                  const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   ~SZDCircularLog() override;
-  SZDStatus Append(const std::string string, uint64_t *lbas = nullptr) override;
+  SZDStatus Append(const std::string string, uint64_t *lbas = nullptr,
+                   bool alligned = true) override;
   SZDStatus Append(const char *data, const size_t size,
                    uint64_t *lbas = nullptr, bool alligned = true) override;
   SZDStatus Append(const SZDBuffer &buffer, uint64_t *lbas = nullptr) override;

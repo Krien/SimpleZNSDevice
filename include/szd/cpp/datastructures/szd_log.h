@@ -21,8 +21,8 @@ public:
   SZDLog(const SZDLog &) = delete;
   SZDLog &operator=(const SZDLog &) = delete;
   virtual ~SZDLog() = default;
-  virtual SZDStatus Append(const std::string string,
-                           uint64_t *lbas = nullptr) = 0;
+  virtual SZDStatus Append(const std::string string, uint64_t *lbas = nullptr,
+                           bool alligned = true) = 0;
   virtual SZDStatus Append(const char *data, const size_t size,
                            uint64_t *lbas = nullptr, bool alligned = true) = 0;
   virtual SZDStatus Append(const SZDBuffer &buffer,

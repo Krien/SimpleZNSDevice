@@ -36,8 +36,9 @@ SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
   return s;
 }
 
-SZDStatus SZDOnceLog::Append(const std::string string, uint64_t *lbas) {
-  return Append(string.data(), string.size(), lbas);
+SZDStatus SZDOnceLog::Append(const std::string string, uint64_t *lbas,
+                             bool alligned) {
+  return Append(string.data(), string.size(), lbas, alligned);
 }
 
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
