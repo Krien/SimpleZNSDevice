@@ -43,7 +43,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer.GetBufferSize();
   if (addr + alligned_size > available_size ||
-      *lba + size / lba_size_ > max_lba_ ||
+      *lba + alligned_size / lba_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
   }
@@ -90,7 +90,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer->GetBufferSize();
   if (addr + alligned_size > available_size ||
-      lba + size / lba_size_ > max_lba_ ||
+      lba + alligned_size / lba_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
   }

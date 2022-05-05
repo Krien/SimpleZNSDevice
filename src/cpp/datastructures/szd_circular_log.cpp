@@ -13,8 +13,7 @@ SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
       zone_head_(min_zone_nr * info.zone_size),
       zone_tail_(min_zone_nr * info.zone_size) {
   channel_factory_->Ref();
-  channel_factory_->register_channel(&channel_, min_zone_head_ / info.zone_size,
-                                     max_zone_head_ / info.zone_size);
+  channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
 }
 
 SZDCircularLog::~SZDCircularLog() {
@@ -46,10 +45,12 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
                                size - first_phase_size, alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   } else {
+    uint64_t z;
+    channel_->ZoneHead(zone_head_, &z);
     s = channel_->DirectAppend(&write_head_, (void *)data, size, alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   }
-  if (lbas_ != nullptr) {
+  if (s == SZDStatus::Success && lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;
