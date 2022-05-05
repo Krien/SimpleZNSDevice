@@ -401,7 +401,7 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
   return rc != 0 ? SZD_SC_SPDK_ERROR_PROBE : SZD_SC_SUCCESS;
 }
 
-void free_probe_information(ProbeInformation *probe_info) {
+void szd_free_probe_information(ProbeInformation *probe_info) {
   free(probe_info->zns);
   for (uint8_t i = 0; i < probe_info->devices; i++) {
     free(probe_info->traddr[i]);

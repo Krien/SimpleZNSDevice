@@ -91,7 +91,7 @@ int parse_reset_zns(int argc, char **argv, DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  DeviceOpenOptions ooptions;
+  DeviceOpenOptions ooptions = DeviceOpenOptions_default;
   int rc = szd_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
@@ -178,7 +178,7 @@ int parse_read_zns(int argc, char **argv, DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  DeviceOpenOptions ooptions;
+  DeviceOpenOptions ooptions = DeviceOpenOptions_default;
   int rc = szd_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
@@ -219,7 +219,7 @@ int parse_read_zns(int argc, char **argv, DeviceManager **manager) {
   rc = szd_read(*qpair, lba, data, size);
   if (rc != 0) {
     fprintf(stderr, "Error reading %d\n", rc);
-    szd_free(*qpair, data);
+    szd_free(data);
     szd_destroy_qpair(*qpair);
     free(qpair);
     rc = szd_destroy(*manager);
@@ -233,7 +233,7 @@ int parse_read_zns(int argc, char **argv, DeviceManager **manager) {
     fprintf(stdout, "%c", data[i]);
   }
   fprintf(stdout, "\n");
-  szd_free(*qpair, data);
+  szd_free(data);
   szd_destroy_qpair(*qpair);
   free(qpair);
   rc = szd_destroy(*manager);
@@ -297,7 +297,7 @@ int parse_write_zns(int argc, char **argv, DeviceManager **manager) {
     print_help_util();
     return 1;
   }
-  DeviceOpenOptions ooptions;
+  DeviceOpenOptions ooptions = DeviceOpenOptions_default;
   int rc = szd_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
@@ -342,13 +342,13 @@ int parse_write_zns(int argc, char **argv, DeviceManager **manager) {
   rc = szd_append(*qpair, (uint64_t *)&lba, data_spdk, size);
   if (rc != 0) {
     fprintf(stderr, "Error appending %d\n", rc);
-    szd_free(*qpair, data_spdk);
+    szd_free(data_spdk);
     goto destroy_context;
     return rc;
   }
   fprintf(stdout, "write data to device %s, location %lu, size %lu\n", trid,
           lba, size);
-  szd_free(*qpair, data_spdk);
+  szd_free(data_spdk);
   goto destroy_context;
   return rc;
 
@@ -411,7 +411,7 @@ int parse_info_zns(int argc, char **argv, DeviceManager **manager) {
     free(trid);
     return 1;
   }
-  DeviceOpenOptions ooptions;
+  DeviceOpenOptions ooptions = DeviceOpenOptions_default;
   int rc = szd_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);
@@ -452,7 +452,7 @@ int parse_zones_zns(int argc, char **argv, DeviceManager **manager) {
   if (!trid_set) {
     return 1;
   }
-  DeviceOpenOptions ooptions;
+  DeviceOpenOptions ooptions = DeviceOpenOptions_default;
   int rc = szd_open(*manager, trid, &ooptions);
   if (rc != 0) {
     fprintf(stderr, "Invalid trid %s\n", trid);

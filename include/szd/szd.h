@@ -166,7 +166,7 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe_info);
 /**
  * @brief Frees information from probe information.
  */
-void free_probe_information(ProbeInformation *probe_info);
+void szd_free_probe_information(ProbeInformation *probe_info);
 
 /**
  * @brief Opens a ZNS device, provided it exists and is a ZNS device.

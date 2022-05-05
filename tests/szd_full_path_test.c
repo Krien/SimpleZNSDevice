@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
   }
   // dangerous! we must be absolutely sure that no other process is using this
   // anymore.
-  free_probe_information(*prober);
+  szd_free_probe_information(*prober);
   free(prober);
   if (!device_to_use) {
     printf("No ZNS Device found.\n Are you sure you have a ZNS device "

@@ -58,7 +58,7 @@ SZDStatus SZDDevice::Probe(std::vector<DeviceOpenInfo> &info) {
     info.push_back(
         DeviceOpenInfo{.traddr = trid, .is_zns = (*prober)->zns[dev]});
   }
-  free_probe_information(*prober);
+  szd_free_probe_information(*prober);
   delete prober;
   // Probe can leave SZD in a weird attached state (zombie devices).
   s = Reinit();
