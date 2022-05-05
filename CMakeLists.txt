@@ -12,7 +12,7 @@ set(CMAKE_LIB_DIR ${CMAKE_SOURCE_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set(LIBRARY_OUTPUT_PATH ${CMAKE_LIB_DIR})
 
-#default to debug
+# Default to debug
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
@@ -37,23 +37,57 @@ endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSPDK.cmake")
 link_directories("${SPDK_LIB_DIRS}")
 
-# Only set these vars, when it is included in another CMake
+# Only set these vars, when it is included in another CMake. Helps with linking issues.
 if(${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME})
 else()
     set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
-    set(SPDK_LIBRARY_DEPENDENCIES "${SPDK_LIBRARY_DEPENDENCIES}" PARENT_SCOPE)
     # necessary to prevent issues when the upstream CMakeList.txt uses -Werror.
     string(REPLACE " -Werror" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
+# Add your files here
+set(szd_core_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include/szd")
+set(szd_core_include_files
+    "${szd_core_include_dir}/szd_namespace.h"
+    "${szd_core_include_dir}/szd_status_code.h"
+    "${szd_core_include_dir}/szd.h"
+)
+list(APPEND szd_all_files szd_core_include_files)
+set(szd_core_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/src")
+set(szd_core_src_files
+    "${szd_core_src_dir}/szd_status_code.c"
+    "${szd_core_src_dir}/szd.c"
+)
+list(APPEND szd_all_files szd_core_src_files)
+
+set(szd_cpp_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include/szd")
+set(szd_cpp_include_files
+    "${szd_cpp_include_dir}/szd_status.hpp"
+    "${szd_cpp_include_dir}/szd_device.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_buffer.hpp"
+    "${szd_cpp_include_dir}/szd_channel.hpp"
+    "${szd_cpp_include_dir}/szd_channel_factory.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_log.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_once_log.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_circular_log.hpp"
+)
+list(APPEND szd_all_files szd_cpp_include_files)
+set(szd_cpp_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/src")
+set(szd_cpp_src_files
+    "${szd_cpp_src_dir}/szd_status.cpp"
+    "${szd_cpp_src_dir}/szd_device.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_buffer.cpp"
+    "${szd_cpp_src_dir}/szd_channel.cpp"
+    "${szd_cpp_src_dir}/szd_channel_factory.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_log.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_once_log.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_circular_log.cpp"
+)
+list(APPEND szd_all_files szd_cpp_src_files)
+
 # Use for each library and executable, it ensures more homogenous builds.
 function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     set_target_properties(${project_name} PROPERTIES LINKER_LANGUAGE CXX)
-    target_include_directories(${project_name} PUBLIC 
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
-        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
-    )
     set_property(TARGET ${project_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
     target_compile_options(
         ${project_name}
@@ -65,54 +99,33 @@ function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     )
 endfunction()
 
-set(include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include/szd")
-set(src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/src")
-set(include_files_core
-    "${include_dir}/szd_namespace.h"
-    "${include_dir}/szd_status_code.h"
-    "${include_dir}/szd.h"
-)
-set(src_files_core
-    "${src_dir}/szd_status_code.c"
-    "${src_dir}/szd.c"
-)
-set(include_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include/szd")
-set(src_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/src")
-set(include_files_cpp
-    "${include_dir_cpp}/szd_status.hpp"
-    "${include_dir_cpp}/szd_device.hpp"
-    "${include_dir_cpp}/datastructures/szd_buffer.hpp"
-    "${include_dir_cpp}/szd_channel.hpp"
-    "${include_dir_cpp}/szd_channel_factory.hpp"
-    "${include_dir_cpp}/datastructures/szd_log.hpp"
-    "${include_dir_cpp}/datastructures/szd_once_log.hpp"
-    "${include_dir_cpp}/datastructures/szd_circular_log.hpp"
-)
-set(src_files_cpp
-    "${src_dir_cpp}/szd_status.cpp"
-    "${src_dir_cpp}/szd_device.cpp"
-    "${src_dir_cpp}/datastructures/szd_buffer.cpp"
-    "${src_dir_cpp}/szd_channel.cpp"
-    "${src_dir_cpp}/szd_channel_factory.cpp"
-    "${src_dir_cpp}/datastructures/szd_log.cpp"
-    "${src_dir_cpp}/datastructures/szd_once_log.cpp"
-    "${src_dir_cpp}/datastructures/szd_circular_log.cpp"
-)
-
-set(common_sources
-    "${include_files_core}"
-    "${src_files_core}"
-    "${include_files_cpp}"
-    "${src_files_cpp}"
-)
-
 # Libraries...
-add_library(szd_lib STATIC
-    "${common_sources}"
+add_library(szd_core STATIC
+    "${szd_core_include_files}"
+    "${szd_core_src_files}"
 )
-target_include_directories(szd_lib PRIVATE "${SPDK_INCLUDE_DIRS}")
-target_link_libraries(szd_lib PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
-setup_szd_project_structure(szd_lib)
+target_include_directories(szd_core PRIVATE "${SPDK_INCLUDE_DIRS}")
+target_link_libraries(szd_core PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
+target_include_directories(szd_core PUBLIC 
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+setup_szd_project_structure(szd_core)
+
+add_library(szd STATIC
+    "${szd_core_include_files}"
+    "${szd_core_src_files}"
+    "${szd_cpp_include_files}"
+    "${szd_cpp_src_files}"
+)
+target_include_directories(szd PRIVATE "${SPDK_INCLUDE_DIRS}")
+target_link_libraries(szd PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
+target_include_directories(szd PUBLIC 
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+setup_szd_project_structure(szd)
 
 #TODO: add shared lib
 # add_library(szd_lib_shared SHARED
@@ -128,8 +141,13 @@ if (SZD_TOOLS)
         add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}")
         add_executable(${tool} "${${tool}_sources}")
         setup_szd_project_structure(${tool})
-        target_link_libraries(${tool} PUBLIC szd_lib)
-        LIST(APPEND tool_files "${${tool}_sources}")
+        if (${tool}_core_only)
+            target_link_libraries(${tool} PUBLIC szd_core)
+        else()
+            target_link_libraries(${tool} PUBLIC szd)
+        endif()
+        list(APPEND tool_files "${${tool}_sources}")
+        list(APPEND szd_all_files tool_files)
     endforeach()
 endif()
 
@@ -137,19 +155,18 @@ endif()
 option(TESTING "Turn on tests" OFF)
 if (TESTING)
     enable_testing()
-    
     # C tests
-    set(test_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/tests")
+    set(szd_core_test_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/tests")
     add_executable(szd_full_path_test
-        "${test_dir}/szd_full_path_test.c"
+        "${szd_core_test_dir}/szd_full_path_test.c"
     )
-    target_link_libraries(szd_full_path_test PUBLIC szd_lib)
+    list(APPEND szd_all_files "${test_dir}/szd_full_path_test.c")
+    target_link_libraries(szd_full_path_test PUBLIC szd)
     setup_szd_project_structure(szd_full_path_test)
     add_test(
         NAME szd_full_path_test_runner
         COMMAND szd_full_path_test
     )
-
     # Setup GTests
     include(GoogleTest)
     include(FetchContent)
@@ -158,7 +175,6 @@ if (TESTING)
         URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
     )
     FetchContent_MakeAvailable(googletest)
-
     # C++ tests
     set(test_dir_cpp "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/tests")
     set(cpp_tests
@@ -167,9 +183,10 @@ if (TESTING)
         "szd_once_log_test"
         "szd_circular_log_test"
     )
+    list(APPEND szd_all_files cpp_tests)
     function(add_cpp_test filename dir)
         add_executable("${filename}" "${dir}/${filename}.cpp")
-        target_link_libraries("${filename}" PRIVATE szd_lib gtest_main)
+        target_link_libraries("${filename}" PRIVATE szd gtest_main)
         setup_szd_project_structure("${filename}")
         gtest_add_tests(TARGET "${filename}")
         add_test(
@@ -195,7 +212,7 @@ add_custom_target(
     COMMAND ${CLANG_FORMAT_PATH}
     -i
     "-style=file"
-    ${common_sources}
+    ${szd_all_files}
     ${tool_files}
     COMMENT "Formatting files"
 )
