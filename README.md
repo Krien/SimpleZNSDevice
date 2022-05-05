@@ -1,15 +1,20 @@
-# SimpleZNSDevice
+# SimpleZNSDevice (SZD)
 SimpleZNSDevice is a simpler wrapper around SPDK that allows developing for ZNS devices without (much) effort.
-It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [ZNSLSM](https://github.com/Krien/znslsm). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with C and C++, see [./incude](./include) and some simple debugging and utility tools, see [./tools](tools).
+It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic that would otherwise be necessary and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [ZNSLSM](https://github.com/Krien/znslsm). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with both C and C++, known as `SZD`, see [./incude/core](./include/core), some simple debugging and utility tools that make use of the interface, see [./tools](tools) and a small C++-only library of extra ZNS-targeted functions and data structures, known as `SZD_extended`, in [./include/cpp](./include/cpp).
 
 # DISCLAIMER
 This code is in early stages of development and prone to change. Use at own risk, for more "risk-involved" information read the rest of this section.
 SPDK needs to bind the device. Therefore ensure that your device is actually binded to SPDK. This can be done by navigating to the `scripts` directory in the SPDK directory and calling `setup.sh`. When a device is binded to SPDK, it CANNOT be used anymore by your own filesystem anymore, untill it is released. Do NOT use on your main disk or disks that you intent to use for important data. There are also some helper scripts in [./scripts](scripts), such as spdk_bind.sh and spdk_unbind.sh. spdk_bind binds all devices to SPDK and spdk_unbind unbinds all devices to SPDK. Further on, always run as root with e.g. `sudo`, the permissions are needed :/. Lastly, the code is only tested on GNU/Linux, specifically Ubuntu 20.04 LTS. It will NOT run properly on non-Unix systems such as Windows (WSL included). FreeBSD, OpenBDS, MacOs etc. are all not tested and will probably not work as well. We make NO guarantees on security or safety, run at own risk for now.
 
-# How to use the SimpleZNSDevice
-SimpleZNSDevice is an interface that we can use to interface with the ZNS device through SPDK. It comes with an interface that allows to write to zones without worrying about SPDK internals. There are functions for reading lbas, writing lbas, erasing zones, getting write heads of zones and getting general device information. Functions for now are synchronous, but asynchronous functions may be added in the future.
+# How to use SZD
+SimpleZNSDevice itself is an interface that can be used to interface with ZNS devices through SPDK. It allows writing and reading to zones without worrying about SPDK internals. There are functions for opening/closing ZNS devices, reading blocks, appending blocks to zones, erasing zones, getting write heads of zones and getting general device information. Functions for now are synchronous, but asynchronous functions may be added in the future.
 It can at the moment be used as a:
-* Shared library called `szd_lib`. For examples on how to use this lib, look in tools.
+* Static library called `szd`. This contains only the SZD interface. For examples on how to use this lib, look in tools.
+
+# How to use SZD_extended
+SZD_extended wrapps the SZD library in a more C++ like interface. This should make the development smoother and feel less out of place when used in C++. It also comes with a bigger set of functionalities. It has threadsafe QPair abstractions known as `SZDChannels` and various log structures (fitting for ZNS) such as `SZDOnceLog`, `SZDCircularLog` and `SZDFragmentedLog`. It can at the moment be used as a:
+
+* Static library called `szd_extended`. This also comes with C++ functionalities on top of the interface, so do not use with C projects. For examples on how to use this lib, see the tests or [ZNSLSM](https://github.com/Krien/znslsm).
 
 # How to build
 There are multiple ways to built this project.
@@ -66,15 +71,21 @@ alias sudo='sudo PATH="$PATH" HOME="$HOME" LD_LIBRARY_PATH="$LD_LIBRARY_PATH"'
 </details>
 
 # Code guidelines
-## Where to put code
-Please create all headers with `.h` and put them in `./include`. Similarly, please create all implementation code with `.cpp` and put them in `./src`.
+The code is separated into multiple subprojects. Each subproject has its own subrules. All core functionality and anything SPDK related should go into the subproject `./szd/core` and everything related to `C++` and a clean interface preferably in `./szd/cpp`.
+
+## SZD
+SZD is the main interface between SPDK and this project. It should be minimalistic and only expose SPDK functionality related to ZNS to a more user-friendly space. We prefer to have all nice to haves in SZD_extended. It is important that it is C-compliant and does not rely on C++ functionalities. Create all header files with `.h` and put them in `./szd/core/include/szd` and all source files with `.c` in `./szd/core/src`.
+
+## SZD_extended
+SZD_extended wraps the interface of Core into a more C++-like interface. It also comes with some extra utilities on top of the interface. Such as some common data structures such as logs. Header files should be created with `.hpp` and stored in `./szd/cpp/include/szd`. Source files should be created with `.cpp` in `./szd/cpp/src`. Tests are created by using [Google Test](https://github.com/google/googletest). 
+
 ## Formatting
 If submitting code, please format the code. This prevents spurious commit changes. We use `clang-format` with the config in `.clang-format`, based on `LLVM`. It is possible to automatically format with make or ninja (depending on what build tool is used). This requires clang-format to be either set in `/home/$USER/bin/clang-format` or requires setting the environmental variable `CLANG_FORMAT_PATH` directly (e.g. `export CLANG_FORMAT_PATH=...`). Then simply run:
 ```bash
 <make_command(make,ninja,...)> format
 ```
 ## Tests
-If submitting code, please ensure that the tests still pass. Either run all tests manually by building and running all tests, such as `<make_command(make,ninja,...)> device_initial_test && sudo ./bin/device_initial_test`. Or use the standard builtin testing functionalities of CMake by running:
+If submitting code, please ensure that the tests still pass. Either run all tests manually by building and running all tests, such as `<make_command(make,ninja,...)> device_full_path_test && sudo ./bin/device_full_path_test`. Or use the standard builtin testing functionalities of CMake by running:
 ```bash
 <make_command(make,ninja,...)> test
 ```

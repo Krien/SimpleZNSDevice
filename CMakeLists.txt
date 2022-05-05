@@ -100,32 +100,32 @@ function(SETUP_SZD_PROJECT_STRUCTURE project_name)
 endfunction()
 
 # Libraries...
-add_library(szd_core STATIC
-    "${szd_core_include_files}"
-    "${szd_core_src_files}"
-)
-target_include_directories(szd_core PRIVATE "${SPDK_INCLUDE_DIRS}")
-target_link_libraries(szd_core PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
-target_include_directories(szd_core PUBLIC 
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
-)
-setup_szd_project_structure(szd_core)
-
 add_library(szd STATIC
     "${szd_core_include_files}"
     "${szd_core_src_files}"
-    "${szd_cpp_include_files}"
-    "${szd_cpp_src_files}"
 )
 target_include_directories(szd PRIVATE "${SPDK_INCLUDE_DIRS}")
 target_link_libraries(szd PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
 target_include_directories(szd PUBLIC 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
     "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 setup_szd_project_structure(szd)
+
+add_library(szd_extended STATIC
+    "${szd_core_include_files}"
+    "${szd_core_src_files}"
+    "${szd_cpp_include_files}"
+    "${szd_cpp_src_files}"
+)
+target_include_directories(szd_extended PRIVATE "${SPDK_INCLUDE_DIRS}")
+target_link_libraries(szd_extended PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
+target_include_directories(szd_extended PUBLIC 
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+setup_szd_project_structure(szd_extended)
 
 #TODO: add shared lib
 # add_library(szd_lib_shared SHARED
@@ -142,9 +142,9 @@ if (SZD_TOOLS)
         add_executable(${tool} "${${tool}_sources}")
         setup_szd_project_structure(${tool})
         if (${tool}_core_only)
-            target_link_libraries(${tool} PUBLIC szd_core)
-        else()
             target_link_libraries(${tool} PUBLIC szd)
+        else()
+            target_link_libraries(${tool} PUBLIC szd_extended)
         endif()
         list(APPEND tool_files "${${tool}_sources}")
         list(APPEND szd_all_files tool_files)
@@ -186,7 +186,7 @@ if (TESTING)
     list(APPEND szd_all_files cpp_tests)
     function(add_cpp_test filename dir)
         add_executable("${filename}" "${dir}/${filename}.cpp")
-        target_link_libraries("${filename}" PRIVATE szd gtest_main)
+        target_link_libraries("${filename}" PRIVATE szd_extended gtest_main)
         setup_szd_project_structure("${filename}")
         gtest_add_tests(TARGET "${filename}")
         add_test(
