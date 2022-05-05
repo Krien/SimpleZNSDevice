@@ -28,11 +28,14 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
   SZDStatus s;
   size_t alligned_size = alligned ? size : channel_->allign_size(size);
   if (!SpaceLeft(alligned_size)) {
+    if (lbas_ != nullptr) {
+      *lbas_ = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t lbas = alligned_size / lba_size_;
   // 2 phase
-  if (write_head_ < write_tail_ && write_head_ + lbas > max_zone_head_) {
+  if (write_head_ + lbas > max_zone_head_ && write_tail_ > min_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
     s = channel_->DirectAppend(&write_head_, (void *)data, first_phase_size,
                                alligned);
@@ -66,6 +69,9 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
   SZDStatus s;
   size_t alligned_size = alligned ? size : channel_->allign_size(size);
   if (!SpaceLeft(size)) {
+    if (lbas_ != nullptr) {
+      *lbas_ = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t lbas = alligned_size / lba_size_;
@@ -98,6 +104,9 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
   SZDStatus s;
   size_t size = buffer.GetBufferSize();
   if (!SpaceLeft(size)) {
+    if (lbas_ != nullptr) {
+      *lbas_ = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t lbas = size / lba_size_;
@@ -196,6 +205,13 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
       end_lba < min_zone_head_) {
     return SZDStatus::InvalidArguments;
   }
+  // Nothing to consume
+  if ((write_tail_ <= write_head_ && end_lba > write_head_) ||
+      (write_tail_ > write_head_ && end_lba > write_head_ &&
+       end_lba < write_tail_)) {
+    return SZDStatus::InvalidArguments;
+  }
+
   write_tail_ = begin_lba < end_lba ? end_lba : max_zone_head_;
   uint64_t cur_zone = (write_tail_ / zone_size_) * zone_size_;
   SZDStatus s;
@@ -240,12 +256,12 @@ SZDStatus SZDCircularLog::RecoverPointers() {
     if ((s = channel_->ZoneHead(slba, &zone_head)) != SZDStatus::Success) {
       return s;
     }
+    old_zone_head = zone_head;
     // tail is at first zone that is not empty
     if (zone_head > slba) {
       log_tail = slba;
       break;
     }
-    old_zone_head = zone_head;
   }
   // Scan for head
   for (; slba < max_zone_head_; slba += zone_size_) {
@@ -259,10 +275,8 @@ SZDStatus SZDCircularLog::RecoverPointers() {
       break;
     }
     // Or the last zone that is completely filled.
-    if (zone_head < slba + zone_size_ && old_zone_head > slba - zone_size_) {
-      if (zone_head == old_zone_head) {
-        continue;
-      }
+    if (zone_head < slba + zone_size_ && slba > zone_size_ &&
+        old_zone_head > slba - zone_size_) {
       log_head = slba;
       break;
     }
@@ -270,7 +284,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   }
   // if head < end and tail == 0, we need to be sure that the tail does not
   // start AFTER head.
-  if (log_head > 0 && log_tail == 0) {
+  if (log_head > min_zone_head_ && log_tail == min_zone_head_) {
     for (slba += zone_size_; slba < max_zone_head_; slba += zone_size_) {
       if ((s = channel_->ZoneHead(slba, &zone_head)) != SZDStatus::Success) {
         return s;
