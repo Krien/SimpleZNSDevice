@@ -182,13 +182,9 @@ int main(int argc, char **argv) {
               strlen((*prober)->traddr[i]));
     }
   }
-  (*prober)->devices = 0;
   // dangerous! we must be absolutely sure that no other process is using this
   // anymore.
-  free((*prober)->mut);
-  free((*prober)->ctrlr);
-  free((*prober)->zns);
-  free(*prober);
+  free_probe_information(*prober);
   free(prober);
   if (!device_to_use) {
     printf("No ZNS Device found.\n Are you sure you have a ZNS device "

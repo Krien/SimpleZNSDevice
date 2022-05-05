@@ -69,7 +69,7 @@ TEST_F(SZDTest, OrderMisuse) {
   std::string device_to_use = "None";
   for (auto it = info.begin(); it != info.end(); it++) {
     if (it->is_zns) {
-      device_to_use.assign(it->traddr, it->traddr.size());
+      device_to_use.assign(it->traddr);
     }
   }
   ASSERT_EQ(dev.Open(device_to_use, 10, 15), SZD::SZDStatus::Success);
@@ -104,7 +104,7 @@ TEST_F(SZDTest, TestValidInfo) {
   std::string device_to_use = "None";
   for (auto it = info.begin(); it != info.end(); it++) {
     if (it->is_zns) {
-      device_to_use.assign(it->traddr, it->traddr.size());
+      device_to_use.assign(it->traddr);
     }
   }
   ASSERT_EQ(dev.Open(device_to_use, 10, 15), SZD::SZDStatus::Success);

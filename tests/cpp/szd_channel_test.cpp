@@ -26,7 +26,7 @@ static void szdsetup(uint64_t min_zone, uint64_t max_zone,
   std::string device_to_use = "None";
   for (auto it = info.begin(); it != info.end(); it++) {
     if (it->is_zns) {
-      device_to_use.assign(it->traddr, it->traddr.size());
+      device_to_use.assign(it->traddr);
     }
   }
   ASSERT_EQ(device->Open(device_to_use, min_zone, max_zone),
@@ -103,7 +103,7 @@ TEST_F(SZDChannelTest, DirectIO) {
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
   ASSERT_EQ(wslba2, 15 * info.zone_size);
-  // Nonalligned
+  factory.unregister_channel(channel);
 }
 
 TEST_F(SZDChannelTest, DirectIONonAlligned) {

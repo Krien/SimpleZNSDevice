@@ -36,14 +36,16 @@ public:
   SZDStatus GetInfo(DeviceInfo *info) const;
   SZDStatus Destroy();
 
-  inline DeviceManager *GetDeviceManager() { return manager_; }
+  inline DeviceManager *GetDeviceManager() {
+    return initialised_device_ ? *manager_ : nullptr;
+  }
 
 private:
   const std::string application_name_;
   // state
   bool initialised_device_;
   bool device_opened_;
-  SZD::DeviceManager *manager_;
+  SZD::DeviceManager **manager_;
   std::string opened_device_;
 };
 

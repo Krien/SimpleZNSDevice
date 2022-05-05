@@ -235,7 +235,7 @@ int szd_open(DeviceManager *manager, const char *traddr,
   if (already_found_once) {
     memset(manager->g_trid, 0, sizeof(*(manager->g_trid)));
 	  spdk_nvme_trid_populate_transport(manager->g_trid, SPDK_NVME_TRANSPORT_PCIE);
-    memcpy(manager->g_trid->traddr, traddr, spdk_max(strlen(traddr), sizeof(manager->g_trid->traddr)));
+    memcpy(manager->g_trid->traddr, traddr, spdk_min(strlen(traddr), sizeof(manager->g_trid->traddr)));
   }
   // Find controller.
   int probe_ctx;
@@ -399,6 +399,17 @@ int szd_probe(DeviceManager *manager, ProbeInformation **probe) {
   }
   pthread_mutex_unlock((*probe)->mut);
   return rc != 0 ? SZD_SC_SPDK_ERROR_PROBE : SZD_SC_SUCCESS;
+}
+
+void free_probe_information(ProbeInformation *probe_info) {
+  free(probe_info->zns);
+  for (uint8_t i = 0; i < probe_info->devices; i++) {
+    free(probe_info->traddr[i]);
+  }
+  free(probe_info->traddr);
+  free(probe_info->ctrlr);
+  free(probe_info->mut);
+  free(probe_info);
 }
 
 int szd_create_qpair(DeviceManager *man, QPair **qpair) {
