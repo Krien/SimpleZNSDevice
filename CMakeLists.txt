@@ -17,7 +17,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 # Set flags
-set(BUILD_FLAGS -Wall -Wextra)
+set(BUILD_FLAGS -Wall -Wextra -Werror)
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     list(APPEND BUILD_FLAGS -g2 -ggdb -O3)
 endif()
@@ -26,10 +26,14 @@ if (CMAKE_BUILD_TYPE MATCHES Release)
 endif()
 option(FSANITIZE "Turn on fsanitize" OFF)
 if (FSANITIZE)
-    list(APPEND BUILD_FLAGS -fsanitize=address -fsanitize=undefined 
-        -fno-sanitize-recover=all -fsanitize=float-divide-by-zero 
-        -fsanitize=float-cast-overflow -fno-sanitize=null 
-        -fno-sanitize=alignment)
+    list(APPEND BUILD_FLAGS 
+        -fsanitize=address #ASAN
+        -fsanitize=undefined  #UBSAN
+        -fsanitize=float-divide-by-zero 
+        -fsanitize=float-cast-overflow  
+        -fno-sanitize-recover=all 
+        -fno-sanitize=alignment
+    )
     message("fsanitize is turned on")
 endif()
 
@@ -41,8 +45,6 @@ link_directories("${SPDK_LIB_DIRS}")
 if(${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME})
 else()
     set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
-    # necessary to prevent issues when the upstream CMakeList.txt uses -Werror.
-    string(REPLACE " -Werror" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
 # Add your files here

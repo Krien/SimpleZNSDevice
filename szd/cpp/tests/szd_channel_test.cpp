@@ -236,8 +236,4 @@ TEST_F(SZDChannelTest, ResetRespectsRange) {
   factory.unregister_channel(channel3);
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
 } // namespace

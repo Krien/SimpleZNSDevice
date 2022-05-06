@@ -136,7 +136,6 @@ int parse_read_zns(int argc, char **argv, DeviceManager **manager) {
   int op;
   char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char *));
   bool trid_set = false;
-  bool reset_all = false;
   int64_t lba = -1;
   int64_t size = -1;
   while ((op = getopt(argc, argv, "t:l:s:")) != -1) {
@@ -207,7 +206,7 @@ int parse_read_zns(int argc, char **argv, DeviceManager **manager) {
     free(trid);
     return rc;
   }
-  char *data = (char *)szd_calloc(*qpair, size, sizeof(char *));
+  char *data = (char *)szd_calloc(info.lba_size, size, sizeof(char *));
   if (!data) {
     fprintf(stderr, "Error allocating with SPDKs malloc\n");
     szd_destroy_qpair(*qpair);
@@ -245,7 +244,6 @@ int parse_write_zns(int argc, char **argv, DeviceManager **manager) {
   int op;
   char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char));
   bool trid_set = false;
-  bool reset_all = false;
   int64_t lba = -1;
   int64_t size = -1;
   int64_t data_size = -1;
@@ -332,7 +330,7 @@ int parse_write_zns(int argc, char **argv, DeviceManager **manager) {
     free(trid);
     return rc;
   }
-  char *data_spdk = (char *)szd_calloc(*qpair, size, sizeof(char *));
+  char *data_spdk = (char *)szd_calloc(info.lba_size, size, sizeof(char *));
   if (!data_spdk) {
     fprintf(stderr, "Error allocating with SPDKs malloc\n");
     goto destroy_context;
@@ -362,6 +360,8 @@ destroy_context:
 }
 
 int parse_probe_zns(int argc, char **argv, DeviceManager **manager) {
+  (void)argc;
+  (void)argv;
   ProbeInformation **prober =
       (ProbeInformation **)calloc(1, sizeof(ProbeInformation *));
   printf("Looking for devices:\n");
@@ -393,6 +393,8 @@ int parse_probe_zns(int argc, char **argv, DeviceManager **manager) {
 }
 
 int parse_info_zns(int argc, char **argv, DeviceManager **manager) {
+  (void)argc;
+  (void)argv;
   int op;
   char *trid = (char *)calloc(MAX_TRADDR_LENGTH, sizeof(char));
   bool trid_set = false;
@@ -489,6 +491,9 @@ int parse_zones_zns(int argc, char **argv, DeviceManager **manager) {
 }
 
 int parse_help_zns(int argc, char **argv, DeviceManager **manager) {
+  (void)argc;
+  (void)argv;
+  (void)manager;
   return print_help_util();
 }
 

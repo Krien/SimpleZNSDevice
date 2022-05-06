@@ -122,8 +122,4 @@ TEST_F(SZDTest, TestValidInfo) {
   ASSERT_EQ(dev.Destroy(), SZD::SZDStatus::Success);
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
 } // namespace

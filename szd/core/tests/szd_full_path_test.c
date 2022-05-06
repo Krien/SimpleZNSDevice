@@ -15,6 +15,8 @@ extern "C" {
 
 // TODO: use a testing framework or something else than raw assert
 #include <assert.h>
+#include <string.h>
+#include <stdlib.h>
 #include <szd/szd_namespace.h>
 #include <szd/szd.h>
 
@@ -59,6 +61,7 @@ typedef struct {
   uint64_t alt_slba_start;
   int32_t data_offset;
   int32_t alt_offset;
+  int rc;
 } thread_data;
 
 static pthread_mutex_t mut;
@@ -81,7 +84,8 @@ void *worker_thread(void *arg) {
   rc = szd_create_qpair(*manager, qpair);
   if (rc != 0) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
-    pthread_exit((void *)rc);
+    dat->rc = rc;
+    pthread_exit(NULL);
   }
   uint64_t zone_size_bytes =
       (*manager)->info.lba_size * (*manager)->info.zone_size;
@@ -89,40 +93,45 @@ void *worker_thread(void *arg) {
   rc = write_pattern(pattern_1, *qpair, zone_size_bytes, dat->data_offset);
   if (rc != 0) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
-    pthread_exit((void *)rc);
+    dat->rc = rc;
+    pthread_exit(NULL);
   }
   char *pattern_read_1 =
       (char *)szd_calloc((*qpair)->man->info.lba_size, zone_size_bytes, sizeof(char *));
   if (pattern_read_1 == NULL) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
-    pthread_exit((void *)1);
+    dat->rc = rc;
+    pthread_exit(NULL);
   }
   // hammering
-  uint64_t wstart = dat->write_slba_start;
-  for (int i = 0; i < 1000; i++) {
+  for (uint16_t i = 0; i < 200; i++) {
+    uint64_t wstart = dat->write_slba_start;
     rc = szd_append(*qpair, &wstart, *pattern_1,
                              zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
-      pthread_exit((void *)rc);
+      dat->rc = rc;
+      pthread_exit(NULL);
     }
     rc = szd_read(*qpair, dat->write_slba_start, pattern_read_1,
                            zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
-      pthread_exit((void *)rc);
+      dat->rc = rc;
+      pthread_exit(NULL);
     }
-    for (int i = 0; i < zone_size_bytes; i++) {
-      rc = (char *)(pattern_read_1)[i] == (char *)(*pattern_1)[i];
-      if (rc == 0) {
+    if (memcmp(pattern_read_1, *pattern_1, zone_size_bytes) != 0) {
         PLUS_THREAD_BARRIER(mut, thread_barrier);
-        pthread_exit((void *)rc);
-      }
+        dat->rc = 1;
+        pthread_exit(NULL);
     }
-    rc = szd_reset(*qpair, dat->write_slba_start);
-    if (rc != 0) {
-      PLUS_THREAD_BARRIER(mut, thread_barrier);
-      pthread_exit((void *)rc);
+    if (i != 199) {
+      rc = szd_reset(*qpair, dat->write_slba_start);
+      if (rc != 0) {
+        PLUS_THREAD_BARRIER(mut, thread_barrier);
+        dat->rc = rc;
+        pthread_exit(NULL);
+      }
     }
   }
 
@@ -133,19 +142,28 @@ void *worker_thread(void *arg) {
     pthread_mutex_lock(&mut);
   }
   pthread_mutex_unlock(&mut);
+
+  szd_free(pattern_read_1);
+  pattern_read_1 =
+      (char *)szd_calloc((*qpair)->man->info.lba_size, zone_size_bytes, sizeof(char *));
+  szd_free(*pattern_1);
   rc = write_pattern(pattern_1, *qpair, zone_size_bytes, dat->alt_offset);
   rc = szd_read(*qpair, dat->alt_slba_start, pattern_read_1,
                          zone_size_bytes);
   if (rc != 0) {
-    pthread_exit((void *)rc);
+    dat->rc = rc;
+    pthread_exit(NULL);
   }
-  for (int i = 0; i < zone_size_bytes; i++) {
-    rc = (char *)(pattern_read_1)[i] == (char *)(*pattern_1)[i];
-    if (rc == 0) {
-      pthread_exit((void *)rc);
-    }
+  if (memcmp(pattern_read_1, *pattern_1, zone_size_bytes) != 0) {
+    PLUS_THREAD_BARRIER(mut, thread_barrier);
+    dat->rc = 1;
+    pthread_exit(NULL);
   }
-  pthread_exit((void *)rc);
+  dat->rc = rc;
+  szd_destroy_qpair(*qpair);
+  free(qpair);
+  free(pattern_1);
+  pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
@@ -162,7 +180,7 @@ int main(int argc, char **argv) {
 
   // find devices
   printf("----------------------PROBE----------------------\n");
-  char *device_to_use;
+  char *device_to_use = NULL;
   ProbeInformation **prober = (ProbeInformation **)calloc(
       1, sizeof(ProbeInformation *));
   rc = szd_probe(*manager, prober);
@@ -178,7 +196,7 @@ int main(int argc, char **argv) {
       }
       device_to_use =
           (char *)calloc(strlen((*prober)->traddr[i]) + 1, sizeof(char));
-      strncpy(device_to_use, (*prober)->traddr[i],
+      memcpy(device_to_use, (*prober)->traddr[i],
               strlen((*prober)->traddr[i]));
     }
   }
@@ -234,13 +252,13 @@ int main(int argc, char **argv) {
   rc = szd_get_device_info(&info, *manager);
   DEBUG_TEST_PRINT("get info code ", rc);
   VALID(rc);
-  printf("lba size is %d\n", info.lba_size);
-  printf("zone size is %d\n", info.zone_size);
-  printf("mdts is %d\n", info.mdts);
-  printf("zasl is %d\n", info.zasl);
-  printf("lba_cap is %d\n", info.lba_cap);
-  printf("min lba is %d\n", info.min_lba);
-  printf("max lba is %d\n", info.max_lba);
+  printf("lba size is %ld\n", info.lba_size);
+  printf("zone size is %ld\n", info.zone_size);
+  printf("mdts is %ld\n", info.mdts);
+  printf("zasl is %ld\n", info.zasl);
+  printf("lba_cap is %ld\n", info.lba_cap);
+  printf("min lba is %ld\n", info.min_lba);
+  printf("max lba is %ld\n", info.max_lba);
 
   uint64_t write_head;
   uint64_t append_head;
@@ -277,8 +295,8 @@ int main(int argc, char **argv) {
   rc = szd_read(*qpair, min_zone*info.zone_size, pattern_read_1, info.lba_size);
   DEBUG_TEST_PRINT("read alligned ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size; i++) {
-    assert((char *)(pattern_read_1)[i] == (char *)(*pattern_1)[i]);
+  for (uint64_t i = 0; i < info.lba_size; i++) {
+    assert((char)(pattern_read_1)[i] == (char)(*pattern_1)[i]);
   }
   szd_free(*pattern_1);
   szd_free(pattern_read_1);
@@ -287,8 +305,8 @@ int main(int argc, char **argv) {
   rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
   DEBUG_TEST_PRINT("read zasl ", rc);
   VALID(rc);
-  for (int i = 0; i < info.zasl; i++) {
-    assert((char *)(pattern_read_2)[i] == (char *)(*pattern_2)[i]);
+  for (uint64_t i = 0; i < info.zasl; i++) {
+    assert((char)(pattern_read_2)[i] == (char)(*pattern_2)[i]);
   }
   szd_free(*pattern_2);
   rc = szd_reset_all(*qpair);
@@ -297,8 +315,8 @@ int main(int argc, char **argv) {
   rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
   DEBUG_TEST_PRINT("verify empty first zone ", rc);
   VALID(rc);
-  for (int i = 0; i < info.zasl; i++) {
-    assert((char *)(pattern_read_2)[i] == 0);
+  for (uint64_t i = 0; i < info.zasl; i++) {
+    assert((char)(pattern_read_2)[i] == 0);
   }
   szd_free(pattern_read_2);
 
@@ -323,8 +341,8 @@ int main(int argc, char **argv) {
                          info.lba_size * (info.max_lba - info.min_lba));
   DEBUG_TEST_PRINT("read entire device ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * (info.max_lba - info.min_lba); i++) {
-    assert((char *)(pattern_read_3)[i] == (char *)(*pattern_3)[i]);
+  for (uint64_t i = 0; i < info.lba_size * (info.max_lba - info.min_lba); i++) {
+    assert((char)(pattern_read_3)[i] == (char)(*pattern_3)[i]);
   }
   szd_free(pattern_read_3);
   rc = szd_reset(*qpair, min_zone*info.zone_size + info.zone_size);
@@ -346,22 +364,22 @@ int main(int argc, char **argv) {
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 1 ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * info.zone_size; i++) {
-    assert((char *)(pattern_read_4)[i] == (char *)(*pattern_3)[i]);
+  for (uint64_t i = 0; i < info.lba_size * info.zone_size; i++) {
+    assert((char)(pattern_read_4)[i] == (char)(*pattern_3)[i]);
   }
   rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 2 ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * info.zone_size; i++) {
-    assert((char *)(pattern_read_4)[i] == 0);
+  for (uint64_t i = 0; i < info.lba_size * info.zone_size; i++) {
+    assert((char)(pattern_read_4)[i] == 0);
   }
   rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 2, pattern_read_4,
                          info.lba_size * info.zone_size);
   DEBUG_TEST_PRINT("read zone 3 ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * info.zone_size; i++) {
-    assert((char *)(pattern_read_4)[i] == 0);
+  for (uint64_t i = 0; i < info.lba_size * info.zone_size; i++) {
+    assert((char)(pattern_read_4)[i] == 0);
   }
   rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 3, pattern_read_4,
                          info.lba_size * info.zone_size);
@@ -371,15 +389,15 @@ int main(int argc, char **argv) {
   // one lba at a time.
   rc = write_pattern(pattern_3, *qpair, info.lba_size,
                      19 + info.zone_size * 3 * info.lba_size);
-  for (int i = 0; i < info.lba_size * info.zone_size; i++) {
+  for (uint64_t i = 0; i < info.lba_size * info.zone_size; i++) {
     if (i % info.lba_size == 0 && i > 0) {
       szd_free(*pattern_3);
       rc = write_pattern(pattern_3, *qpair, info.lba_size,
                          19 + i + info.zone_size * 3 * info.lba_size);
       VALID(rc);
     }
-    assert((char *)(pattern_read_4)[i] ==
-           (char *)(*pattern_3)[i % info.lba_size]);
+    assert((char)(pattern_read_4)[i] ==
+           (char)(*pattern_3)[i % info.lba_size]);
   }
   rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
@@ -428,8 +446,8 @@ int main(int argc, char **argv) {
                          info.lba_size * 13);
   DEBUG_TEST_PRINT("zone friction part 6: read 1 zoneborder + 16 ", rc);
   VALID(rc);
-  for (int i = 0; i < info.lba_size * (info.zone_size + 15); i++) {
-    assert((char *)(pattern_read_4)[i] == (char *)(*pattern_3)[i]);
+  for (uint64_t i = 0; i < info.lba_size * (info.zone_size + 15); i++) {
+    assert((char)(pattern_read_4)[i] == (char)(*pattern_3)[i]);
   }
   szd_free(*pattern_3);
   szd_free(pattern_read_4);
@@ -442,35 +460,37 @@ int main(int argc, char **argv) {
   printf("This might take a time...\n");
   pthread_mutex_init(&mut, NULL);
   pthread_t thread1;
-  void *ret1;
   thread_data first_thread_dat = {.manager = manager,
                                   .write_slba_start = min_zone*info.zone_size,
-                                  .alt_slba_start = min_zone*info.zone_size + info.zone_size,
+                                  .alt_slba_start = min_zone*info.zone_size + 2 * info.zone_size,
                                   .data_offset = 3,
-                                  .alt_offset = 9};
+                                  .alt_offset = 9,
+                                  .rc = 0};
   rc = pthread_create(&thread1, NULL, worker_thread, (void *)&first_thread_dat);
   VALID(rc);
   pthread_t thread2;
-  void *ret2;
   thread_data second_thread_dat = {.manager = manager,
-                                   .write_slba_start = min_zone*info.zone_size + info.zone_size,
+                                   .write_slba_start = min_zone*info.zone_size + 2 * info.zone_size,
                                    .alt_slba_start = min_zone*info.zone_size,
-                                   .data_offset = 3,
-                                   .alt_offset = 0};
+                                   .data_offset = 9,
+                                   .alt_offset = 3,
+                                   .rc = 0};
   rc =
       pthread_create(&thread2, NULL, worker_thread, (void *)&second_thread_dat);
   VALID(rc);
 
-  if (pthread_join(thread1, &ret1) != 0) {
-    DEBUG_TEST_PRINT("Error in thread1 ", ret1);
+  if (pthread_join(thread1, NULL) != 0) {
+    DEBUG_TEST_PRINT("Error in thread1 ", 1);
   }
-  DEBUG_TEST_PRINT("thread 2 writes and reads ", ret1);
-  VALID(ret1);
-  if (pthread_join(thread2, &ret2) != 0) {
-    DEBUG_TEST_PRINT("Error in thread2 ", ret2);
+  rc = first_thread_dat.rc;
+  DEBUG_TEST_PRINT("thread 2 writes and reads ", rc);
+  VALID(rc);
+  if (pthread_join(thread2, NULL) != 0) {
+    DEBUG_TEST_PRINT("Error in thread2 ", 1);
   }
-  DEBUG_TEST_PRINT("thread 3 writes and reads ", ret2);
-  VALID(ret2);
+  rc = second_thread_dat.rc;
+  DEBUG_TEST_PRINT("thread 3 writes and reads ", rc);
+  VALID(rc);
 
   printf("----------------------CLOSE----------------------\n");
   // destroy qpair
@@ -499,6 +519,9 @@ int main(int argc, char **argv) {
 
   free(qpair);
   free(manager);
+  // Werror-unused-parameter
+  (void)argc;
+  (void)argv;
 }
 
 #ifdef __cplusplus
