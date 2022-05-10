@@ -76,7 +76,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
   }
   uint64_t lbas = alligned_size / lba_size_;
   // 2 phase
-  if (write_head_ < write_tail_ && write_head_ + lbas > max_zone_head_) {
+  if (write_tail_ > min_zone_head_ && write_head_ + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
     s = channel_->FlushBufferSection(&write_head_, buffer, addr,
                                      first_phase_size);
@@ -201,10 +201,13 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
 }
 
 SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
-  if (begin_lba != write_tail_ || end_lba > max_zone_head_ ||
-      end_lba < min_zone_head_) {
+  if (begin_lba != write_tail_ || end_lba < min_zone_head_) {
     return SZDStatus::InvalidArguments;
   }
+  if (end_lba > max_zone_head_) {
+    return ConsumeTail(begin_lba, end_lba - max_zone_head_ + begin_lba);
+  }
+
   // Nothing to consume
   if ((write_tail_ <= write_head_ && end_lba > write_head_) ||
       (write_tail_ > write_head_ && end_lba > write_head_ &&
@@ -215,7 +218,7 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
   write_tail_ = begin_lba < end_lba ? end_lba : max_zone_head_;
   uint64_t cur_zone = (write_tail_ / zone_size_) * zone_size_;
   SZDStatus s;
-  for (uint64_t slba = zone_tail_; slba < cur_zone; slba += zone_size_) {
+  for (uint64_t slba = zone_tail_; slba != cur_zone; slba += zone_size_) {
     if ((s = channel_->ResetZone(slba)) != SZDStatus::Success) {
       return s;
     }
