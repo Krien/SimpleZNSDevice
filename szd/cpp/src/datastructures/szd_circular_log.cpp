@@ -205,6 +205,11 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
   if (begin_lba != write_tail_ || end_lba < min_zone_head_) {
     return SZDStatus::InvalidArguments;
   }
+  // We want to wrap apparently, this moves the head correctly.
+  if (end_lba < begin_lba) {
+    end_lba = end_lba - min_zone_head_ + max_zone_head_;
+  }
+  // First up to max and then up from start.
   if (end_lba > max_zone_head_) {
     SZDStatus s = ConsumeTail(begin_lba, max_zone_head_);
     if (s != SZDStatus::Success) {
