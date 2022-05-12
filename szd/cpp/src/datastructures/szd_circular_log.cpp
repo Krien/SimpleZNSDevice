@@ -35,7 +35,6 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
   }
   uint64_t lbas = alligned_size / lba_size_;
   // 2 phase
-  uint64_t prev_write_head_ = write_head_;
   if (write_head_ + lbas > max_zone_head_ && write_tail_ > min_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - write_head_) * lba_size_;
     s = channel_->DirectAppend(&write_head_, (void *)data, first_phase_size,
@@ -95,7 +94,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
                                      alligned);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   }
-  if (lbas_ != nullptr) {
+  if (s == SZDStatus::Success && lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;
@@ -127,7 +126,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
     s = channel_->FlushBuffer(&write_head_, buffer);
     zone_head_ = (write_head_ / zone_size_) * zone_size_;
   }
-  if (lbas_ != nullptr) {
+  if (s == SZDStatus::Success && lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;
@@ -152,12 +151,18 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
 
 SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
                                bool alligned) {
+  // Wraparound
+  if (lba > max_zone_head_) {
+    return Read(lba - max_zone_head_ + min_zone_head_, data, size, alligned);
+  }
+  // Set up proper size
   uint64_t alligned_size = alligned ? size : channel_->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
+  // Ensure data is written
   if (!IsValidReadAddress(lba, lbas)) {
     return SZDStatus::InvalidArguments;
   }
-  // 2 phase
+  // 2 phase (wraparound) or 1 phase read needed?
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
     SZDStatus s = channel_->DirectRead(lba, data, first_phase_size, alligned);
@@ -174,12 +179,19 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
 
 SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
                                size_t size, bool alligned) {
+  // Wraparound
+  if (lba > max_zone_head_) {
+    return Read(lba - max_zone_head_ + min_zone_head_, buffer, addr, size,
+                alligned);
+  }
+  // Set up proper size
   uint64_t alligned_size = alligned ? size : channel_->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
+  // Ensure data is written
   if (!IsValidReadAddress(lba, lbas)) {
     return SZDStatus::InvalidArguments;
   }
-  // 2 phase
+  // 2 phase (wraparound) or 1 phase read needed?
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
     SZDStatus s =
@@ -205,11 +217,12 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
   if (begin_lba != write_tail_ || end_lba < min_zone_head_) {
     return SZDStatus::InvalidArguments;
   }
-  // We want to wrap apparently, this moves the head correctly.
+  // We want to force wrap apparently, we do not allow this. Therefore we move
+  // the head back "past" the end. We wrap later on manually.
   if (end_lba < begin_lba) {
     end_lba = end_lba - min_zone_head_ + max_zone_head_;
   }
-  // First up to max and then up from start.
+  // Manual wrapping. First up to max and then up from start.
   if (end_lba > max_zone_head_) {
     SZDStatus s = ConsumeTail(begin_lba, max_zone_head_);
     if (s != SZDStatus::Success) {
@@ -219,13 +232,14 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
     begin_lba = min_zone_head_;
   }
 
-  // Nothing to consume
+  // Nothing to consume.
   if ((write_tail_ <= write_head_ && end_lba > write_head_) ||
       (write_tail_ > write_head_ && end_lba > write_head_ &&
        end_lba < write_tail_)) {
     return SZDStatus::InvalidArguments;
   }
 
+  // Reset zones.
   write_tail_ = end_lba;
   uint64_t cur_zone = (write_tail_ / zone_size_) * zone_size_;
   SZDStatus s;
@@ -235,7 +249,8 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
     }
   }
   zone_tail_ = cur_zone;
-  // Wraparound
+
+  // Wraparound of the actual tail.
   if (zone_tail_ == max_zone_head_) {
     zone_tail_ = write_tail_ = min_zone_head_;
   }
@@ -244,6 +259,8 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
 
 SZDStatus SZDCircularLog::ResetAll() {
   SZDStatus s;
+  // We never own all zones for a circular log (I hope), therefore we need
+  // individual resetting.
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_size_) {
     s = channel_->ResetZone(slba);
@@ -252,6 +269,7 @@ SZDStatus SZDCircularLog::ResetAll() {
     }
   }
   s = SZDStatus::Success;
+  // Clean state
   write_head_ = zone_head_ = zone_tail_ = write_tail_ = min_zone_head_;
   return s;
 }

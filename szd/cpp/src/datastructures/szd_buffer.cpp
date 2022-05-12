@@ -69,7 +69,9 @@ SZDStatus SZDBuffer::ReallocBuffer(uint64_t size) {
     return s;
   }
   // realloc, we need more space
+  char tmp[backed_memory_size_];
   if (backed_memory_size_ > 0) {
+    memcpy(tmp, backed_memory_, backed_memory_size_);
     if ((s = FreeBuffer()) != SZDStatus::Success) {
       return s;
     }
@@ -79,13 +81,16 @@ SZDStatus SZDBuffer::ReallocBuffer(uint64_t size) {
     backed_memory_size_ = 0;
     return SZDStatus::IOError;
   }
+  if (backed_memory_size_ > 0) {
+    memcpy(backed_memory_, tmp, backed_memory_size_);
+  }
   backed_memory_size_ = alligned_size;
   return SZDStatus::Success;
 }
 
 SZDStatus SZDBuffer::FreeBuffer() {
   if (backed_memory_size_ == 0) {
-    return SZDStatus::InvalidArguments;
+    return SZDStatus::Success;
   }
   szd_free(backed_memory_);
   backed_memory_ = nullptr;
