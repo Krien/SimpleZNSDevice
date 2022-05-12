@@ -204,15 +204,15 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
   // Repeatedly eat and append
   for (uint64_t slba = 0; slba < 5 * info.zone_size - 6; slba += 6) {
     uint64_t eat_address_first = 12 * info.zone_size + slba;
+    uint64_t eat_address_second = 12 * info.zone_size + slba + 6;
+    eat_address_second =
+        eat_address_first >= 15 * info.zone_size
+            ? (eat_address_second - 15 * info.zone_size) + 10 * info.zone_size
+            : eat_address_second;
     eat_address_first =
         eat_address_first >= 15 * info.zone_size
             ? (eat_address_first - 15 * info.zone_size) + 10 * info.zone_size
             : eat_address_first;
-    uint64_t eat_address_second = 12 * info.zone_size + slba + 6;
-    eat_address_second =
-        eat_address_second > 15 * info.zone_size
-            ? (eat_address_second - 15 * info.zone_size) + 10 * info.zone_size
-            : eat_address_second;
 
     ASSERT_EQ(log.ConsumeTail(eat_address_first, eat_address_second),
               SZD::SZDStatus::Success);
