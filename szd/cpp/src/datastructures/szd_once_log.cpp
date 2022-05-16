@@ -8,8 +8,9 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr)
-    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
-      zone_head_(min_zone_nr * info.zone_size) {
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr), block_range_((max_zone_nr - min_zone_nr) * info.zone_size),
+    space_left_(block_range_ * info.lba_size)
+  {
   channel_factory_->Ref();
   channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
 }
@@ -24,15 +25,16 @@ SZDOnceLog::~SZDOnceLog() {
 SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size)) {
+  if (!SpaceLeft(size, alligned)) {
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
   s = channel_->DirectAppend(&write_head_, (void *)data, size, alligned);
-  zone_head_ = (write_head_ / zone_size_) * zone_size_;
+  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
-    *lbas = write_head_ - write_head_old;
+    *lbas = blocks;
   }
+  space_left_ -= blocks * lba_size_;
   return s;
 }
 
@@ -44,15 +46,16 @@ SZDStatus SZDOnceLog::Append(const std::string string, uint64_t *lbas,
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size)) {
+  if (!SpaceLeft(size, alligned)) {
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
   s = channel_->FlushBufferSection(&write_head_, buffer, addr, size, alligned);
-  zone_head_ = (write_head_ / zone_size_) * zone_size_;
+  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
-    *lbas = write_head_ - write_head_old;
+    *lbas = blocks;
   }
+  space_left_ -= blocks * lba_size_;
   return s;
 }
 
@@ -64,11 +67,16 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
   }
   uint64_t write_head_old = write_head_;
   s = channel_->FlushBuffer(&write_head_, buffer);
-  zone_head_ = (write_head_ / zone_size_) * zone_size_;
+  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
-    *lbas = write_head_ - write_head_old;
+    *lbas = blocks;
   }
+  space_left_ -= blocks * lba_size_;
   return s;
+}
+
+bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
+  return lba >= min_zone_head_ && lba + lbas <= write_head_;
 }
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
@@ -106,7 +114,7 @@ SZDStatus SZDOnceLog::ResetAll() {
   }
   s = SZDStatus::Success;
   write_head_ = min_zone_head_;
-  zone_head_ = min_zone_head_;
+  space_left_ = block_range_ * lba_size_;
   return s;
 }
 
@@ -130,12 +138,8 @@ SZDStatus SZDOnceLog::RecoverPointers() {
     }
   }
   write_head_ = write_head;
-  zone_head_ = (write_head_ / zone_size_) * zone_size_;
+  space_left_ = (max_zone_head_ - write_head_) * lba_size_;
   return SZDStatus::Success;
-}
-
-bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
-  return lba >= min_zone_head_ && lba + lbas <= write_head_;
 }
 
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

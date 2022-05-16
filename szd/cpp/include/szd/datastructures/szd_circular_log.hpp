@@ -36,16 +36,20 @@ public:
   SZDStatus ConsumeTail(uint64_t begin_lba, uint64_t end_lba);
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
-  bool Empty() const override { return write_head_ == min_zone_head_; }
-  bool SpaceLeft(const size_t size) const override;
+
+  inline bool Empty() const override { return write_head_ == min_zone_head_; }
+  uint64_t SpaceAvailable() const override;
+  bool SpaceLeft(const size_t size, bool alligned=true) const override;
+
   bool IsValidReadAddress(const uint64_t addr, const uint64_t lbas) const;
 
 private:
   // log
-  uint64_t zone_head_;
   uint64_t zone_tail_;
+  uint64_t space_left_;
   // references
-  SZDChannel *channel_;
+  SZDChannel *read_channel_;
+  SZDChannel *write_channel_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

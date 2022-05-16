@@ -10,7 +10,6 @@
 #include "szd/szd_status.hpp"
 
 #include <memory>
-#include <mutex>
 #include <string>
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
@@ -74,7 +73,6 @@ private:
   bool can_access_all_;
   void *backed_memory_spill_;
   uint64_t lba_msb_;
-  std::mutex mutex_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

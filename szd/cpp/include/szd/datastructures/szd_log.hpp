@@ -38,7 +38,8 @@ public:
   virtual SZDStatus ResetAll() = 0;
   virtual SZDStatus RecoverPointers() = 0;
   virtual bool Empty() const = 0;
-  virtual bool SpaceLeft(const size_t size) const = 0;
+  virtual uint64_t SpaceAvailable() const = 0;
+  virtual bool SpaceLeft(const size_t size, bool alligned=true) const = 0;
   inline uint64_t GetWriteHead() const { return write_head_; }
   inline uint64_t GetWriteTail() const { return write_tail_; }
 

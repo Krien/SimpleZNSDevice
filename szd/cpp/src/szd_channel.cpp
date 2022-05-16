@@ -60,23 +60,17 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
-      mutex_.lock();
       rc = szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size);
-      mutex_.unlock();
     }
     memset((char *)backed_memory_spill_ + postfix_size, '\0',
            lba_size_ - postfix_size);
     memcpy(backed_memory_spill_, (char *)cbuffer + addr + alligned_size,
            postfix_size);
-    mutex_.lock();
     rc = rc | szd_append(qpair_, lba, backed_memory_spill_, lba_size_);
-    mutex_.unlock();
     return FromStatus(rc);
   } else {
-    mutex_.lock();
     s = FromStatus(
         szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size));
-    mutex_.unlock();
     return s;
   }
 }
@@ -107,14 +101,10 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
-      mutex_.lock();
       rc = szd_read(qpair_, lba, (char *)cbuffer + addr, alligned_size);
-      mutex_.unlock();
     }
-    mutex_.lock();
     rc = rc | szd_read(qpair_, lba + alligned_size / lba_size_,
                        (char *)backed_memory_spill_, lba_size_);
-    mutex_.unlock();
     s = FromStatus(rc);
     if (s == SZDStatus::Success) {
       memcpy((char *)cbuffer + addr + alligned_size, backed_memory_spill_,
@@ -122,10 +112,8 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     }
     return s;
   } else {
-    mutex_.lock();
     s = FromStatus(
         szd_read(qpair_, lba, (char *)cbuffer + addr, alligned_size));
-    mutex_.unlock();
     return s;
   }
 }
@@ -142,9 +130,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     return SZDStatus::IOError;
   }
   memcpy(dma_buffer, buffer, size);
-  mutex_.lock();
   SZDStatus s = FromStatus(szd_append(qpair_, lba, dma_buffer, alligned_size));
-  mutex_.unlock();
   szd_free(dma_buffer);
   return s;
 }
@@ -160,9 +146,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   if (buffer_dma == nullptr) {
     return SZDStatus::IOError;
   }
-  mutex_.lock();
   SZDStatus s = FromStatus(szd_read(qpair_, lba, buffer_dma, alligned_size));
-  mutex_.unlock();
   if (s == SZDStatus::Success) {
     memcpy(buffer, buffer_dma, size);
   }
@@ -174,9 +158,7 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  mutex_.lock();
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
-  mutex_.unlock();
   return s;
 }
 
@@ -200,9 +182,7 @@ SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
-  mutex_.lock();
   SZDStatus s = FromStatus(szd_get_zone_head(qpair_, slba, zone_head));
-  mutex_.unlock();
   return s;
 }
 

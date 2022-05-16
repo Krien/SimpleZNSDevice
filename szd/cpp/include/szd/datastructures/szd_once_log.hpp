@@ -35,16 +35,18 @@ public:
                  bool alligned = true) override;
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
-  bool Empty() const override { return write_head_ == min_zone_head_; }
-  bool SpaceLeft(const size_t size) const override {
-    return write_head_ + (channel_->allign_size(size)) / lba_size_ <=
-           max_zone_head_;
+  inline bool Empty() const override { return write_head_ == min_zone_head_; }
+  inline uint64_t SpaceAvailable() const override { return space_left_;}
+  inline bool SpaceLeft(const size_t size, bool alligned=true) const override {
+    uint64_t alligned_size = alligned ? size : channel_->allign_size(size);
+    return alligned_size <= space_left_;
   }
 
 private:
   bool IsValidAddress(uint64_t lba, uint64_t lbas);
   // log
-  uint64_t zone_head_;
+  const uint64_t block_range_;
+  uint64_t space_left_;
   // references
   SZDChannel *channel_;
 };
