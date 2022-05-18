@@ -40,8 +40,11 @@ SZDStatus AllocZones(std::vector<std::pair<uint64_t, u_int64_t>> &zone_regions,
 SZDStatus FindRegion(const uint64_t ident, SZDFreeList *from,
                      SZDFreeList **target);
 
-char *EncodeFreelist(SZDFreeList *target);
-void DecodeFreelist();
+char *EncodeFreelist(SZDFreeList *target, uint64_t *size);
+SZDStatus DecodeFreelist(const char *buffer, uint64_t buffer_size,
+                         SZDFreeList **target, uint32_t *zones_free);
+
+bool TESTFreeListsEqual(SZDFreeList *left, SZDFreeList *right);
 } // namespace SZDFreeListFunctions
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

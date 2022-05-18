@@ -42,6 +42,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   ASSERT_FALSE(log.Empty());
   // !, yes a small write claims an entire zone in this design...
   ASSERT_TRUE(log.SpaceLeft(range - info.lba_size * info.zone_size));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Fill rest of device
   std::vector<std::pair<uint64_t, uint64_t>> regions_full;
@@ -49,6 +50,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   ASSERT_EQ(log.Append(buff, range - info.lba_size * info.zone_size,
                        regions_full, true),
             SZD::SZDStatus::Success);
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // on heap because of stack limitations..
   char *buffr = new char[range - info.lba_size * info.zone_size];
@@ -68,6 +70,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   ASSERT_EQ(log.Reset(regions_full), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.SpaceLeft(range));
   ASSERT_TRUE(log.Empty());
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 }
 
 TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
@@ -104,6 +107,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
 
   // No more space.
   ASSERT_TRUE(!log.SpaceLeft(1, false));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Delete middle region and try setting "2" regions, which should succeed.
   ASSERT_EQ(log.Reset(mid_regions), SZD::SZDStatus::Success);
@@ -117,10 +121,12 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   std::vector<std::pair<uint64_t, uint64_t>> stub_regions;
   ASSERT_NE(log.Append(mid_buff, size3, stub_regions, true),
             SZD::SZDStatus::Success);
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Delete first region and set region of 4 zones, this should succeed.
   ASSERT_EQ(log.Reset(first_regions), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.SpaceLeft(size4));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
   char *final_buff = new char[size4];
   SZDTestUtil::CreateCyclicPattern(final_buff, size4, 0);
   first_regions.clear();
@@ -128,6 +134,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
             SZD::SZDStatus::Success);
   // Filled again
   ASSERT_TRUE(!log.SpaceLeft(1, false));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Ensure content is consistent
   char *read_buff = new char[size4];
@@ -146,11 +153,14 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   // delete the full one.
   ASSERT_EQ(log.Reset(mid_regions), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.SpaceLeft(size2));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
   ASSERT_EQ(log.Reset(first_regions),
             SZD::SZDStatus::Success); // remember that first now surrounds mid..
   ASSERT_TRUE(log.SpaceLeft(size2 + size4));
+  ASSERT_TRUE(log.TESTEncodingDecoding());
   ASSERT_EQ(log.Reset(last_regions), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.Empty());
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Memory cleanup...
   delete[] first_buff;
@@ -166,6 +176,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   first_regions.clear(); // Not used anymore, so why not?
   ASSERT_EQ(log.Append(total_buff, total_range, first_regions, true),
             SZD::SZDStatus::Success);
+  ASSERT_TRUE(log.TESTEncodingDecoding());
   char *total_buff_read = new char[total_range];
   ASSERT_EQ(log.Read(first_regions, total_buff_read, total_range, true),
             SZD::SZDStatus::Success);
@@ -176,6 +187,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.SpaceLeft(total_range, true));
   ASSERT_TRUE(log.Empty());
+  ASSERT_TRUE(log.TESTEncodingDecoding());
 
   delete[] total_buff;
   delete[] total_buff_read;

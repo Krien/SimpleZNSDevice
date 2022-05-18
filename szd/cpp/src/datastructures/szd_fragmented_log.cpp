@@ -204,4 +204,28 @@ bool SZDFragmentedLog::SpaceLeft(const size_t size, bool alligned) const {
   return zones_needed <= zones_left_;
 }
 
+bool SZDFragmentedLog::TESTEncodingDecoding() const {
+  uint64_t encoded_size;
+  const char *encoded =
+      SZDFreeListFunctions::EncodeFreelist(seeker_, &encoded_size);
+  SZDFreeList *newlist;
+  uint32_t zones_free = 0;
+  SZDStatus s = SZDFreeListFunctions::DecodeFreelist(encoded, encoded_size,
+                                                     &newlist, &zones_free);
+  delete[] encoded;
+  if (s != SZDStatus::Success) {
+    return false;
+  }
+  if (!SZDFreeListFunctions::TESTFreeListsEqual(seeker_, newlist)) {
+    SZDFreeListFunctions::Destroy(newlist);
+    return false;
+  }
+  if (zones_free != zones_left_) {
+    SZDFreeListFunctions::Destroy(newlist);
+    return false;
+  }
+  SZDFreeListFunctions::Destroy(newlist);
+  return true;
+}
+
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

@@ -40,6 +40,8 @@ public:
   uint64_t SpaceAvailable() const;
   bool SpaceLeft(const size_t size, bool alligned = true) const;
 
+  bool TESTEncodingDecoding() const;
+
 private:
   // const after initialisation
   const uint64_t min_zone_head_;

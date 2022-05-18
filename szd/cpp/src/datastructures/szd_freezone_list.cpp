@@ -2,6 +2,8 @@
 #include "szd/szd.h"
 #include "szd/szd_channel_factory.hpp"
 
+#include <string.h>
+
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 namespace SZDFreeListFunctions {
 void Init(SZDFreeList **freelist, uint64_t begin_zone, uint64_t max_zone) {
@@ -162,16 +164,111 @@ SZDStatus FindRegion(const uint64_t ident, SZDFreeList *from,
   return SZDStatus::InvalidArguments;
 }
 
-char *EncodeFreelist(SZDFreeList *target) {
-  SZDFreeList *first = target;
-  while (first) {
+static uint64_t Decode64(const char *data) {
+  // Important first cast to uint64t to avoid signed logic or undefined
+  // shifts...
+  return static_cast<uint64_t>(data[0]) |
+         (static_cast<uint64_t>(data[1]) << 8) |
+         (static_cast<uint64_t>(data[2]) << 16) |
+         (static_cast<uint64_t>(data[3]) << 24) |
+         (static_cast<uint64_t>(data[4]) << 32) |
+         (static_cast<uint64_t>(data[5]) << 40) |
+         (static_cast<uint64_t>(data[6]) << 48) |
+         (static_cast<uint64_t>(data[7]) << 56);
+}
 
+static void Encode64(char *data, uint64_t nr) {
+  data[0] = nr & 0xff;
+  data[1] = (nr >> 8) & 0xff;
+  data[2] = (nr >> 16) & 0xff;
+  data[3] = (nr >> 24) & 0xff;
+  data[4] = (nr >> 32) & 0xff;
+  data[5] = (nr >> 40) & 0xff;
+  data[6] = (nr >> 48) & 0xff;
+  data[7] = (nr >> 56) & 0xff;
+}
+
+// 17 bytes * frags + 8 bytes for size
+// TODO: this is temporary, preferably rework...
+char *EncodeFreelist(SZDFreeList *target, uint64_t *size) {
+  std::string data;
+  SZDFreeList *first = FirstZoneRegion(target);
+  char entry[17];
+  while (first) {
+    Encode64(entry, first->begin_zone_);
+    Encode64(entry + sizeof(uint64_t), first->zones_);
+    memcpy(entry + sizeof(uint64_t) * 2, &first->used_, sizeof(bool));
+    data.append(entry, sizeof(entry));
     first = first->next_;
   }
-  char *output = (char *)calloc(sizeof("deadbeef") + 1, sizeof(char));
+  char *output = new char[data.size() + sizeof(uint64_t)];
+  uint64_t out_size = static_cast<uint64_t>(data.size() + sizeof(uint64_t));
+  Encode64(output, out_size);
+  memcpy(output + sizeof(uint64_t), data.data(), data.size());
+  *size = out_size;
   return output;
 }
 
-void DecodeFreelist() {}
+SZDStatus DecodeFreelist(const char *buffer, uint64_t buffer_size,
+                         SZDFreeList **target, uint32_t *zones_free) {
+  if (buffer_size < sizeof(uint64_t)) {
+    return SZDStatus::InvalidArguments;
+  }
+  uint64_t true_size;
+  true_size = Decode64(buffer);
+  if (true_size > buffer_size) {
+    return SZDStatus::InvalidArguments;
+  }
+  buffer_size = true_size;
+
+  SZDFreeList *prev = nullptr;
+  *zones_free = 0;
+  // Try parsing entries
+  uint64_t walker = sizeof(uint64_t);
+  while (walker < buffer_size) {
+    SZDFreeList *next = new SZDFreeList;
+    next->begin_zone_ = Decode64(buffer + walker);
+    walker += sizeof(uint64_t);
+    next->zones_ = Decode64(buffer + walker);
+    walker += sizeof(uint64_t);
+    memcpy(&next->used_, buffer + walker, sizeof(bool));
+    if (!next->used_) {
+      *zones_free += next->zones_;
+    }
+    walker += sizeof(bool);
+    if (prev != nullptr) {
+      next->prev_ = prev;
+      prev->next_ = next;
+    } else {
+      next->prev_ = nullptr;
+    }
+    next->next_ = nullptr;
+    prev = next;
+    *target = next;
+  }
+  return SZDStatus::Success;
+}
+
+bool TESTFreeListsEqual(SZDFreeList *left, SZDFreeList *right) {
+  if (right == nullptr && left != nullptr) {
+    return false;
+  }
+  SZDFreeList *first_left = FirstZoneRegion(left);
+  SZDFreeList *first_right = FirstZoneRegion(right);
+  while (first_left != nullptr && first_right != nullptr) {
+    if (first_left->begin_zone_ != first_right->begin_zone_ ||
+        first_left->zones_ != first_right->zones_ ||
+        first_left->used_ != first_right->used_) {
+      return false;
+    }
+    first_left = first_left->next_;
+    first_right = first_right->next_;
+  }
+  if (!(first_left == nullptr && first_right == nullptr)) {
+    return false;
+  }
+  return true;
+};
+
 } // namespace SZDFreeListFunctions
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
