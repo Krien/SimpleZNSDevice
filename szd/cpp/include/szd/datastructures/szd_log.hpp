@@ -48,6 +48,8 @@ public:
   virtual uint64_t GetWriteHead() const = 0;
   virtual uint64_t GetWriteTail() const = 0;
 
+  inline uint8_t GetNumberOfReaders() const { return number_of_readers_; }
+
 protected:
   // const after initialisation
   const uint64_t min_zone_head_;
