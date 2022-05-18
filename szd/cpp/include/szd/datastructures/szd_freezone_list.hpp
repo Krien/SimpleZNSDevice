@@ -25,14 +25,15 @@ struct SZDFreeList {
 };
 
 namespace SZDFreeListFunctions {
-void Init(SZDFreeList *freelist);
+void Init(SZDFreeList **freelist, uint64_t begin_zone, uint64_t max_zone);
+void Destroy(SZDFreeList *target);
 
 SZDFreeList *NextZoneRegion(SZDFreeList *target);
 SZDFreeList *PrevZoneRegion(SZDFreeList *target);
 SZDFreeList *FirstZoneRegion(SZDFreeList *target);
 SZDFreeList *lastZoneRegion(SZDFreeList *target);
 
-void FreeZones(SZDFreeList *target);
+void FreeZones(SZDFreeList *target, SZDFreeList **orig);
 void AllocZonesFromRegion(SZDFreeList *target, uint64_t zones);
 SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
                      SZDFreeList **from, uint64_t requested_zones);

@@ -24,11 +24,13 @@ public:
   SZDFragmentedLog &operator=(const SZDFragmentedLog &) = delete;
   ~SZDFragmentedLog();
 
+  SZDStatus Append(const char *buffer, size_t size,
+                   std::vector<SZDFreeList *> &regions, bool alligned = true);
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
-                   uint64_t *lbas, bool alligned = true);
-  SZDStatus Read(uint64_t *lbas, char *data, uint64_t size,
-                 bool alligned = true);
-  SZDStatus Reset(uint64_t &lbas);
+                   std::vector<SZDFreeList *> &regions, bool alligned = true);
+  SZDStatus Read(const std::vector<SZDFreeList *> &regions, char *data,
+                 uint64_t size, bool alligned = true);
+  SZDStatus Reset(std::vector<SZDFreeList *> &regions);
   SZDStatus ResetAll();
   SZDStatus Recover();
 
@@ -45,7 +47,7 @@ private:
   const uint64_t zone_bytes_;
   // Log
   SZDFreeList *freelist_;
-  SZDFreeList *head_;
+  SZDFreeList *seeker_;
   uint64_t zones_left_;
   // references
   SZDChannelFactory *channel_factory_;

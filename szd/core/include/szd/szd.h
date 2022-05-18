@@ -111,7 +111,7 @@ typedef struct {
  */
 typedef struct {
   bool done; /**< Synchronous call is done.*/
-  int err;   /**< return code after call is done.*/
+  uint16_t err;   /**< return code after call is done.*/
 } Completion;
 extern const Completion Completion_default;
 

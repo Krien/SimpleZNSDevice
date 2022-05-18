@@ -188,6 +188,7 @@ if (TESTING)
         "szd_channel_test"
         "szd_once_log_test"
         "szd_circular_log_test"
+        "szd_fragmented_log_test"
     )
     list(APPEND szd_all_files cpp_tests)
     function(add_cpp_test filename dir)
