@@ -35,8 +35,10 @@ SZDFreeList *lastZoneRegion(SZDFreeList *target);
 
 void FreeZones(SZDFreeList *target, SZDFreeList **orig);
 void AllocZonesFromRegion(SZDFreeList *target, uint64_t zones);
-SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
+SZDStatus AllocZones(std::vector<std::pair<uint64_t, u_int64_t>> &zone_regions,
                      SZDFreeList **from, uint64_t requested_zones);
+SZDStatus FindRegion(const uint64_t ident, SZDFreeList *from,
+                     SZDFreeList **target);
 
 char *EncodeFreelist(SZDFreeList *target);
 void DecodeFreelist();

@@ -33,9 +33,10 @@ SZDFragmentedLog::~SZDFragmentedLog() {
   }
 }
 
-SZDStatus SZDFragmentedLog::Append(const char *buffer, size_t size,
-                                   std::vector<SZDFreeList *> &regions,
-                                   bool alligned) {
+SZDStatus
+SZDFragmentedLog::Append(const char *buffer, size_t size,
+                         std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                         bool alligned) {
   // Check buffer space
   size_t alligned_size = alligned ? size : write_channel_->allign_size(size);
   // Check zone space
@@ -59,8 +60,8 @@ SZDStatus SZDFragmentedLog::Append(const char *buffer, size_t size,
   uint64_t slba;
   bool write_alligned = true;
   for (auto region : regions) {
-    slba = region->begin_zone_ * zone_size_;
-    bytes_to_write = region->zones_ * zone_size_ * lba_size_;
+    slba = region.first * zone_size_;
+    bytes_to_write = region.second * zone_size_ * lba_size_;
     if (bytes_to_write > size - offset) {
       bytes_to_write = size - offset;
       write_alligned = alligned;
@@ -76,10 +77,10 @@ SZDStatus SZDFragmentedLog::Append(const char *buffer, size_t size,
   return s;
 }
 
-SZDStatus SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr,
-                                   size_t size,
-                                   std::vector<SZDFreeList *> &regions,
-                                   bool alligned) {
+SZDStatus
+SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
+                         std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                         bool alligned) {
   // Check buffer space
   size_t alligned_size = alligned ? size : write_channel_->allign_size(size);
   if (addr + size > buffer.GetBufferSize()) {
@@ -107,8 +108,8 @@ SZDStatus SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr,
   uint64_t slba;
   bool write_alligned = true;
   for (auto region : regions) {
-    slba = region->begin_zone_ * zone_size_;
-    bytes_to_write = region->zones_ * zone_size_;
+    slba = region.first * zone_size_;
+    bytes_to_write = region.second * zone_size_;
     if (bytes_to_write > size - offset) {
       bytes_to_write = size - offset;
       write_alligned = alligned;
@@ -124,20 +125,21 @@ SZDStatus SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr,
   return s;
 }
 
-SZDStatus SZDFragmentedLog::Read(const std::vector<SZDFreeList *> &regions,
-                                 char *data, uint64_t size, bool alligned) {
+SZDStatus SZDFragmentedLog::Read(
+    const std::vector<std::pair<uint64_t, uint64_t>> &regions, char *data,
+    uint64_t size, bool alligned) {
   SZDStatus s = SZDStatus::Success;
   uint64_t read = 0;
   bool alligned_read = true;
   uint64_t size_to_read = 0;
   for (auto region : regions) {
-    if (size - read < region->zones_ * zone_size_ * lba_size_) {
+    if (size - read < region.second * zone_size_ * lba_size_) {
       size_to_read = size - read;
       alligned_read = alligned;
     } else {
-      size_to_read = region->zones_ * zone_size_ * lba_size_;
+      size_to_read = region.second * zone_size_ * lba_size_;
     }
-    s = read_channel_->DirectRead(region->begin_zone_ * zone_size_, data + read,
+    s = read_channel_->DirectRead(region.first * zone_size_, data + read,
                                   size_to_read, alligned_read);
     if (s != SZDStatus::Success) {
       return s;
@@ -147,12 +149,13 @@ SZDStatus SZDFragmentedLog::Read(const std::vector<SZDFreeList *> &regions,
   return s;
 }
 
-SZDStatus SZDFragmentedLog::Reset(std::vector<SZDFreeList *> &regions) {
+SZDStatus
+SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions) {
   SZDStatus s = SZDStatus::Success;
   // Erase data
   for (auto region : regions) {
-    uint64_t begin = region->begin_zone_ * zone_size_;
-    uint64_t end = begin + region->zones_ * zone_size_;
+    uint64_t begin = region.first * zone_size_;
+    uint64_t end = begin + region.second * zone_size_;
     for (uint64_t slba = begin; slba < end; slba += zone_size_) {
       s = write_channel_->ResetZone(slba);
       if (s != SZDStatus::Success) {
@@ -160,7 +163,9 @@ SZDStatus SZDFragmentedLog::Reset(std::vector<SZDFreeList *> &regions) {
       }
       zones_left_++;
     }
-    SZDFreeListFunctions::FreeZones(region, &seeker_);
+    SZDFreeList *to_delete;
+    SZDFreeListFunctions::FindRegion(region.first, seeker_, &to_delete);
+    SZDFreeListFunctions::FreeZones(to_delete, &seeker_);
   }
   return s;
 }
@@ -179,6 +184,7 @@ SZDStatus SZDFragmentedLog::ResetAll() {
   SZDFreeListFunctions::Init(&freelist_, min_zone_head_ / zone_size_,
                              max_zone_head_ / zone_size_);
   seeker_ = freelist_;
+  zones_left_ = (max_zone_head_ - min_zone_head_) / zone_size_;
   return s;
 }
 

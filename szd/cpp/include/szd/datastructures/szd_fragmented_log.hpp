@@ -25,12 +25,14 @@ public:
   ~SZDFragmentedLog();
 
   SZDStatus Append(const char *buffer, size_t size,
-                   std::vector<SZDFreeList *> &regions, bool alligned = true);
+                   std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                   bool alligned = true);
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
-                   std::vector<SZDFreeList *> &regions, bool alligned = true);
-  SZDStatus Read(const std::vector<SZDFreeList *> &regions, char *data,
-                 uint64_t size, bool alligned = true);
-  SZDStatus Reset(std::vector<SZDFreeList *> &regions);
+                   std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                   bool alligned = true);
+  SZDStatus Read(const std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                 char *data, uint64_t size, bool alligned = true);
+  SZDStatus Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions);
   SZDStatus ResetAll();
   SZDStatus Recover();
 

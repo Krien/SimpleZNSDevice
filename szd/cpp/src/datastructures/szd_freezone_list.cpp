@@ -110,7 +110,7 @@ void AllocZonesFromRegion(SZDFreeList *target, uint64_t zones) {
   target->used_ = true;
 }
 
-SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
+SZDStatus AllocZones(std::vector<std::pair<uint64_t, u_int64_t>> &zone_regions,
                      SZDFreeList **from, uint64_t requested_zones) {
   SZDFreeList *start = *from;
   // forward
@@ -118,7 +118,8 @@ SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
     if (!(*from)->used_) {
       uint32_t claimed_zones = std::min((*from)->zones_, requested_zones);
       AllocZonesFromRegion(*from, claimed_zones);
-      zone_regions.push_back(*from);
+      std::pair region = std::make_pair((*from)->begin_zone_, (*from)->zones_);
+      zone_regions.push_back(region);
       requested_zones -= claimed_zones;
       if (requested_zones == 0) {
         return SZDStatus::Success;
@@ -132,7 +133,8 @@ SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
     if (!(*from)->used_) {
       uint32_t claimed_zones = std::min((*from)->zones_, requested_zones);
       AllocZonesFromRegion(*from, claimed_zones);
-      zone_regions.push_back(*from);
+      std::pair region = std::make_pair((*from)->begin_zone_, (*from)->zones_);
+      zone_regions.push_back(region);
       requested_zones -= claimed_zones;
       if (requested_zones == 0) {
         return SZDStatus::Success;
@@ -143,6 +145,19 @@ SZDStatus AllocZones(std::vector<SZDFreeList *> &zone_regions,
   // No space found...
   if ((*from) == nullptr) {
     *from = start; // prevents memory leaks and nullptrs
+  }
+  return SZDStatus::InvalidArguments;
+}
+
+SZDStatus FindRegion(const uint64_t ident, SZDFreeList *from,
+                     SZDFreeList **target) {
+  SZDFreeList *first = FirstZoneRegion(from);
+  while (first != nullptr) {
+    if (first->begin_zone_ == ident) {
+      *target = first;
+      return SZDStatus::Success;
+    }
+    first = first->next_;
   }
   return SZDStatus::InvalidArguments;
 }

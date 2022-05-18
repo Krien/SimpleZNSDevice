@@ -32,7 +32,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   memset(buff, 0, sizeof(buff));
 
   // Write and read one entry
-  std::vector<SZD::SZDFreeList *> regions;
+  std::vector<std::pair<uint64_t, uint64_t>> regions;
   ASSERT_EQ(log.Append("TEST", sizeof("TEST"), regions, false),
             SZD::SZDStatus::Success);
   ASSERT_EQ(regions.size(), 1);
@@ -44,7 +44,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   ASSERT_TRUE(log.SpaceLeft(range - info.lba_size * info.zone_size));
 
   // Fill rest of device
-  std::vector<SZD::SZDFreeList *> regions_full;
+  std::vector<std::pair<uint64_t, uint64_t>> regions_full;
   SZDTestUtil::CreateCyclicPattern(buff, range, 0);
   ASSERT_EQ(log.Append(buff, range - info.lba_size * info.zone_size,
                        regions_full, true),
@@ -92,9 +92,9 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   SZDTestUtil::CreateCyclicPattern(first_buff, size3, 0);
   SZDTestUtil::CreateCyclicPattern(mid_buff, size3, 10);  // other pattern!
   SZDTestUtil::CreateCyclicPattern(last_buff, size3, 15); // other pattern!
-  std::vector<SZD::SZDFreeList *> first_regions;
-  std::vector<SZD::SZDFreeList *> mid_regions;
-  std::vector<SZD::SZDFreeList *> last_regions;
+  std::vector<std::pair<uint64_t, uint64_t>> first_regions;
+  std::vector<std::pair<uint64_t, uint64_t>> mid_regions;
+  std::vector<std::pair<uint64_t, uint64_t>> last_regions;
   ASSERT_EQ(log.Append(first_buff, size3, first_regions, true),
             SZD::SZDStatus::Success);
   ASSERT_EQ(log.Append(mid_buff, size3, mid_regions, true),
@@ -114,7 +114,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   ASSERT_TRUE(log.SpaceLeft(size1));
 
   // Try setting 3 regions which should fail.
-  std::vector<SZD::SZDFreeList *> stub_regions;
+  std::vector<std::pair<uint64_t, uint64_t>> stub_regions;
   ASSERT_NE(log.Append(mid_buff, size3, stub_regions, true),
             SZD::SZDStatus::Success);
 
@@ -167,10 +167,16 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   ASSERT_EQ(log.Append(total_buff, total_range, first_regions, true),
             SZD::SZDStatus::Success);
   char *total_buff_read = new char[total_range];
-
   ASSERT_EQ(log.Read(first_regions, total_buff_read, total_range, true),
             SZD::SZDStatus::Success);
   ASSERT_TRUE(memcmp(total_buff_read, total_buff, total_range) == 0);
+  ASSERT_TRUE(!log.SpaceLeft(1, false));
+
+  // Destroy all
+  ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
+  ASSERT_TRUE(log.SpaceLeft(total_range, true));
+  ASSERT_TRUE(log.Empty());
+
   delete[] total_buff;
   delete[] total_buff_read;
 }
