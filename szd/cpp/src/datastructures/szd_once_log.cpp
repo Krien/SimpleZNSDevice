@@ -8,9 +8,9 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr)
-    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr), block_range_((max_zone_nr - min_zone_nr) * info.zone_size),
-    space_left_(block_range_ * info.lba_size)
-  {
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+      block_range_((max_zone_nr - min_zone_nr) * info.zone_size),
+      space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_) {
   channel_factory_->Ref();
   channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
 }
@@ -26,6 +26,9 @@ SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
   if (!SpaceLeft(size, alligned)) {
+    if (lbas != nullptr) {
+      *lbas = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
@@ -47,6 +50,9 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
   if (!SpaceLeft(size, alligned)) {
+    if (lbas != nullptr) {
+      *lbas = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
@@ -63,6 +69,9 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
   SZDStatus s;
   size_t size = buffer.GetBufferSize();
   if (!SpaceLeft(size)) {
+    if (lbas != nullptr) {
+      *lbas = 0;
+    }
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;

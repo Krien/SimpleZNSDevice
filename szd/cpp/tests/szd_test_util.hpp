@@ -12,6 +12,8 @@ static void SZDSetupDevice(uint64_t min_zone, uint64_t max_zone,
   for (auto it = info.begin(); it != info.end(); it++) {
     if (it->is_zns) {
       device_to_use.assign(it->traddr);
+      printf("using device at traddr %s \n", it->traddr.data());
+      break;
     }
   }
   ASSERT_EQ(device->Open(device_to_use, min_zone, max_zone),

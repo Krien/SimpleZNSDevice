@@ -72,6 +72,8 @@ set(szd_cpp_include_files
     "${szd_cpp_include_dir}/datastructures/szd_log.hpp"
     "${szd_cpp_include_dir}/datastructures/szd_once_log.hpp"
     "${szd_cpp_include_dir}/datastructures/szd_circular_log.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_freezone_list.hpp"
+    "${szd_cpp_include_dir}/datastructures/szd_fragmented_log.hpp"
 )
 list(APPEND szd_all_files szd_cpp_include_files)
 set(szd_cpp_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/src")
@@ -84,6 +86,8 @@ set(szd_cpp_src_files
     "${szd_cpp_src_dir}/datastructures/szd_log.cpp"
     "${szd_cpp_src_dir}/datastructures/szd_once_log.cpp"
     "${szd_cpp_src_dir}/datastructures/szd_circular_log.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_freezone_list.cpp"
+    "${szd_cpp_src_dir}/datastructures/szd_fragmented_log.cpp"
 )
 list(APPEND szd_all_files szd_cpp_src_files)
 

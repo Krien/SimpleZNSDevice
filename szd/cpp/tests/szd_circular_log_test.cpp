@@ -17,7 +17,7 @@ TEST_F(SZDTest, TestFillingACircularLogEphemerally) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
-      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 1);
+      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
   SZD::SZDCircularLog log(factory, info, 11, 13);
 
   // We need to reset all data if it is there, as always.
@@ -94,7 +94,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
-      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 1);
+      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
   factory->Ref();
 
   // Cleanup first round
@@ -152,7 +152,7 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
-      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
+      new SZD::SZDChannelFactory(dev.GetDeviceManager(), 4);
   SZD::SZDCircularLog log(factory, info, 10, 15);
 
   // We need to reset all data if it is there, as always.

@@ -21,6 +21,7 @@ public:
   SZDLog(const SZDLog &) = delete;
   SZDLog &operator=(const SZDLog &) = delete;
   virtual ~SZDLog() = default;
+
   virtual SZDStatus Append(const std::string string, uint64_t *lbas = nullptr,
                            bool alligned = true) = 0;
   virtual SZDStatus Append(const char *data, const size_t size,
@@ -37,11 +38,13 @@ public:
                          size_t size, bool alligned = true) = 0;
   virtual SZDStatus ResetAll() = 0;
   virtual SZDStatus RecoverPointers() = 0;
+
   virtual bool Empty() const = 0;
   virtual uint64_t SpaceAvailable() const = 0;
-  virtual bool SpaceLeft(const size_t size, bool alligned=true) const = 0;
-  inline uint64_t GetWriteHead() const { return write_head_; }
-  inline uint64_t GetWriteTail() const { return write_tail_; }
+  virtual bool SpaceLeft(const size_t size, bool alligned = true) const = 0;
+
+  virtual uint64_t GetWriteHead() const = 0;
+  virtual uint64_t GetWriteTail() const = 0;
 
 protected:
   // const after initialisation
@@ -49,9 +52,6 @@ protected:
   const uint64_t max_zone_head_;
   const uint64_t zone_size_;
   const uint64_t lba_size_;
-  // log
-  uint64_t write_head_;
-  uint64_t write_tail_;
   // references
   SZD::SZDChannelFactory *channel_factory_;
 };

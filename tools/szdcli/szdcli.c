@@ -3,8 +3,8 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <szd/szd.h>
 #include <unistd.h>
@@ -530,8 +530,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  DeviceManager **manager =
-      (DeviceManager **)calloc(1, sizeof(DeviceManager));
+  DeviceManager **manager = (DeviceManager **)calloc(1, sizeof(DeviceManager));
   DeviceOptions options = {.name = "znscli", .setup_spdk = true};
   rc = szd_init(manager, &options);
   if (rc != 0) {
