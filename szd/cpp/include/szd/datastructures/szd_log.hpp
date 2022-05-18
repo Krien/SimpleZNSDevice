@@ -17,7 +17,8 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDLog {
 public:
   SZDLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-         const uint64_t min_zone_nr, const uint64_t max_zone_nr);
+         const uint64_t min_zone_nr, const uint64_t max_zone_nr,
+         const uint8_t number_of_readers);
   SZDLog(const SZDLog &) = delete;
   SZDLog &operator=(const SZDLog &) = delete;
   virtual ~SZDLog() = default;
@@ -31,11 +32,12 @@ public:
   virtual SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                            uint64_t *lbas = nullptr, bool alligned = true) = 0;
   virtual SZDStatus Read(uint64_t lba, char *data, uint64_t size,
-                         bool alligned = true) = 0;
+                         bool alligned = true, uint8_t reader = 0) = 0;
   virtual SZDStatus Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
-                         bool alligned = true) = 0;
+                         bool alligned = true, uint8_t reader = 0) = 0;
   virtual SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
-                         size_t size, bool alligned = true) = 0;
+                         size_t size, bool alligned = true,
+                         uint8_t reader = 0) = 0;
   virtual SZDStatus ResetAll() = 0;
   virtual SZDStatus RecoverPointers() = 0;
 
@@ -52,6 +54,7 @@ protected:
   const uint64_t max_zone_head_;
   const uint64_t zone_size_;
   const uint64_t lba_size_;
+  const uint8_t number_of_readers_;
   // references
   SZD::SZDChannelFactory *channel_factory_;
 };

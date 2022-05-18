@@ -8,7 +8,7 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr)
-    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr, 1),
       block_range_((max_zone_nr - min_zone_nr) * info.zone_size),
       space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_) {
   channel_factory_->Ref();
@@ -89,7 +89,7 @@ bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
 }
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
-                           bool alligned) {
+                           bool alligned, uint8_t /*reader*/) {
   if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
     return SZDStatus::InvalidArguments;
   }
@@ -97,7 +97,7 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
 }
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
-                           bool alligned) {
+                           bool alligned, uint8_t /*reader*/) {
   if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
     return SZDStatus::InvalidArguments;
   }
@@ -105,7 +105,7 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
 }
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
-                           size_t size, bool alligned) {
+                           size_t size, bool alligned, uint8_t /*reader*/) {
   if (!IsValidAddress(lba, channel_->allign_size(size) / lba_size_)) {
     return SZDStatus::InvalidArguments;
   }

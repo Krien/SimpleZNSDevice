@@ -8,20 +8,31 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                const DeviceInfo &info,
                                const uint64_t min_zone_nr,
-                               const uint64_t max_zone_nr)
-    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+                               const uint64_t max_zone_nr,
+                               const uint8_t number_of_readers)
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr,
+             number_of_readers),
       write_head_(min_zone_head_), write_tail_(min_zone_head_),
       zone_tail_(min_zone_nr * info.zone_size),
       space_left_((max_zone_nr - min_zone_nr) * info.zone_size *
                   info.lba_size) {
   channel_factory_->Ref();
-  channel_factory_->register_channel(&read_channel_, min_zone_nr, max_zone_nr);
+  read_channel_ = new SZD::SZDChannel *[number_of_readers_];
+  for (uint8_t i = 0; i < number_of_readers_; i++) {
+    channel_factory_->register_channel(&read_channel_[i], min_zone_nr,
+                                       max_zone_nr);
+  }
   channel_factory_->register_channel(&write_channel_, min_zone_nr, max_zone_nr);
 }
 
 SZDCircularLog::~SZDCircularLog() {
   if (read_channel_ != nullptr) {
-    channel_factory_->unregister_channel(read_channel_);
+    for (uint8_t i = 0; i < number_of_readers_; i++) {
+      if (read_channel_[i]) {
+        channel_factory_->unregister_channel(read_channel_[i]);
+      }
+    }
+    delete[] read_channel_;
   }
   if (write_channel_ != nullptr) {
     channel_factory_->unregister_channel(write_channel_);
@@ -163,13 +174,14 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
 }
 
 SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
-                               bool alligned) {
+                               bool alligned, uint8_t reader) {
   // Wraparound
-  if (lba > max_zone_head_) {
+  if (lba > max_zone_head_ || reader >= number_of_readers_) {
     return Read(lba - max_zone_head_ + min_zone_head_, data, size, alligned);
   }
   // Set up proper size
-  uint64_t alligned_size = alligned ? size : read_channel_->allign_size(size);
+  uint64_t alligned_size =
+      alligned ? size : read_channel_[reader]->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
   // Ensure data is written
   if (!IsValidReadAddress(lba, lbas)) {
@@ -178,28 +190,30 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
   // 2 phase (wraparound) or 1 phase read needed?
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
-    SZDStatus s =
-        read_channel_->DirectRead(lba, data, first_phase_size, alligned);
+    SZDStatus s = read_channel_[reader]->DirectRead(lba, data, first_phase_size,
+                                                    alligned);
     if (s != SZDStatus::Success) {
       return s;
     }
-    s = read_channel_->DirectRead(min_zone_head_, data,
-                                  alligned_size - first_phase_size, alligned);
+    s = read_channel_[reader]->DirectRead(
+        min_zone_head_, data, alligned_size - first_phase_size, alligned);
     return s;
   } else {
-    return read_channel_->DirectRead(lba, data, alligned_size, alligned);
+    return read_channel_[reader]->DirectRead(lba, data, alligned_size,
+                                             alligned);
   }
 }
 
 SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
-                               size_t size, bool alligned) {
+                               size_t size, bool alligned, uint8_t reader) {
   // Wraparound
-  if (lba > max_zone_head_) {
+  if (lba > max_zone_head_ || reader >= number_of_readers_) {
     return Read(lba - max_zone_head_ + min_zone_head_, buffer, addr, size,
                 alligned);
   }
   // Set up proper size
-  uint64_t alligned_size = alligned ? size : read_channel_->allign_size(size);
+  uint64_t alligned_size =
+      alligned ? size : read_channel_[reader]->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
   // Ensure data is written
   if (!IsValidReadAddress(lba, lbas)) {
@@ -208,23 +222,24 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
   // 2 phase (wraparound) or 1 phase read needed?
   if (write_head_ < write_tail_ && lba + lbas > max_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
-    SZDStatus s = read_channel_->ReadIntoBuffer(lba, buffer, addr,
-                                                first_phase_size, alligned);
+    SZDStatus s = read_channel_[reader]->ReadIntoBuffer(
+        lba, buffer, addr, first_phase_size, alligned);
     if (s != SZDStatus::Success) {
       return s;
     }
-    s = read_channel_->ReadIntoBuffer(min_zone_head_, buffer,
-                                      addr + first_phase_size,
-                                      size - first_phase_size, alligned);
+    s = read_channel_[reader]->ReadIntoBuffer(
+        min_zone_head_, buffer, addr + first_phase_size,
+        size - first_phase_size, alligned);
     return s;
   } else {
-    return read_channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
+    return read_channel_[reader]->ReadIntoBuffer(lba, buffer, addr, size,
+                                                 alligned);
   }
 }
 
 SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
-                               bool alligned) {
-  return Read(lba, buffer, 0, size, alligned);
+                               bool alligned, uint8_t reader) {
+  return Read(lba, buffer, 0, size, alligned, reader);
 }
 
 SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
@@ -317,7 +332,8 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   uint64_t slba;
   uint64_t zone_head = min_zone_head_, old_zone_head = min_zone_head_;
   for (slba = min_zone_head_; slba < max_zone_head_; slba += zone_size_) {
-    if ((s = read_channel_->ZoneHead(slba, &zone_head)) != SZDStatus::Success) {
+    if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
+        SZDStatus::Success) {
       return s;
     }
     old_zone_head = zone_head;
@@ -329,7 +345,8 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   }
   // Scan for head
   for (; slba < max_zone_head_; slba += zone_size_) {
-    if ((s = read_channel_->ZoneHead(slba, &zone_head)) != SZDStatus::Success) {
+    if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
+        SZDStatus::Success) {
       return s;
     }
     // The first zone with a head more than 0 and less than max_zone, holds the
@@ -350,7 +367,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   // start AFTER head.
   if (log_head > min_zone_head_ && log_tail == min_zone_head_) {
     for (slba += zone_size_; slba < max_zone_head_; slba += zone_size_) {
-      if ((s = read_channel_->ZoneHead(slba, &zone_head)) !=
+      if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
           SZDStatus::Success) {
         return s;
       }

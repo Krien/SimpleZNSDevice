@@ -28,12 +28,12 @@ public:
   SZDStatus Append(const SZDBuffer &buffer, uint64_t *lbas = nullptr) override;
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                    uint64_t *lbas = nullptr, bool alligned = true) override;
-  SZDStatus Read(uint64_t lba, char *data, uint64_t size,
-                 bool alligned = true) override;
+  SZDStatus Read(uint64_t lba, char *data, uint64_t size, bool alligned = true,
+                 uint8_t reader = 0) override;
   SZDStatus Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
-                 bool alligned = true) override;
+                 bool alligned = true, uint8_t reader = 0) override;
   SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr, size_t size,
-                 bool alligned = true) override;
+                 bool alligned = true, uint8_t reader = 0) override;
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
 

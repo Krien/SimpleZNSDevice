@@ -18,7 +18,7 @@ TEST_F(SZDTest, TestFillingACircularLogEphemerally) {
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
       new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
-  SZD::SZDCircularLog log(factory, info, 11, 13);
+  SZD::SZDCircularLog log(factory, info, 11, 13, 1);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
@@ -99,7 +99,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
 
   // Cleanup first round
   {
-    SZD::SZDCircularLog log(factory, info, 10, 15);
+    SZD::SZDCircularLog log(factory, info, 10, 15, 1);
 
     // We need to reset all data if it is there, as always.
     ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
@@ -115,7 +115,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
   // the pointers still match up after recovery.
   for (uint64_t slba = 10 * info.zone_size; slba < 15 * info.zone_size - 3;
        slba += 3) {
-    SZD::SZDCircularLog log(factory, info, 10, 15);
+    SZD::SZDCircularLog log(factory, info, 10, 15, 1);
     ASSERT_EQ(log.RecoverPointers(), SZD::SZDStatus::Success);
     ASSERT_EQ(log.GetWriteHead(), slba);
     ASSERT_EQ(log.GetWriteTail(), 10 * info.zone_size);
@@ -127,7 +127,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
   SZD::SZDBuffer buffer((15 - 10) * info.zone_size * info.lba_size,
                         info.lba_size);
   {
-    SZD::SZDCircularLog log(factory, info, 10, 15);
+    SZD::SZDCircularLog log(factory, info, 10, 15, 1);
 
     ASSERT_EQ(log.RecoverPointers(), SZD::SZDStatus::Success);
     ASSERT_EQ(
@@ -153,7 +153,7 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
       new SZD::SZDChannelFactory(dev.GetDeviceManager(), 4);
-  SZD::SZDCircularLog log(factory, info, 10, 15);
+  SZD::SZDCircularLog log(factory, info, 10, 15, 1);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
@@ -182,7 +182,7 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
 
   // Try if pointers could be partially recovered on restart
   {
-    SZD::SZDCircularLog tlog(factory, info, 10, 15);
+    SZD::SZDCircularLog tlog(factory, info, 10, 15, 1);
     ASSERT_EQ(tlog.RecoverPointers(), SZD::SZDStatus::Success);
     ASSERT_EQ(tlog.GetWriteHead(), log.GetWriteHead());
     ASSERT_EQ(tlog.GetWriteTail(),
@@ -229,7 +229,7 @@ TEST_F(SZDTest, TestCircularLogCircularPattern) {
 
     // Try if pointers could be partially recovered on restart
     {
-      SZD::SZDCircularLog tlog(factory, info, 10, 15);
+      SZD::SZDCircularLog tlog(factory, info, 10, 15, 1);
       ASSERT_EQ(tlog.RecoverPointers(), SZD::SZDStatus::Success);
       ASSERT_EQ(tlog.GetWriteHead(), log.GetWriteHead());
       ASSERT_EQ(tlog.GetWriteTail(),
