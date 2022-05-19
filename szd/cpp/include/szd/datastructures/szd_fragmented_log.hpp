@@ -40,6 +40,7 @@ public:
   uint64_t SpaceAvailable() const;
   bool SpaceLeft(const size_t size, bool alligned = true) const;
 
+  SZDStatus DecodeFrom(const char *data, const size_t size);
   bool TESTEncodingDecoding() const;
 
 private:

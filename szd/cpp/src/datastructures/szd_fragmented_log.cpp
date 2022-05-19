@@ -204,6 +204,21 @@ bool SZDFragmentedLog::SpaceLeft(const size_t size, bool alligned) const {
   return zones_needed <= zones_left_;
 }
 
+SZDStatus SZDFragmentedLog::DecodeFrom(const char *data, const size_t size) {
+  uint32_t new_zones_left;
+  SZDFreeList **new_freelist;
+  SZDStatus s = SZDFreeListFunctions::DecodeFreelist(data, size, new_freelist,
+                                                     &new_zones_left);
+  if (s != SZDStatus::Success) {
+    return s;
+  }
+  SZDFreeListFunctions::Destroy(seeker_);
+  freelist_ = *new_freelist;
+  seeker_ = freelist_;
+  zones_left_ = new_zones_left;
+  return s;
+}
+
 bool SZDFragmentedLog::TESTEncodingDecoding() const {
   uint64_t encoded_size;
   const char *encoded =
