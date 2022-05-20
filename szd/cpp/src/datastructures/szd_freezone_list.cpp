@@ -201,7 +201,7 @@ char *EncodeFreelist(SZDFreeList *target, uint64_t *size) {
     data.append(entry, sizeof(entry));
     first = first->next_;
   }
-  char *output = new char[data.size() + sizeof(uint64_t)];
+  char *output = new char[data.size() + sizeof(uint64_t) + 1];
   uint64_t out_size = static_cast<uint64_t>(data.size() + sizeof(uint64_t));
   Encode64(output, out_size);
   memcpy(output + sizeof(uint64_t), data.data(), data.size());
@@ -214,6 +214,7 @@ SZDStatus DecodeFreelist(const char *buffer, uint64_t buffer_size,
   if (buffer_size < sizeof(uint64_t)) {
     return SZDStatus::InvalidArguments;
   }
+  // Size of original encoded string.
   uint64_t true_size;
   true_size = Decode64(buffer);
   if (true_size > buffer_size) {
@@ -222,6 +223,7 @@ SZDStatus DecodeFreelist(const char *buffer, uint64_t buffer_size,
   buffer_size = true_size;
 
   SZDFreeList *prev = nullptr;
+  *target = prev; // Ensure consistent error handling;
   *zones_free = 0;
   // Try parsing entries
   uint64_t walker = sizeof(uint64_t);

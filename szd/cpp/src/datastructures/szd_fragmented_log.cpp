@@ -1,7 +1,6 @@
 #include "szd/datastructures/szd_fragmented_log.hpp"
 #include "szd/szd.h"
 #include "szd/szd_channel_factory.hpp"
-
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDFragmentedLog::SZDFragmentedLog(SZDChannelFactory *channel_factory,
                                    const DeviceInfo &info,
@@ -204,18 +203,26 @@ bool SZDFragmentedLog::SpaceLeft(const size_t size, bool alligned) const {
   return zones_needed <= zones_left_;
 }
 
+std::string SZDFragmentedLog::Encode() {
+  uint64_t encoded_size;
+  char *encoded = SZDFreeListFunctions::EncodeFreelist(seeker_, &encoded_size);
+  std::string encoded_str(encoded, encoded_size);
+  return encoded_str;
+}
+
 SZDStatus SZDFragmentedLog::DecodeFrom(const char *data, const size_t size) {
   uint32_t new_zones_left;
-  SZDFreeList **new_freelist;
+  SZDFreeList **new_freelist = new SZDFreeList *;
   SZDStatus s = SZDFreeListFunctions::DecodeFreelist(data, size, new_freelist,
                                                      &new_zones_left);
   if (s != SZDStatus::Success) {
+    delete new_freelist;
     return s;
   }
-  SZDFreeListFunctions::Destroy(seeker_);
   freelist_ = *new_freelist;
   seeker_ = freelist_;
   zones_left_ = new_zones_left;
+  delete new_freelist;
   return s;
 }
 
