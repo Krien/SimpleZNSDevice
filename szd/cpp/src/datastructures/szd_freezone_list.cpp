@@ -165,27 +165,27 @@ SZDStatus FindRegion(const uint64_t ident, SZDFreeList *from,
 }
 
 static uint64_t Decode64(const char *data) {
-  // Important first cast to uint64t to avoid signed logic or undefined
+  // Important first cast to unsigned char to avoid signed logic or undefined
   // shifts...
-  return static_cast<uint64_t>(data[0]) |
-         (static_cast<uint64_t>(data[1]) << 8) |
-         (static_cast<uint64_t>(data[2]) << 16) |
-         (static_cast<uint64_t>(data[3]) << 24) |
-         (static_cast<uint64_t>(data[4]) << 32) |
-         (static_cast<uint64_t>(data[5]) << 40) |
-         (static_cast<uint64_t>(data[6]) << 48) |
-         (static_cast<uint64_t>(data[7]) << 56);
+  return static_cast<uint64_t>(static_cast<unsigned char>(data[0])) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[1])) << 8) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[2])) << 16) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[3])) << 24) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[4])) << 32) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[5])) << 40) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[6])) << 48) |
+         (static_cast<uint64_t>(static_cast<unsigned char>(data[7])) << 56);
 }
 
 static void Encode64(char *data, uint64_t nr) {
-  data[0] = nr & 0xff;
-  data[1] = (nr >> 8) & 0xff;
-  data[2] = (nr >> 16) & 0xff;
-  data[3] = (nr >> 24) & 0xff;
-  data[4] = (nr >> 32) & 0xff;
-  data[5] = (nr >> 40) & 0xff;
-  data[6] = (nr >> 48) & 0xff;
-  data[7] = (nr >> 56) & 0xff;
+  data[0] = nr & 0xffu;
+  data[1] = (nr >> 8) & 0xffu;
+  data[2] = (nr >> 16) & 0xffu;
+  data[3] = (nr >> 24) & 0xffu;
+  data[4] = (nr >> 32) & 0xffu;
+  data[5] = (nr >> 40) & 0xffu;
+  data[6] = (nr >> 48) & 0xffu;
+  data[7] = (nr >> 56) & 0xffu;
 }
 
 // 17 bytes * frags + 8 bytes for size
@@ -193,7 +193,7 @@ static void Encode64(char *data, uint64_t nr) {
 char *EncodeFreelist(SZDFreeList *target, uint64_t *size) {
   std::string data;
   SZDFreeList *first = FirstZoneRegion(target);
-  char entry[17];
+  char entry[sizeof(uint64_t) * 2 + sizeof(bool)];
   while (first) {
     Encode64(entry, first->begin_zone_);
     Encode64(entry + sizeof(uint64_t), first->zones_);
