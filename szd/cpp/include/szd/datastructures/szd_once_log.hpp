@@ -48,6 +48,16 @@ public:
   inline uint64_t GetWriteHead() const override { return write_head_; }
   inline uint64_t GetWriteTail() const override { return min_zone_head_; }
 
+  inline uint64_t GetBytesWritten() const override {
+    return channel_->GetBytesWritten();
+  };
+  inline uint64_t GetBytesRead() const override {
+    return channel_->GetBytesRead();
+  };
+  inline uint64_t GetZonesReset() const override {
+    return channel_->GetZonesReset();
+  };
+
 private:
   bool IsValidAddress(uint64_t lba, uint64_t lbas);
   // log

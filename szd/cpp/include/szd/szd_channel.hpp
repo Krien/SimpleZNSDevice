@@ -64,6 +64,11 @@ public:
   SZDStatus ResetAllZones();
   SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head);
 
+  // diagnostics
+  uint64_t GetBytesWritten() const { return bytes_written_; }
+  uint64_t GetBytesRead() const { return bytes_read_; }
+  uint64_t GetZonesReset() const { return zones_reset_; }
+
 private:
   QPair *qpair_;
   uint64_t lba_size_;
@@ -73,6 +78,10 @@ private:
   bool can_access_all_;
   void *backed_memory_spill_;
   uint64_t lba_msb_;
+  // diag
+  uint64_t bytes_written_;
+  uint64_t bytes_read_;
+  uint64_t zones_reset_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

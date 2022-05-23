@@ -55,6 +55,20 @@ public:
   inline uint64_t GetWriteHead() const override { return write_head_; }
   inline uint64_t GetWriteTail() const override { return write_tail_; }
 
+  inline uint64_t GetBytesWritten() const override {
+    return write_channel_->GetBytesWritten();
+  };
+  inline uint64_t GetBytesRead() const override {
+    uint64_t read = 0;
+    for (size_t i = 0; i < number_of_readers_; i++) {
+      read += read_channel_[i]->GetBytesRead();
+    }
+    return read;
+  };
+  inline uint64_t GetZonesReset() const override {
+    return write_channel_->GetZonesReset();
+  };
+
   bool IsValidReadAddress(const uint64_t addr, const uint64_t lbas) const;
 
 private:

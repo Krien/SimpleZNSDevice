@@ -50,6 +50,11 @@ public:
 
   inline uint8_t GetNumberOfReaders() const { return number_of_readers_; }
 
+  // diagnostics (NOT threadsafe, meant to be called at the END)
+  virtual uint64_t GetBytesWritten() const = 0;
+  virtual uint64_t GetBytesRead() const = 0;
+  virtual uint64_t GetZonesReset() const = 0;
+
 protected:
   // const after initialisation
   const uint64_t min_zone_head_;

@@ -18,6 +18,7 @@
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDFragmentedLog {
 public:
+  // TODO: Add support for multiple readers...
   SZDFragmentedLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
                    const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   SZDFragmentedLog(const SZDFragmentedLog &) = delete;
@@ -42,6 +43,17 @@ public:
 
   std::string Encode();
   SZDStatus DecodeFrom(const char *data, const size_t size);
+
+  inline uint64_t GetBytesWritten() const {
+    return write_channel_->GetBytesWritten();
+  };
+  inline uint64_t GetBytesRead() const {
+    return read_channel_->GetBytesRead();
+  };
+  inline uint64_t GetZonesReset() const {
+    return write_channel_->GetZonesReset();
+  };
+
   bool TESTEncodingDecoding() const;
 
 private:
