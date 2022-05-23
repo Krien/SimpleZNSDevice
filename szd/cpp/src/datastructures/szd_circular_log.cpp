@@ -340,6 +340,8 @@ SZDStatus SZDCircularLog::RecoverPointers() {
     // tail is at first zone that is not empty
     if (zone_head > slba) {
       log_tail = slba;
+      // Head might be here if exactly 1 zone is filled...
+      log_head = zone_head;
       break;
     }
   }
