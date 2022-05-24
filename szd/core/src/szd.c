@@ -611,10 +611,10 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
     }
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
-    *lba = *lba + current_step_size;
     if (completion.err != 0) {
       return SZD_SC_SPDK_ERROR_APPEND;
     }
+    *lba = *lba + current_step_size;
     lbas_processed += current_step_size;
     // To the next zone we go
     if (*lba >= current_zone_end) {

@@ -46,7 +46,7 @@ TEST_F(SZDChannelTest, DirectIO) {
 
   // Alligned (1 zone + 2 lbas)
   uint64_t slba = 10 * info.zone_size;
-  uint64_t range = info.lba_size * info.zone_size + info.lba_size * 2;
+  uint64_t range = info.lba_size * info.zone_cap + info.lba_size * 2;
   char bufferw[range + 1];
   char bufferr[range + 1];
   SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
@@ -70,6 +70,7 @@ TEST_F(SZDChannelTest, DirectIO) {
 
   // Can not write to first zone anymore
   uint64_t wslba2 = slba;
+  printf("Z %lu %lu \n", info.zone_size, info.zone_cap);
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
   ASSERT_EQ(wslba2, slba);

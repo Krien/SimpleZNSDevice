@@ -73,6 +73,7 @@ private:
   QPair *qpair_;
   uint64_t lba_size_;
   uint64_t zone_size_;
+  uint64_t zone_cap_;
   uint64_t min_lba_;
   uint64_t max_lba_;
   bool can_access_all_;
