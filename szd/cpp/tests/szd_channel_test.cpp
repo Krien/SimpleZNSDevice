@@ -45,7 +45,7 @@ TEST_F(SZDChannelTest, DirectIO) {
   ASSERT_EQ(channel->ResetAllZones(), SZD::SZDStatus::Success);
 
   // Alligned (1 zone + 2 lbas)
-  uint64_t slba = 10 * info.zone_size;
+  uint64_t slba = 10 * info.zone_cap;
   uint64_t range = info.lba_size * info.zone_cap + info.lba_size * 2;
   char bufferw[range + 1];
   char bufferr[range + 1];
@@ -54,7 +54,7 @@ TEST_F(SZDChannelTest, DirectIO) {
 
   ASSERT_EQ(channel->DirectAppend(&wslba, bufferw, range, true),
             SZD::SZDStatus::Success);
-  ASSERT_EQ(wslba, slba + info.zone_size + 2);
+  ASSERT_EQ(wslba, slba + info.zone_cap + 2);
   ASSERT_EQ(channel->DirectRead(slba, bufferr, range, true),
             SZD::SZDStatus::Success);
   ASSERT_TRUE(memcmp(bufferw, bufferr, range) == 0);
@@ -62,7 +62,7 @@ TEST_F(SZDChannelTest, DirectIO) {
   // Can append again
   ASSERT_EQ(channel->DirectAppend(&wslba, bufferw, range, true),
             SZD::SZDStatus::Success);
-  ASSERT_EQ(wslba, slba + 2 * (info.zone_size + 2));
+  ASSERT_EQ(wslba, slba + 2 * (info.zone_cap + 2));
   ASSERT_EQ(
       channel->DirectRead(slba + range / info.lba_size, bufferr, range, true),
       SZD::SZDStatus::Success);
@@ -70,7 +70,6 @@ TEST_F(SZDChannelTest, DirectIO) {
 
   // Can not write to first zone anymore
   uint64_t wslba2 = slba;
-  printf("Z %lu %lu \n", info.zone_size, info.zone_cap);
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
   ASSERT_EQ(wslba2, slba);
@@ -79,10 +78,10 @@ TEST_F(SZDChannelTest, DirectIO) {
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
   ASSERT_EQ(wslba2, 0);
-  wslba2 = 15 * info.zone_size;
+  wslba2 = 15 * info.zone_cap;
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
-  ASSERT_EQ(wslba2, 15 * info.zone_size);
+  ASSERT_EQ(wslba2, 15 * info.zone_cap);
   factory.unregister_channel(channel);
 }
 
@@ -103,7 +102,7 @@ TEST_F(SZDChannelTest, DirectIONonAlligned) {
   memset(bufferr, 0, range);
   SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
 
-  uint64_t wslba = 10 * info.zone_size;
+  uint64_t wslba = 10 * info.zone_cap;
   uint64_t slba = wslba;
   ASSERT_NE(channel->DirectAppend(&wslba, bufferw,
                                   info.lba_size + info.lba_size - 10, true),
@@ -149,7 +148,7 @@ TEST_F(SZDChannelTest, BufferIO) {
   uint64_t range = info.lba_size;
   SZDTestUtil::CreateCyclicPattern(raw_buffer + range, range, 0);
 
-  uint64_t wslba = 10 * info.zone_size;
+  uint64_t wslba = 10 * info.zone_cap;
   uint64_t slba = wslba;
   ASSERT_EQ(channel->FlushBufferSection(&wslba, buffer, range, range, true),
             SZD::SZDStatus::Success);
@@ -209,13 +208,13 @@ TEST_F(SZDChannelTest, ResetRespectsRange) {
   uint64_t range = info.lba_size * 2;
   char bufferw[range + 1];
   SZDTestUtil::CreateCyclicPattern(bufferw, range, 0);
-  uint64_t first_wslba = 10 * info.zone_size;
+  uint64_t first_wslba = 10 * info.zone_cap;
   u_int64_t first_slba = first_wslba;
   ASSERT_EQ(channel->DirectAppend(&first_wslba, bufferw,
                                   info.lba_size + info.lba_size - 10, false),
             SZD::SZDStatus::Success);
 
-  uint64_t third_wslba = 13 * info.zone_size;
+  uint64_t third_wslba = 13 * info.zone_cap;
   uint64_t third_slba = third_wslba;
   ASSERT_EQ(channel->DirectAppend(&third_wslba, bufferw,
                                   info.lba_size + info.lba_size - 10, false),

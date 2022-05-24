@@ -24,7 +24,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
   // Test empty state
-  uint64_t range = (15 - 10) * info.zone_size * info.lba_size;
+  uint64_t range = (15 - 10) * info.zone_cap * info.lba_size;
   ASSERT_EQ(log.SpaceAvailable(), range);
   ASSERT_TRUE(log.Empty());
   ASSERT_TRUE(log.SpaceLeft(range));
@@ -41,31 +41,30 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   ASSERT_TRUE(memcmp(buff, "TEST", sizeof("TEST")) == 0);
   ASSERT_FALSE(log.Empty());
   // !, yes a small write claims an entire zone in this design...
-  ASSERT_TRUE(log.SpaceLeft(range - info.lba_size * info.zone_size));
+  ASSERT_TRUE(log.SpaceLeft(range - info.lba_size * info.zone_cap));
   ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // Fill rest of device
   std::vector<std::pair<uint64_t, uint64_t>> regions_full;
   SZDTestUtil::CreateCyclicPattern(buff, range, 0);
-  ASSERT_EQ(log.Append(buff, range - info.lba_size * info.zone_size,
+  ASSERT_EQ(log.Append(buff, range - info.lba_size * info.zone_cap,
                        regions_full, true),
             SZD::SZDStatus::Success);
   ASSERT_TRUE(log.TESTEncodingDecoding());
 
   // on heap because of stack limitations..
-  char *buffr = new char[range - info.lba_size * info.zone_size];
+  char *buffr = new char[range - info.lba_size * info.zone_cap];
   ASSERT_EQ(
-      log.Read(regions, buffr, range - info.lba_size * info.zone_size, true),
+      log.Read(regions, buffr, range - info.lba_size * info.zone_cap, true),
       SZD::SZDStatus::Success);
-  ASSERT_TRUE(memcmp(buffr, buffr, range - info.lba_size * info.zone_size) ==
-              0);
+  ASSERT_TRUE(memcmp(buffr, buffr, range - info.lba_size * info.zone_cap) == 0);
   ASSERT_FALSE(log.Empty());
   ASSERT_TRUE(!log.SpaceLeft(1, false));
   delete[] buffr;
 
   // Reset parts and see how space decreases
   ASSERT_EQ(log.Reset(regions), SZD::SZDStatus::Success);
-  ASSERT_TRUE(log.SpaceLeft(info.lba_size * info.zone_size));
+  ASSERT_TRUE(log.SpaceLeft(info.lba_size * info.zone_cap));
   ASSERT_FALSE(log.Empty());
   ASSERT_EQ(log.Reset(regions_full), SZD::SZDStatus::Success);
   ASSERT_TRUE(log.SpaceLeft(range));
@@ -85,10 +84,10 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
 
   // Create 3 regions of each 3 zones.
-  size_t size1 = 1 * info.lba_size * info.zone_size;
-  size_t size2 = 2 * info.lba_size * info.zone_size;
-  size_t size3 = 3 * info.lba_size * info.zone_size;
-  size_t size4 = 4 * info.lba_size * info.zone_size;
+  size_t size1 = 1 * info.lba_size * info.zone_cap;
+  size_t size2 = 2 * info.lba_size * info.zone_cap;
+  size_t size3 = 3 * info.lba_size * info.zone_cap;
+  size_t size4 = 4 * info.lba_size * info.zone_cap;
   char *first_buff = new char[size3];
   char *mid_buff = new char[size3];
   char *last_buff = new char[size3];
@@ -170,7 +169,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   delete[] read_buff;
 
   // Fill entire device one last time for good measure...
-  uint64_t total_range = (19 - 10) * info.zone_size * info.lba_size;
+  uint64_t total_range = (19 - 10) * info.zone_cap * info.lba_size;
   char *total_buff = new char[total_range];
   SZDTestUtil::CreateCyclicPattern(total_buff, total_range, 0);
   first_regions.clear(); // Not used anymore, so why not?

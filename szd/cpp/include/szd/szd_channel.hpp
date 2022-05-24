@@ -54,15 +54,21 @@ public:
                                bool alligned = true);
   SZDStatus ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer, size_t section_addr,
                            size_t section_size, bool alligned = true);
+
   // Direct I/O Operations
   SZDStatus DirectAppend(uint64_t *lba, void *buffer, const uint64_t size,
                          bool alligned = true);
   SZDStatus DirectRead(uint64_t lba, void *buffer, uint64_t size,
                        bool alligned = true);
+
   // Management of zones
   SZDStatus ResetZone(uint64_t slba);
   SZDStatus ResetAllZones();
   SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head);
+
+  // Used to aid with the fact that zonecap != zonesize
+  uint64_t TranslateLbaToPba(uint64_t lba);
+  uint64_t TranslatePbaToLba(uint64_t lba);
 
   // diagnostics
   uint64_t GetBytesWritten() const { return bytes_written_; }

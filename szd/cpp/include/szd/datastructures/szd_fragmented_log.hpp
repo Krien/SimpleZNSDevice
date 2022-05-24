@@ -61,6 +61,7 @@ private:
   const uint64_t min_zone_head_;
   const uint64_t max_zone_head_;
   const uint64_t zone_size_;
+  const uint64_t zone_cap_;
   const uint64_t lba_size_;
   const uint64_t zone_bytes_;
   // Log

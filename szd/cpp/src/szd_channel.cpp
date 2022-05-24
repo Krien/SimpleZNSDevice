@@ -38,16 +38,34 @@ SZDChannel::~SZDChannel() {
   }
 }
 
+uint64_t SZDChannel::TranslateLbaToPba(uint64_t lba) {
+  // determine lba by going to actual zone offset and readding offset.
+  uint64_t slba = (lba / zone_cap_) * zone_size_;
+  uint64_t slba_offset = lba % zone_cap_;
+  // printf("translate lba to pba %lu %lu %lu\n", lba, slba, slba_offset);
+  return slba + slba_offset;
+}
+
+uint64_t SZDChannel::TranslatePbaToLba(uint64_t lba) {
+  // determine lba by going to fake zone offset and readding offset.
+  uint64_t slba = (lba / zone_size_) * zone_cap_;
+  uint64_t slba_offset = lba % zone_size_;
+  // printf("translate pba to lba %lu %lu %lu\n", lba, slba, slba_offset);
+  return slba + slba_offset;
+}
+
 SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
                                          uint64_t addr, uint64_t size,
                                          bool alligned) {
+  // Translate lba
+  uint64_t new_lba = TranslateLbaToPba(*lba);
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer.GetBufferSize();
   // Check if in bounds...
-  uint64_t slba = ((*lba + zone_size_ - 1) / zone_size_) * zone_size_;
+  uint64_t slba = ((new_lba + zone_size_ - 1) / zone_size_) * zone_size_;
   uint64_t zones_needed =
-      (*lba - slba + (alligned_size / lba_size_)) / zone_cap_;
+      (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (addr + alligned_size > available_size ||
       slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
@@ -68,22 +86,23 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
-      rc = szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size);
+      rc = szd_append(qpair_, &new_lba, (char *)cbuffer + addr, alligned_size);
       bytes_written_ += alligned_size;
     }
     memset((char *)backed_memory_spill_ + postfix_size, '\0',
            lba_size_ - postfix_size);
     memcpy(backed_memory_spill_, (char *)cbuffer + addr + alligned_size,
            postfix_size);
-    rc = rc | szd_append(qpair_, lba, backed_memory_spill_, lba_size_);
+    rc = rc | szd_append(qpair_, &new_lba, backed_memory_spill_, lba_size_);
     bytes_written_ += lba_size_;
-    return FromStatus(rc);
+    s = FromStatus(rc);
   } else {
     s = FromStatus(
-        szd_append(qpair_, lba, (char *)cbuffer + addr, alligned_size));
+        szd_append(qpair_, &new_lba, (char *)cbuffer + addr, alligned_size));
     bytes_written_ += alligned_size;
-    return s;
   }
+  *lba = TranslatePbaToLba(new_lba);
+  return s;
 }
 
 SZDStatus SZDChannel::FlushBuffer(uint64_t *lba, const SZDBuffer &buffer) {
@@ -92,6 +111,7 @@ SZDStatus SZDChannel::FlushBuffer(uint64_t *lba, const SZDBuffer &buffer) {
 
 SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
                                      size_t addr, size_t size, bool alligned) {
+  lba = TranslateLbaToPba(lba);
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer->GetBufferSize();
@@ -141,12 +161,14 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
 
 SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
                                    const uint64_t size, bool alligned) {
+  // Translate lba
+  uint64_t new_lba = TranslateLbaToPba(*lba);
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   // Check if in bounds...
-  uint64_t slba = ((*lba + zone_size_ - 1) / zone_size_) * zone_size_;
+  uint64_t slba = ((new_lba + zone_size_ - 1) / zone_size_) * zone_size_;
   uint64_t zones_needed =
-      (*lba - slba + (alligned_size / lba_size_)) / zone_cap_;
+      (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
@@ -157,15 +179,18 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     return SZDStatus::IOError;
   }
   memcpy(dma_buffer, buffer, size);
-  SZDStatus s = FromStatus(szd_append(qpair_, lba, dma_buffer, alligned_size));
+  SZDStatus s =
+      FromStatus(szd_append(qpair_, &new_lba, dma_buffer, alligned_size));
   bytes_written_ += alligned_size;
   // Remove temporary buffer.
   szd_free(dma_buffer);
+  *lba = TranslatePbaToLba(new_lba);
   return s;
 }
 
 SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
                                  bool alligned) {
+  lba = TranslateLbaToPba(lba);
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   // Check if in bounds...
@@ -192,6 +217,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
 }
 
 SZDStatus SZDChannel::ResetZone(uint64_t slba) {
+  slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
@@ -205,7 +231,8 @@ SZDStatus SZDChannel::ResetAllZones() {
   // There is no partial reset, reset the partial zones one by one.
   if (!can_access_all_) {
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
-      if ((s = ResetZone(slba)) != SZDStatus::Success) {
+      if ((s = FromStatus(szd_reset(qpair_, slba))) != SZDStatus::Success) {
+        printf("ok %lu\n", slba);
         return s;
       }
       zones_reset_++;
@@ -219,10 +246,12 @@ SZDStatus SZDChannel::ResetAllZones() {
 }
 
 SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
+  slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_get_zone_head(qpair_, slba, zone_head));
+  *zone_head = TranslatePbaToLba(*zone_head);
   return s;
 }
 
