@@ -116,7 +116,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer->GetBufferSize();
   // Check if in bounds...
-  uint64_t slba = (new_lba / zone_size_) * zone_size_;
+  uint64_t slba = (lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (addr + alligned_size > available_size ||
@@ -194,7 +194,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   // Check if in bounds...
-  uint64_t slba = (new_lba / zone_size_) * zone_size_;
+  uint64_t slba = (lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
