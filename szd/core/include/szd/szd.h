@@ -65,6 +65,7 @@ typedef struct {
   uint64_t
       lba_size; /**< Size of one block, also known as logical block address.*/
   uint64_t zone_size; /**<  Size of one zone in lbas.*/
+  uint64_t zone_cap;  /**< Size of user availabe space in one zone. */
   uint64_t mdts;      /**<  Maximum data transfer size in bytes.*/
   uint64_t zasl;      /**<  Maximum size of one append command in bytes.*/
   uint64_t lba_cap;   /**<  Amount of lbas available on the device.*/
@@ -110,8 +111,8 @@ typedef struct {
  * callbacks).
  */
 typedef struct {
-  bool done; /**< Synchronous call is done.*/
-  uint16_t err;   /**< return code after call is done.*/
+  bool done;    /**< Synchronous call is done.*/
+  uint16_t err; /**< return code after call is done.*/
 } Completion;
 extern const Completion Completion_default;
 
@@ -250,6 +251,16 @@ int szd_reset_all(QPair *qpair);
  * @param write_head pointer to store the write head in.
  */
 int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head);
+
+/**
+ * @brief Gets the write head of a zone synchronously as a logical block
+ * address (lba).
+ * @param qpair channel to use for I/O
+ * @param slba starting logical block address of zone to get the write head
+ * from.
+ * @param zone_cap capacity of a zone.
+ */
+int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap);
 
 /**
  * @brief Converts status code of SZD to human readable messages.

@@ -9,7 +9,7 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr)
     : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr, 1),
-      block_range_((max_zone_nr - min_zone_nr) * info.zone_size),
+      block_range_((max_zone_nr - min_zone_nr) * info.zone_cap),
       space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_) {
   channel_factory_->Ref();
   channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
@@ -115,7 +115,7 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
 SZDStatus SZDOnceLog::ResetAll() {
   SZDStatus s;
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
-       slba += zone_size_) {
+       slba += zone_cap_) {
     s = channel_->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
@@ -132,7 +132,7 @@ SZDStatus SZDOnceLog::RecoverPointers() {
   uint64_t write_head = min_zone_head_;
   uint64_t zone_head = min_zone_head_;
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
-       slba += zone_size_) {
+       slba += zone_cap_) {
     s = channel_->ZoneHead(slba, &zone_head);
     if (s != SZDStatus::Success) {
       return s;

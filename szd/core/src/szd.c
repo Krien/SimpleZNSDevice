@@ -64,7 +64,7 @@ const DeviceOptions DeviceOptions_default = {"znsdevice", true};
 const DeviceOpenOptions DeviceOpenOptions_default = {0, 0};
 const Completion Completion_default = {false, SZD_SC_SUCCESS};
 const DeviceManagerInternal DeviceManagerInternal_default = {0, 0};
-const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, "SZD"};
+const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, 0, "SZD"};
 
 // Needed because of DPDK and reattaching, we need to remember what we have seen...
 static char* found_devices[MAX_DEVICE_COUNT];
@@ -134,6 +134,12 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   info->lba_cap = ns_data->ncap;
   info->min_lba = manager->info.min_lba;
   info->max_lba = manager->info.max_lba;
+  // TODO: zone cap can differ between zones... 
+  QPair **temp = (QPair**)calloc(1,sizeof(QPair*));
+  szd_create_qpair(manager, temp);
+  szd_get_zone_cap(*temp, info->min_lba, &info->zone_cap);
+  szd_destroy_qpair(*temp);
+  free(temp);
   return SZD_SC_SUCCESS;
 }
 
@@ -486,27 +492,34 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   int rc = SZD_SC_SUCCESS;
   DeviceInfo info = qpair->man->info;
 
-  uint64_t lba_start = lba;
+  // zone pointers
+  uint64_t slba = (lba / info.zone_size) * info.zone_size;
+  uint64_t current_zone_end = slba + info.zone_cap;
+  // Oops, let me fix this for you
+  if (lba > current_zone_end) {
+    slba += info.zone_size;
+    lba = slba + lba - current_zone_end;
+    current_zone_end = slba + info.zone_cap;
+  }
+  // Progress variables
   uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
   uint64_t lbas_processed = 0;
-  // If lba_size > mdts, we have a big problem, but not because of the read.
-  uint64_t step_size = (info.mdts / info.lba_size);
+  // Used to determine next IO call
+  uint64_t step_size = (info.mdts / info.lba_size);   // If lba_size > mdts, we have a big problem, but not because of the read.
   uint64_t current_step_size = step_size;
   Completion completion = Completion_default;
 
   // Otherwise we have an out of range.
-  if (lba < info.min_lba || lba + lbas_to_process > info.max_lba) {
+  uint64_t number_of_zones_traversed = (lbas_to_process + (lba - slba)) / info.zone_cap;
+  if (lba < info.min_lba || slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
+  // Read in steps of max MDTS bytess and respect boundaries
   while (lbas_processed < lbas_to_process) {
     // Read accross a zone border.
-    if ((lba + lbas_processed + step_size) / info.zone_size >
-        (lba + lbas_processed) / info.zone_size) {
-      current_step_size =
-          ((lba + lbas_processed + step_size) / info.zone_size) *
-              info.zone_size -
-          lbas_processed - lba;
+    if (lba + step_size  >= current_zone_end) {
+      current_step_size = current_zone_end - lba;
     } else {
       current_step_size = step_size;
     }
@@ -519,7 +532,7 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
     completion.err = 0x00;
     rc = spdk_nvme_ns_cmd_read(qpair->man->ns, qpair->qpair,
                                (char *)buffer + lbas_processed * info.lba_size,
-                               lba_start,         /* LBA start */
+                               lba,         /* LBA start */
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
     if (rc != 0) {
@@ -531,7 +544,13 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
       return SZD_SC_SPDK_ERROR_READ;
     }
     lbas_processed += current_step_size;
-    lba_start = lba + lbas_processed;
+    lba += current_step_size;
+    // To the next zone we go
+    if (lba >= current_zone_end) {
+      slba += info.zone_size;
+      lba = slba;
+      current_zone_end = slba + info.zone_cap;
+    }
   }
   return SZD_SC_SUCCESS;
 }
@@ -542,27 +561,34 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   int rc = SZD_SC_SUCCESS;
   DeviceInfo info = qpair->man->info;
 
-  uint64_t lba_start = (*lba / info.zone_size) * info.zone_size;
+  // Zone pointers
+  uint64_t slba = (*lba / info.zone_size) * info.zone_size;
+  uint64_t current_zone_end = slba + info.zone_cap;
+  // Oops, let me fix this for you
+  if (*lba > current_zone_end) {
+    slba += info.zone_size;
+    *lba = slba + *lba - current_zone_end;
+    current_zone_end = slba + info.zone_cap;
+  }
+  // Progress variables
   uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
   uint64_t lbas_processed = 0;
-  // If lba_size > zasl, we have a big problem, but not because of the append.
-  uint64_t step_size = (info.zasl / info.lba_size);
+  // Used to determine next IO call
+  uint64_t step_size = (info.zasl / info.lba_size); // < If lba_size > zasl, we have a big problem, but not because of the append.
   uint64_t current_step_size = step_size;
   Completion completion = Completion_default;
 
-  // Otherwise we have an out of range.
-  if (*lba < info.min_lba || *lba + lbas_to_process > info.max_lba) {
-    return SZD_SC_SPDK_ERROR_READ;
+  // Error if we have an out of range.
+  uint64_t number_of_zones_traversed = (lbas_to_process + (*lba - slba)) / info.zone_cap;
+  if (*lba < info.min_lba || slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
+    return SZD_SC_SPDK_ERROR_APPEND;
   }
 
+  // Append in steps of max ZASL bytes and respect boundaries
   while (lbas_processed < lbas_to_process) {
     // Append across a zone border.
-    if ((*lba + lbas_processed + step_size) / info.zone_size >
-        (*lba + lbas_processed) / info.zone_size) {
-      current_step_size =
-          ((*lba + lbas_processed + step_size) / info.zone_size) *
-              info.zone_size -
-          lbas_processed - *lba;
+    if ((*lba + step_size) >= current_zone_end) {
+      current_step_size = current_zone_end - *lba;
     } else {
       current_step_size = step_size;
     }
@@ -573,10 +599,11 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
 
     completion.done = false;
     completion.err = 0x00;
+
     rc = spdk_nvme_zns_zone_append(qpair->man->ns, qpair->qpair,
                                    (char *)buffer +
                                        lbas_processed * info.lba_size,
-                                   lba_start,         /* LBA start */
+                                   slba,         /* LBA start */
                                    current_step_size, /* number of LBAs */
                                    __append_complete, &completion, 0);
     if (rc != 0) {
@@ -585,13 +612,17 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
-      *lba = *lba + lbas_processed;
       return SZD_SC_SPDK_ERROR_APPEND;
     }
+    *lba = *lba + current_step_size;
     lbas_processed += current_step_size;
-    lba_start = ((*lba + lbas_processed) / info.zone_size) * info.zone_size;
+    // To the next zone we go
+    if (*lba >= current_zone_end) {
+      slba += info.zone_size;
+      *lba = slba;
+      current_zone_end = slba + info.zone_cap;
+    }
   }
-  *lba = *lba + lbas_processed;
   return SZD_SC_SUCCESS;
 }
 
@@ -688,13 +719,53 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   struct spdk_nvme_zns_zone_desc *desc =
       (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
   *write_head = desc->wp;
-  free(report_buf);
   if (*write_head < slba) {
+    free(report_buf);
     return SZD_SC_SPDK_ERROR_REPORT_ZONES;
   }
-  if (*write_head > slba + info.zone_size) {
+  if (*write_head > slba + desc->zcap) {
     *write_head = slba + info.zone_size;
   }
+  free(report_buf);
+  return SZD_SC_SUCCESS;
+}
+
+
+int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(qpair->man);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.max_lba) {
+    return SZD_SC_SPDK_ERROR_READ;
+  }
+
+  int rc = SZD_SC_SUCCESS;
+  // Get information from a zone.
+  size_t report_bufsize = spdk_nvme_ns_get_max_io_xfer_size(qpair->man->ns);
+  uint8_t *report_buf = (uint8_t *)calloc(1, report_bufsize);
+  {
+    Completion completion = Completion_default;
+    rc = spdk_nvme_zns_report_zones(
+        qpair->man->ns, qpair->qpair, report_buf, report_bufsize, slba,
+        SPDK_NVME_ZRA_LIST_ALL, true, __get_zone_head_complete, &completion);
+    if (rc != 0) {
+      free(report_buf);
+      return SZD_SC_SPDK_ERROR_REPORT_ZONES;
+    }
+    // Busy wait for the head.
+    POLL_QPAIR(qpair->qpair, completion.done);
+    if (completion.err != 0) {
+      free(report_buf);
+      return SZD_SC_SPDK_ERROR_REPORT_ZONES;
+    }
+  }
+  // Retrieve write head from zone information.
+  uint32_t zd_index = sizeof(struct spdk_nvme_zns_zone_report);
+  struct spdk_nvme_zns_zone_desc *desc =
+      (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
+  *zone_cap = desc->zcap;
+  free(report_buf);
   return SZD_SC_SUCCESS;
 }
 
