@@ -51,8 +51,14 @@ public:
   inline uint64_t GetBytesWritten() const override {
     return channel_->GetBytesWritten();
   };
+  inline uint64_t GetAppendOperations() const override {
+    return channel_->GetAppendOperations();
+  };
   inline uint64_t GetBytesRead() const override {
     return channel_->GetBytesRead();
+  };
+  inline uint64_t GetReadOperations() const override {
+    return channel_->GetReadOperations();
   };
   inline uint64_t GetZonesReset() const override {
     return channel_->GetZonesReset();

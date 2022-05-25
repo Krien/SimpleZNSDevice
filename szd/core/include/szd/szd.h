@@ -217,8 +217,12 @@ void szd_free(void *buffer);
  * areas)
  * @param buffer zcalloced buffer to store the read data in.
  * @param size Amount of data to read in bytes (lba_size alligned)
+ * @param nr_reads ptr to variable that can be used for diagnostics, can be
+ * set to NULL.
  */
 int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
+int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+                       uint64_t *nr_reads);
 
 /**
  * @brief Append z_calloced data synchronously to a zone.
@@ -227,8 +231,12 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
  * write_head of zone), will be updated after each succesful write.
  * @param buffer zcalloced data
  * @param size size of buffer
+ * @param nr_appends ptr to variable that can be used for diagnostics, can be
+ * set to NULL.
  */
 int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size);
+int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
+                         uint64_t size, uint64_t *nr_appends);
 
 /**
  * @brief Resets a zone synchronously, allowing it to be reused.
