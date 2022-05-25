@@ -52,7 +52,9 @@ public:
 
   // diagnostics (NOT threadsafe, meant to be called at the END)
   virtual uint64_t GetBytesWritten() const = 0;
+  virtual uint64_t GetAppendOperations() const = 0;
   virtual uint64_t GetBytesRead() const = 0;
+  virtual uint64_t GetReadOperations() const = 0;
   virtual uint64_t GetZonesReset() const = 0;
 
 protected:

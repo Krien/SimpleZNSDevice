@@ -58,10 +58,20 @@ public:
   inline uint64_t GetBytesWritten() const override {
     return write_channel_->GetBytesWritten();
   };
+  inline uint64_t GetAppendOperations() const {
+    return write_channel_->GetAppendOperations();
+  }
   inline uint64_t GetBytesRead() const override {
     uint64_t read = 0;
     for (size_t i = 0; i < number_of_readers_; i++) {
       read += read_channel_[i]->GetBytesRead();
+    }
+    return read;
+  };
+  inline uint64_t GetReadOperations() const override {
+    uint64_t read = 0;
+    for (size_t i = 0; i < number_of_readers_; i++) {
+      read += read_channel_[i]->GetReadOperations();
     }
     return read;
   };

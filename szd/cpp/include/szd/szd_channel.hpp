@@ -72,7 +72,9 @@ public:
 
   // diagnostics
   uint64_t GetBytesWritten() const { return bytes_written_; }
+  uint64_t GetAppendOperations() const { return append_operations_; }
   uint64_t GetBytesRead() const { return bytes_read_; }
+  uint64_t GetReadOperations() const { return read_operations_; }
   uint64_t GetZonesReset() const { return zones_reset_; }
 
 private:
@@ -87,7 +89,9 @@ private:
   uint64_t lba_msb_;
   // diag
   uint64_t bytes_written_;
+  uint64_t append_operations_;
   uint64_t bytes_read_;
+  uint64_t read_operations_;
   uint64_t zones_reset_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

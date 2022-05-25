@@ -486,7 +486,7 @@ void __get_zone_head_complete(void *arg,
     }                                                                          \
   } while (0)
 
-int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
+int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size, uint64_t *nr_reads) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -535,6 +535,9 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
                                lba,         /* LBA start */
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
+    if (nr_reads != NULL) {
+      *nr_reads+=1;
+    }
     if (rc != 0) {
       return SZD_SC_SPDK_ERROR_READ;
     }
@@ -555,7 +558,11 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   return SZD_SC_SUCCESS;
 }
 
-int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
+int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
+  return szd_read_with_diag(qpair, lba, buffer, size, NULL);
+}
+
+int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size, uint64_t *nr_appends) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -606,6 +613,9 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
                                    slba,         /* LBA start */
                                    current_step_size, /* number of LBAs */
                                    __append_complete, &completion, 0);
+    if (nr_appends != NULL) {
+      *nr_appends+=1;
+    }
     if (rc != 0) {
       return SZD_SC_SPDK_ERROR_APPEND;
     }
@@ -624,6 +634,10 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
     }
   }
   return SZD_SC_SUCCESS;
+}
+
+int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
+  return szd_append_with_diag(qpair, lba, buffer, size, NULL);
 }
 
 int szd_reset(QPair *qpair, uint64_t slba) {

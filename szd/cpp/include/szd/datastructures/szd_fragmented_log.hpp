@@ -47,8 +47,14 @@ public:
   inline uint64_t GetBytesWritten() const {
     return write_channel_->GetBytesWritten();
   };
+  inline uint64_t GetAppendOperations() const {
+    return write_channel_->GetAppendOperations();
+  };
   inline uint64_t GetBytesRead() const {
     return read_channel_->GetBytesRead();
+  };
+  inline uint64_t GetReadOperations() const {
+    return read_channel_->GetReadOperations();
   };
   inline uint64_t GetZonesReset() const {
     return write_channel_->GetZonesReset();
