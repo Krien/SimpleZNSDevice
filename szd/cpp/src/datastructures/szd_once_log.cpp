@@ -151,4 +151,12 @@ SZDStatus SZDOnceLog::RecoverPointers() {
   return SZDStatus::Success;
 }
 
+SZDStatus SZDOnceLog::MarkInactive() {
+  SZDStatus s = SZDStatus::Success;
+  if ((write_head_ / zone_size_) * zone_size_ != write_head_) {
+    s = channel_->FinishZone((write_head_ / zone_size_) * zone_size_);
+  }
+  return s;
+}
+
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

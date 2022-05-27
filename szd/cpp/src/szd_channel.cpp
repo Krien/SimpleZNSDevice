@@ -261,4 +261,13 @@ SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
   return s;
 }
 
+SZDStatus SZDChannel::FinishZone(uint64_t slba) {
+  slba = TranslateLbaToPba(slba);
+  if (slba < min_lba_ || slba > max_lba_) {
+    return SZDStatus::InvalidArguments;
+  }
+  SZDStatus s = FromStatus(szd_finish_zone(qpair_, slba));
+  return s;
+}
+
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

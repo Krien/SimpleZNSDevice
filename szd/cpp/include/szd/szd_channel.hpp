@@ -65,6 +65,7 @@ public:
   SZDStatus ResetZone(uint64_t slba);
   SZDStatus ResetAllZones();
   SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head);
+  SZDStatus FinishZone(uint64_t slba);
 
   // Used to aid with the fact that zonecap != zonesize
   uint64_t TranslateLbaToPba(uint64_t lba);

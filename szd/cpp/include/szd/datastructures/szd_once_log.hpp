@@ -36,6 +36,7 @@ public:
                  bool alligned = true, uint8_t reader = 0) override;
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
+  SZDStatus MarkInactive();
 
   inline bool Empty() const override { return write_head_ == min_zone_head_; }
   inline uint64_t SpaceAvailable() const override { return space_left_; }

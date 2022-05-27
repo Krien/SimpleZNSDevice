@@ -474,6 +474,10 @@ void __reset_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
   __operation_complete(arg, completion);
 }
 
+void __finish_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
+  __operation_complete(arg, completion);
+}
+
 void __get_zone_head_complete(void *arg,
                               const struct spdk_nvme_cpl *completion) {
   __operation_complete(arg, completion);
@@ -695,6 +699,30 @@ int szd_reset_all(QPair *qpair) {
     if (completion.err != 0) {
       return SZD_SC_SPDK_ERROR_RESET;
     }
+  }
+  return rc;
+}
+
+int szd_finish_zone(QPair *qpair, uint64_t slba) {
+  RETURN_ERR_ON_NULL(qpair);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.lba_cap) {
+    return SZD_SC_SPDK_ERROR_FINISH;
+  }
+  Completion completion = Completion_default;
+  int rc =
+      spdk_nvme_zns_finish_zone(qpair->man->ns, qpair->qpair,
+                               slba,  /* starting LBA of the zone to finish */
+                               false, /* don't finish all zones */
+                               __finish_zone_complete, &completion);
+  if (rc != 0) {
+    return SZD_SC_SPDK_ERROR_FINISH;
+  }
+  // Busy wait
+  POLL_QPAIR(qpair->qpair, completion.done);
+  if (completion.err != 0) {
+    return SZD_SC_SPDK_ERROR_FINISH;
   }
   return rc;
 }

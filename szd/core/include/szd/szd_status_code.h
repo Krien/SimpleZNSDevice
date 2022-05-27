@@ -30,7 +30,8 @@ enum szd_status_code {
   SZD_SC_SPDK_ERROR_REPORT_ZONES = 0x09,
   SZD_SC_SPDK_ERROR_ZCALLOC = 0x0A,
   SZD_SC_SPDK_ERROR_QPAIR = 0x0B,
-  SZD_SC_UNKNOWN = 0x0C
+  SZD_SC_SPDK_ERROR_FINISH = 0x0C,
+  SZD_SC_UNKNOWN = 0x0D
 };
 
 extern const char *szd_status_code_msg(int status);

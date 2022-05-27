@@ -251,6 +251,13 @@ int szd_reset(QPair *qpair, uint64_t slba);
 int szd_reset_all(QPair *qpair);
 
 /**
+ * @brief Finishes a zone synchronously, preventing too many active zones.
+ * @param qpair channel to use for I/O
+ * @param slba starting logical block address of zone to reset
+ */
+int szd_finish_zone(QPair *qpair, uint64_t slba);
+
+/**
  * @brief Gets the write head of a zone synchronously as a logical block
  * address (lba).
  * @param qpair channel to use for I/O
@@ -311,6 +318,8 @@ void __read_complete(void *arg, const t_spdk_nvme_cpl *completion);
 void __append_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
 void __reset_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
+
+void __finish_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
 void __get_zone_head_complete(void *arg, const t_spdk_nvme_cpl *completion);
 

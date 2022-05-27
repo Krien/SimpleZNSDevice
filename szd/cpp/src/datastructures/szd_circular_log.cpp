@@ -85,7 +85,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
                                  size_t size, uint64_t *lbas_, bool alligned) {
   SZDStatus s;
   size_t alligned_size = alligned ? size : write_channel_->allign_size(size);
-  if (!SpaceLeft(size)) {
+  if (!SpaceLeft(alligned_size)) {
     if (lbas_ != nullptr) {
       *lbas_ = 0;
     }

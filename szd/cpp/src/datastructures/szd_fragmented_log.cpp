@@ -74,6 +74,10 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
     offset += bytes_to_write;
   }
 
+  // Ensure that resources are released
+  if ((slba / zone_size_) * zone_size_ != slba) {
+    s = write_channel_->FinishZone((slba / zone_size_) * zone_size_);
+  }
   return s;
 }
 
@@ -122,6 +126,10 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     offset += bytes_to_write;
   }
 
+  // Ensure that resources are released
+  if ((slba / zone_size_) * zone_size_ != slba) {
+    s = write_channel_->FinishZone((slba / zone_size_) * zone_size_);
+  }
   return s;
 }
 
