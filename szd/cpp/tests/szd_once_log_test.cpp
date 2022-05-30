@@ -29,8 +29,8 @@ TEST_F(SZDTest, TestOnceLogEphemeral) {
   ASSERT_TRUE(log.Empty());
   uint64_t range = (13 - 11) * info.zone_cap * info.lba_size;
   ASSERT_TRUE(log.SpaceLeft(range));
-  char buff[range];
-  memset(buff, 0, sizeof(buff));
+  char *buff = new char[range];
+  memset(buff, 0, range);
 
   // We can not read when nothing is written
   uint64_t slba = 11 * info.zone_cap;
@@ -87,6 +87,7 @@ TEST_F(SZDTest, TestOnceLogEphemeral) {
   ASSERT_EQ(log.GetWriteTail(), 11 * info.zone_cap);
   ASSERT_FALSE(log.Empty());
   ASSERT_TRUE(log.SpaceLeft(info.lba_size));
+  delete[] buff;
 }
 
 TEST_F(SZDTest, TestOnceLogPersistence) {
@@ -111,7 +112,8 @@ TEST_F(SZDTest, TestOnceLogPersistence) {
   char buff[info.lba_size * 3];
   SZDTestUtil::CreateCyclicPattern(buff, info.lba_size * 3, 0);
 
-  // We are going to repeatedly recreate logs, append some data and verify that
+  // We are going to repeatedly recreate logs, append some data and verify
+  // that
   // the pointers still match up after recovery.
   for (uint64_t slba = 10 * info.zone_cap; slba < 15 * info.zone_cap - 3;
        slba += 3) {
@@ -145,6 +147,6 @@ TEST_F(SZDTest, TestOnceLogPersistence) {
   }
 
   factory->Unref();
-}
+} // namespace
 
 } // namespace

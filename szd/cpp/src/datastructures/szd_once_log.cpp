@@ -31,9 +31,8 @@ SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
     }
     return SZDStatus::IOError;
   }
-  uint64_t write_head_old = write_head_;
+  uint64_t blocks = channel_->allign_size(size) / lba_size_;
   s = channel_->DirectAppend(&write_head_, (void *)data, size, alligned);
-  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
     *lbas = blocks;
   }
@@ -55,9 +54,8 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     }
     return SZDStatus::IOError;
   }
-  uint64_t write_head_old = write_head_;
+  uint64_t blocks = channel_->allign_size(size) / lba_size_;
   s = channel_->FlushBufferSection(&write_head_, buffer, addr, size, alligned);
-  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
     *lbas = blocks;
   }
@@ -74,9 +72,8 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
     }
     return SZDStatus::IOError;
   }
-  uint64_t write_head_old = write_head_;
+  uint64_t blocks = channel_->allign_size(size) / lba_size_;
   s = channel_->FlushBuffer(&write_head_, buffer);
-  uint64_t blocks = write_head_ - write_head_old;
   if (lbas != nullptr) {
     *lbas = blocks;
   }

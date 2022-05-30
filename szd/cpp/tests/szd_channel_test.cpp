@@ -81,7 +81,8 @@ TEST_F(SZDChannelTest, DirectIO) {
   wslba2 = 15 * info.zone_cap;
   ASSERT_NE(channel->DirectAppend(&wslba2, bufferw, range, true),
             SZD::SZDStatus::Success);
-  ASSERT_EQ(wslba2, 15 * info.zone_cap);
+  // ASSERT_EQ(wslba2, 15 * info.zone_cap); < This is no longer true! We go on
+  // till we can't.
   factory.unregister_channel(channel);
 }
 
