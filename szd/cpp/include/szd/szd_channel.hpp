@@ -83,6 +83,8 @@ public:
   // Used to aid with the fact that zonecap != zonesize
   uint64_t TranslateLbaToPba(uint64_t lba);
   uint64_t TranslatePbaToLba(uint64_t lba);
+  uint64_t LbasLeft() const { return lbas_left_; }
+  uint64_t MaxLbas() const { return max_lbas_; }
 
   // diagnostics
   uint64_t GetBytesWritten() const { return bytes_written_; }
@@ -92,7 +94,8 @@ public:
   uint64_t GetZonesReset() const { return zones_reset_; }
 
 private:
-  static Zone *GetZone(QPair *qpair, uint64_t slba);
+  static Zone *GetZone(QPair *qpair, uint64_t slba, uint64_t *max_lbas,
+                       uint64_t *lbas_left);
   // I/O
   QPair *qpair_;
   // Const
@@ -104,6 +107,8 @@ private:
   bool can_access_all_;
   // Used to maintain state
   std::vector<Zone *> zones_;
+  uint64_t lbas_left_;
+  uint64_t max_lbas_;
   // during I/O
   void *backed_memory_spill_;
   uint64_t lba_msb_;

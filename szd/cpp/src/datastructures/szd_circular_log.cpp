@@ -22,6 +22,7 @@ SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                        max_zone_nr);
   }
   channel_factory_->register_channel(&write_channel_, min_zone_nr, max_zone_nr);
+  space_left_ = write_channel_->LbasLeft() * info.lba_size;
 }
 
 SZDCircularLog::~SZDCircularLog() {
@@ -305,7 +306,7 @@ SZDStatus SZDCircularLog::ResetAll() {
   s = SZDStatus::Success;
   // Clean state
   write_head_ = zone_tail_ = write_tail_ = min_zone_head_;
-  space_left_ = (max_zone_head_ - write_head_) * lba_size_;
+  space_left_ = write_channel_->LbasLeft() * lba_size_;
   return s;
 }
 

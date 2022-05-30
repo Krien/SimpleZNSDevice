@@ -8,12 +8,15 @@
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
-Zone *SZDChannel::GetZone(QPair *qpair, uint64_t slba) {
+Zone *SZDChannel::GetZone(QPair *qpair, uint64_t slba, uint64_t *max_lbas,
+                          uint64_t *lbas_left) {
   uint64_t wp = 0;
   uint64_t zone_cap = 0;
   szd_get_zone_head(qpair, slba, &wp);
   szd_get_zone_cap(qpair, slba, &zone_cap);
   Zone *z = new Zone{.slba = slba, .wp = wp, .zone_cap = zone_cap};
+  *lbas_left += slba + zone_cap - wp;
+  *max_lbas += zone_cap;
   // printf("New zone of %lu %lu %lu\n", slba, wp, zone_cap);
   return z;
 }
@@ -22,9 +25,10 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), zone_cap_(info.zone_cap), min_lba_(min_lba),
-      max_lba_(max_lba), can_access_all_(false), backed_memory_spill_(nullptr),
-      lba_msb_(msb(info.lba_size)), bytes_written_(0), append_operations_(0),
-      bytes_read_(0), read_operations_(0), zones_reset_(0) {
+      max_lba_(max_lba), can_access_all_(false), lbas_left_(0), max_lbas_(0),
+      backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)),
+      bytes_written_(0), append_operations_(0), bytes_read_(0),
+      read_operations_(0), zones_reset_(0) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
@@ -34,7 +38,7 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
   backed_memory_spill_ = szd_calloc(lba_size_, 1, lba_size_);
   // Get zone states
   for (uint64_t slba = min_lba; slba <= max_lba; slba += zone_size_) {
-    zones_.push_back(GetZone(qpair_, slba));
+    zones_.push_back(GetZone(qpair_, slba, &max_lbas_, &lbas_left_));
   }
 }
 
@@ -121,6 +125,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
            postfix_size);
     int rc = szd_append_with_diag(qpair_, &new_lba, backed_memory_spill_,
                                   lba_size_, &append_operations_);
+    lbas_left_ -= 1;
     bytes_written_ += lba_size_;
     s = FromStatus(rc);
   } else {
@@ -128,7 +133,6 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     uint64_t left = alligned_size;
     uint64_t written = 0;
     uint64_t mock_lba = new_lba;
-    SZDStatus s;
     while (left > 0) {
       uint64_t avail =
           (current_zone_->slba + current_zone_->zone_cap - current_zone_->wp) *
@@ -139,6 +143,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
                                           step, &append_operations_));
       bytes_written_ += step;
       new_lba += step / lba_size_;
+      lbas_left_ -= step / lba_size_;
       if (s != SZDStatus::Success) {
         break;
       }
@@ -207,7 +212,6 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     // Read in steps that make sense for the zone
     uint64_t left = alligned_size;
     uint64_t read = 0;
-    SZDStatus s;
     while (left > 0) {
       uint64_t avail =
           (current_zone_->slba + current_zone_->zone_cap - lba) * lba_size_;
@@ -247,7 +251,6 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     // Read in steps that make sense for the zone
     uint64_t left = alligned_size;
     uint64_t read = 0;
-    SZDStatus s;
     while (left > 0) {
       uint64_t avail =
           (current_zone_->slba + current_zone_->zone_cap - lba) * lba_size_;
@@ -319,6 +322,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
       break;
     }
     current_zone_->wp += step / lba_size_;
+    lbas_left_ -= step / lba_size_;
     written += step;
     left -= step;
     if (left == 0) {
@@ -332,7 +336,6 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     current_zone_ = zones_[zone_index];
     // This means that we are going into an already partially filled zone?
     if (current_zone_->wp > current_zone_->slba) {
-      printf("INVALID %lu \n", current_zone_->slba);
       s = SZDStatus::InvalidArguments;
       break;
     }
@@ -407,6 +410,7 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
   uint64_t zone_index = (slba - min_lba_) / zone_size_;
   zones_[zone_index]->wp = zones_[zone_index]->slba;
+  lbas_left_ += zones_[zone_index]->zone_cap;
   zones_reset_++;
   return s;
 }
@@ -421,6 +425,7 @@ SZDStatus SZDChannel::ResetAllZones() {
         return s;
       }
       zones_[zones_i_]->wp = zones_[zones_i_]->slba;
+      lbas_left_ += zones_[zones_i_]->zone_cap;
       zones_reset_++;
       zones_i_++;
     }
@@ -431,6 +436,7 @@ SZDStatus SZDChannel::ResetAllZones() {
     int zones_i_ = 0;
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
       zones_[zones_i_]->wp = zones_[zones_i_]->slba;
+      lbas_left_ += zones_[zones_i_]->zone_cap;
       zones_i_++;
     }
     return s;

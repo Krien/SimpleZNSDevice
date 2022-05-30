@@ -113,8 +113,7 @@ TEST_F(SZDTest, TestOnceLogPersistence) {
   SZDTestUtil::CreateCyclicPattern(buff, info.lba_size * 3, 0);
 
   // We are going to repeatedly recreate logs, append some data and verify
-  // that
-  // the pointers still match up after recovery.
+  // that the pointers still match up after recovery.
   for (uint64_t slba = 10 * info.zone_cap; slba < 15 * info.zone_cap - 3;
        slba += 3) {
     SZD::SZDOnceLog log(factory, info, 10, 15);

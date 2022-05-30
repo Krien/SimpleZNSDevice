@@ -13,6 +13,7 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
       space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_) {
   channel_factory_->Ref();
   channel_factory_->register_channel(&channel_, min_zone_nr, max_zone_nr);
+  space_left_ = channel_->LbasLeft() * info.lba_size;
 }
 
 SZDOnceLog::~SZDOnceLog() {
@@ -120,7 +121,7 @@ SZDStatus SZDOnceLog::ResetAll() {
   }
   s = SZDStatus::Success;
   write_head_ = min_zone_head_;
-  space_left_ = block_range_ * lba_size_;
+  space_left_ = channel_->LbasLeft() * lba_size_;
   return s;
 }
 
