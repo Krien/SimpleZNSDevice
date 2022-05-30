@@ -8,6 +8,15 @@
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
+Zone *SZDChannel::GetZone(QPair *qpair, uint64_t slba) {
+  uint64_t wp = 0;
+  uint64_t zone_cap = 0;
+  szd_get_zone_head(qpair, slba, &wp);
+  szd_get_zone_cap(qpair, slba, &zone_cap);
+  Zone *z = new Zone{.slba = slba, .wp = wp, .zone_cap = zone_cap};
+  return z;
+}
+
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
     : qpair_(qpair.release()), lba_size_(info.lba_size),
@@ -20,7 +29,12 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
   if (min_lba_ > max_lba) {
     min_lba_ = max_lba_;
   }
+  // Reserve a small buffer
   backed_memory_spill_ = szd_calloc(lba_size_, 1, lba_size_);
+  // Get zone states
+  for (uint64_t slba = min_lba; slba != max_lba; slba += zone_size_) {
+    zones_.push_back(GetZone(qpair_, slba));
+  }
 }
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
@@ -35,6 +49,9 @@ SZDChannel::~SZDChannel() {
   }
   if (qpair_ != nullptr) {
     szd_destroy_qpair(qpair_);
+  }
+  for (size_t i = 0; i < zones_.size(); i++) {
+    delete zones_[i];
   }
 }
 

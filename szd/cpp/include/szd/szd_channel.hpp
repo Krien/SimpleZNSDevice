@@ -11,8 +11,21 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
+
+/**
+ * @brief Minimal amount of data describing the zone.
+ * State such as Open, Full, Closed, Finished must be maintained externally.
+ * As it can be easily inferred.
+ */
+struct Zone {
+  uint64_t slba;     /**< Begin address of zone */
+  uint64_t wp;       /**< write pointer of zone */
+  uint64_t zone_cap; /**< zone capacity of zone */
+};
+
 /**
  * @brief Simple abstraction on top of a QPair to make the code more Cxx like.
  * Comes with helper functions and performance optimisations.
@@ -79,13 +92,19 @@ public:
   uint64_t GetZonesReset() const { return zones_reset_; }
 
 private:
+  static Zone *GetZone(QPair *qpair, uint64_t slba);
+  // I/O
   QPair *qpair_;
+  // Const
   uint64_t lba_size_;
   uint64_t zone_size_;
   uint64_t zone_cap_;
   uint64_t min_lba_;
   uint64_t max_lba_;
   bool can_access_all_;
+  // Used to maintain state
+  std::vector<Zone *> zones_;
+  // during I/O
   void *backed_memory_spill_;
   uint64_t lba_msb_;
   // diag

@@ -64,7 +64,7 @@ const DeviceOptions DeviceOptions_default = {"znsdevice", true};
 const DeviceOpenOptions DeviceOpenOptions_default = {0, 0};
 const Completion Completion_default = {false, SZD_SC_SUCCESS};
 const DeviceManagerInternal DeviceManagerInternal_default = {0, 0};
-const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, 0, "SZD"};
+const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "SZD"};
 
 // Needed because of DPDK and reattaching, we need to remember what we have seen...
 static char* found_devices[MAX_DEVICE_COUNT];
@@ -125,6 +125,9 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
 
   info->lba_size = 1UL << ns_data->lbaf[ns_data->flbas.format].lbads;
   info->zone_size = ns_data_zns->lbafe[ns_data->flbas.format].zsze;
+  uint64_t total_number_zones = spdk_nvme_zns_ns_get_num_zones(manager->ns);
+  info->max_active_zones = ns_data_zns->mar == 0 ? total_number_zones + 1 : ns_data_zns->mar + 1;
+  info->max_open_zones = ns_data_zns->mor == 0 ? total_number_zones + 1 : ns_data_zns->mor + 1;
   info->mdts = (uint64_t)1 << (12U + cap.bits.mpsmin + ctrlr_data->mdts);
   info->zasl = (uint64_t)ctrlr_data_zns->zasl;
   // If zasl is not set, it is equal to mdts.
@@ -474,7 +477,15 @@ void __reset_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
   __operation_complete(arg, completion);
 }
 
+void __open_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
+  __operation_complete(arg, completion);
+}
+
 void __finish_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
+  __operation_complete(arg, completion);
+}
+
+void __close_zone_complete(void *arg, const struct spdk_nvme_cpl *completion) {
   __operation_complete(arg, completion);
 }
 
@@ -703,12 +714,36 @@ int szd_reset_all(QPair *qpair) {
   return rc;
 }
 
+int szd_open_zone(QPair *qpair, uint64_t slba) {
+  RETURN_ERR_ON_NULL(qpair);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.lba_cap) {
+    return SZD_SC_SPDK_ERROR_OPEN_ZONE;
+  }
+  Completion completion = Completion_default;
+  int rc =
+      spdk_nvme_zns_open_zone(qpair->man->ns, qpair->qpair,
+                               slba,  /* starting LBA of the zone to finish */
+                               false, /* don't finish all zones */
+                               __open_zone_complete, &completion);
+  if (rc != 0) {
+    return SZD_SC_SPDK_ERROR_OPEN_ZONE;
+  }
+  // Busy wait
+  POLL_QPAIR(qpair->qpair, completion.done);
+  if (completion.err != 0) {
+    return SZD_SC_SPDK_ERROR_OPEN_ZONE;
+  }
+  return rc; 
+}
+
 int szd_finish_zone(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
   if (slba < info.min_lba || slba > info.lba_cap) {
-    return SZD_SC_SPDK_ERROR_FINISH;
+    return SZD_SC_SPDK_ERROR_FINISH_ZONE;
   }
   Completion completion = Completion_default;
   int rc =
@@ -717,12 +752,36 @@ int szd_finish_zone(QPair *qpair, uint64_t slba) {
                                false, /* don't finish all zones */
                                __finish_zone_complete, &completion);
   if (rc != 0) {
-    return SZD_SC_SPDK_ERROR_FINISH;
+    return SZD_SC_SPDK_ERROR_FINISH_ZONE;
   }
   // Busy wait
   POLL_QPAIR(qpair->qpair, completion.done);
   if (completion.err != 0) {
-    return SZD_SC_SPDK_ERROR_FINISH;
+    return SZD_SC_SPDK_ERROR_FINISH_ZONE;
+  }
+  return rc;
+}
+
+int szd_close_zone(QPair *qpair, uint64_t slba) {
+  RETURN_ERR_ON_NULL(qpair);
+  // Otherwise we have an out of range.
+  DeviceInfo info = qpair->man->info;
+  if (slba < info.min_lba || slba > info.lba_cap) {
+    return SZD_SC_SPDK_ERROR_CLOSE_ZONE;
+  }
+  Completion completion = Completion_default;
+  int rc =
+      spdk_nvme_zns_close_zone(qpair->man->ns, qpair->qpair,
+                               slba,  /* starting LBA of the zone to finish */
+                               false, /* don't finish all zones */
+                               __close_zone_complete, &completion);
+  if (rc != 0) {
+    return SZD_SC_SPDK_ERROR_CLOSE_ZONE;
+  }
+  // Busy wait
+  POLL_QPAIR(qpair->qpair, completion.done);
+  if (completion.err != 0) {
+    return SZD_SC_SPDK_ERROR_CLOSE_ZONE;
   }
   return rc;
 }

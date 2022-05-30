@@ -238,6 +238,8 @@ int main(int argc, char **argv) {
   assert((*manager)->info.zasl > 0);
   assert((*manager)->info.zone_size > 0);
   assert((*manager)->info.zone_cap > 0);
+  assert((*manager)->info.max_active_zones > 0);
+  assert((*manager)->info.max_open_zones > 0);
   assert((*manager)->info.lba_cap > 0);
 
   // create qpair
@@ -256,6 +258,8 @@ int main(int argc, char **argv) {
   printf("lba size is %ld\n", info.lba_size);
   printf("zone size is %ld\n", info.zone_size);
   printf("zone cap is %ld\n", info.zone_cap);
+  printf("Max zones active are %ld\n", info.max_active_zones);
+  printf("Max zones open are %ld\n", info.max_open_zones);
   printf("mdts is %ld\n", info.mdts);
   printf("zasl is %ld\n", info.zasl);
   printf("lba_cap is %ld\n", info.lba_cap);

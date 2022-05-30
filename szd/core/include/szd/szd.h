@@ -64,14 +64,16 @@ extern const DeviceOpenOptions DeviceOpenOptions_default;
 typedef struct {
   uint64_t
       lba_size; /**< Size of one block, also known as logical block address.*/
-  uint64_t zone_size; /**<  Size of one zone in lbas.*/
-  uint64_t zone_cap;  /**< Size of user availabe space in one zone. */
-  uint64_t mdts;      /**<  Maximum data transfer size in bytes.*/
-  uint64_t zasl;      /**<  Maximum size of one append command in bytes.*/
-  uint64_t lba_cap;   /**<  Amount of lbas available on the device.*/
-  uint64_t min_lba;   /**< Minimum lba that is allowed to be written to.*/
-  uint64_t max_lba;   /**< Maximum lba that is allowed to be written to.*/
-  const char *name;   /**< Name used by SPDK to identify device.*/
+  uint64_t zone_size;        /**<  Size of one zone in lbas.*/
+  uint64_t zone_cap;         /**< Size of user availabe space in one zone. */
+  uint64_t max_active_zones; /**< Maximum number of zones that can be active. */
+  uint64_t max_open_zones;   /**< Maximum number of zones that can be open. */
+  uint64_t mdts;             /**<  Maximum data transfer size in bytes.*/
+  uint64_t zasl;    /**<  Maximum size of one append command in bytes.*/
+  uint64_t lba_cap; /**<  Amount of lbas available on the device.*/
+  uint64_t min_lba; /**< Minimum lba that is allowed to be written to.*/
+  uint64_t max_lba; /**< Maximum lba that is allowed to be written to.*/
+  const char *name; /**< Name used by SPDK to identify device.*/
 } DeviceInfo;
 extern const DeviceInfo DeviceInfo_default;
 
@@ -251,11 +253,26 @@ int szd_reset(QPair *qpair, uint64_t slba);
 int szd_reset_all(QPair *qpair);
 
 /**
+ * @brief Explicitely opens a zone.
+ * @param qpair channel to use for I/O
+ * @param slba starting logical block address of zone to open.
+ */
+int szd_open_zone(QPair *qpair, uint64_t slba);
+
+/**
  * @brief Finishes a zone synchronously, preventing too many active zones.
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to reset
  */
 int szd_finish_zone(QPair *qpair, uint64_t slba);
+
+/**
+ * @brief Closes a zone synchronously, making it inactive, preventing too many
+ * active zones. Note that if the zone is not full, it will still be open!
+ * @param qpair channel to use for I/O
+ * @param slba starting logical block address of zone to close
+ */
+int szd_close_zone(QPair *qpair, uint64_t slba);
 
 /**
  * @brief Gets the write head of a zone synchronously as a logical block
@@ -319,7 +336,11 @@ void __append_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
 void __reset_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
+void __open_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
+
 void __finish_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
+
+void __close_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
 void __get_zone_head_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
