@@ -61,7 +61,10 @@ public:
   inline uint64_t GetReadOperations() const override {
     return channel_->GetReadOperations();
   };
-  inline uint64_t GetZonesReset() const override {
+  inline uint64_t GetZonesResetCounter() const override {
+    return channel_->GetZonesResetCounter();
+  };
+  inline std::vector<uint64_t> GetZonesReset() const override {
     return channel_->GetZonesReset();
   };
 

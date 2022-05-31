@@ -56,7 +56,10 @@ public:
   inline uint64_t GetReadOperations() const {
     return read_channel_->GetReadOperations();
   };
-  inline uint64_t GetZonesReset() const {
+  inline uint64_t GetZonesResetCounter() const {
+    return write_channel_->GetZonesResetCounter();
+  };
+  inline std::vector<uint64_t> GetZonesReset() const {
     return write_channel_->GetZonesReset();
   };
 

@@ -55,7 +55,10 @@ public:
   virtual uint64_t GetAppendOperations() const = 0;
   virtual uint64_t GetBytesRead() const = 0;
   virtual uint64_t GetReadOperations() const = 0;
-  virtual uint64_t GetZonesReset() const = 0;
+  virtual uint64_t GetZonesResetCounter() const = 0;
+
+  // diagnostics headzone
+  virtual std::vector<uint64_t> GetZonesReset() const = 0;
 
 protected:
   // const after initialisation

@@ -75,7 +75,10 @@ public:
     }
     return read;
   };
-  inline uint64_t GetZonesReset() const override {
+  inline uint64_t GetZonesResetCounter() const override {
+    return write_channel_->GetZonesResetCounter();
+  };
+  inline std::vector<uint64_t> GetZonesReset() const override {
     return write_channel_->GetZonesReset();
   };
 

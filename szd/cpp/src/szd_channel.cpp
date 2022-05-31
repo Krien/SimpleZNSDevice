@@ -14,13 +14,18 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
       zone_size_(info.zone_size), zone_cap_(info.zone_cap), min_lba_(min_lba),
       max_lba_(max_lba), can_access_all_(false), backed_memory_spill_(nullptr),
       lba_msb_(msb(info.lba_size)), bytes_written_(0), append_operations_(0),
-      bytes_read_(0), read_operations_(0), zones_reset_(0) {
+      bytes_read_(0), read_operations_(0), zones_reset_counter_(0) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
     min_lba_ = max_lba_;
   }
   backed_memory_spill_ = szd_calloc(lba_size_, 1, lba_size_);
+  // Ensure that all diagnosed zones are
+  zones_reset_.clear();
+  for (size_t slba = min_lba; slba < max_lba_; slba += zone_size_) {
+    zones_reset_.push_back(0);
+  }
 }
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
@@ -228,7 +233,8 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) {
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
-  zones_reset_++;
+  zones_reset_counter_++;
+  zones_reset_[(slba - min_lba_) / zone_size_]++;
   return s;
 }
 
@@ -238,15 +244,18 @@ SZDStatus SZDChannel::ResetAllZones() {
   if (!can_access_all_) {
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
       if ((s = FromStatus(szd_reset(qpair_, slba))) != SZDStatus::Success) {
-        printf("ok %lu\n", slba);
         return s;
       }
-      zones_reset_++;
+      zones_reset_counter_++;
+      zones_reset_[(slba - min_lba_) / zone_size_]++;
     }
     return s;
   } else {
     s = FromStatus(szd_reset_all(qpair_));
-    zones_reset_ += (max_lba_ - min_lba_) / zone_size_;
+    zones_reset_counter_ += (max_lba_ - min_lba_) / zone_size_;
+    for (uint64_t &z : zones_reset_) {
+      z++;
+    }
     return s;
   }
 }

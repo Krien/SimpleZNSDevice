@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
@@ -76,7 +77,10 @@ public:
   uint64_t GetAppendOperations() const { return append_operations_; }
   uint64_t GetBytesRead() const { return bytes_read_; }
   uint64_t GetReadOperations() const { return read_operations_; }
-  uint64_t GetZonesReset() const { return zones_reset_; }
+  uint64_t GetZonesResetCounter() const { return zones_reset_counter_; }
+
+  // diagnostics heat zones
+  std::vector<uint64_t> GetZonesReset() const { return zones_reset_; }
 
 private:
   QPair *qpair_;
@@ -88,12 +92,14 @@ private:
   bool can_access_all_;
   void *backed_memory_spill_;
   uint64_t lba_msb_;
-  // diag
+  // diag counters
   uint64_t bytes_written_;
   uint64_t append_operations_;
   uint64_t bytes_read_;
   uint64_t read_operations_;
-  uint64_t zones_reset_;
+  uint64_t zones_reset_counter_;
+  // diag for heat zones
+  std::vector<uint64_t> zones_reset_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
