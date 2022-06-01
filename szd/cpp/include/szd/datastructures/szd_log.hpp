@@ -52,13 +52,14 @@ public:
 
   // diagnostics (NOT threadsafe, meant to be called at the END)
   virtual uint64_t GetBytesWritten() const = 0;
-  virtual uint64_t GetAppendOperations() const = 0;
+  virtual uint64_t GetAppendOperationsCounter() const = 0;
   virtual uint64_t GetBytesRead() const = 0;
-  virtual uint64_t GetReadOperations() const = 0;
+  virtual uint64_t GetReadOperationsCounter() const = 0;
   virtual uint64_t GetZonesResetCounter() const = 0;
 
-  // diagnostics headzone
+  // diagnostics for each zone
   virtual std::vector<uint64_t> GetZonesReset() const = 0;
+  virtual std::vector<uint64_t> GetAppendOperations() const = 0;
 
 protected:
   // const after initialisation
