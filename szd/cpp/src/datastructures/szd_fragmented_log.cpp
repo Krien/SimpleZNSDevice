@@ -43,12 +43,14 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   size_t zones_needed =
       (alligned_size + zone_bytes_ - 1) / zone_cap_ / lba_size_;
   if (zones_needed > zones_left_) {
+    // printf("Invalid arguments fragmented log append");
     return SZDStatus::InvalidArguments;
   }
 
   // Reserve zones
   if (SZDFreeListFunctions::AllocZones(regions, &seeker_, zones_needed) !=
       SZDStatus::Success) {
+    // printf("Fragmented log freelist reports no space left\n");
     return SZDStatus::Unknown;
   }
   zones_left_ -= zones_needed;
@@ -69,14 +71,19 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
     s = write_channel_->DirectAppend(&slba, (void *)(buffer + offset),
                                      bytes_to_write, write_alligned);
     if (s != SZDStatus::Success) {
+      // printf("error writing to fragmented zone %lu %lu %lu %u %lu\n", slba,
+      //        offset, bytes_to_write, write_alligned, size);
       return s;
     }
     offset += bytes_to_write;
   }
 
   // Ensure that resources are released
-  if ((slba / zone_size_) * zone_size_ != slba) {
-    s = write_channel_->FinishZone((slba / zone_size_) * zone_size_);
+  if ((slba / zone_cap_) * zone_cap_ != slba) {
+    s = write_channel_->FinishZone((slba / zone_cap_) * zone_cap_);
+    // if (s != SZDStatus::Success) {
+    //   printf("error finishing zone\n");
+    // }
   }
   return s;
 }
