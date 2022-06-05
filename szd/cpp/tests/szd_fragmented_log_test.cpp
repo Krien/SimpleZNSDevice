@@ -19,7 +19,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogSimple) {
   SZDTestUtil::SZDSetupDevice(10, 15, &dev, &info);
   SZD::SZDChannelFactory *factory =
       new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
-  SZD::SZDFragmentedLog log(factory, info, 10, 15);
+  SZD::SZDFragmentedLog log(factory, info, 10, 15, 1);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);
@@ -78,7 +78,7 @@ TEST_F(SZDTest, TestFillingFragmentedLogFragmenting) {
   SZDTestUtil::SZDSetupDevice(10, 19, &dev, &info);
   SZD::SZDChannelFactory *factory =
       new SZD::SZDChannelFactory(dev.GetDeviceManager(), 2);
-  SZD::SZDFragmentedLog log(factory, info, 10, 19);
+  SZD::SZDFragmentedLog log(factory, info, 10, 19, 1);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAll(), SZD::SZDStatus::Success);

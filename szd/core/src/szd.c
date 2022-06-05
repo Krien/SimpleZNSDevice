@@ -592,6 +592,7 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
   // Error if we have an out of range.
   uint64_t number_of_zones_traversed = (lbas_to_process + (*lba - slba)) / info.zone_cap;
   if (*lba < info.min_lba || slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
+    printf("Out of range append\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
 
@@ -621,11 +622,19 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
       *nr_appends+=1;
     }
     if (rc != 0) {
+      printf("Error creating append request\n");
       return SZD_SC_SPDK_ERROR_APPEND;
     }
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
+      printf("Error during append %x\n", completion.err);
+      for (uint64_t slba = info.min_lba; slba != info.max_lba; slba+=info.zone_size) {
+        uint64_t zone_head;
+        szd_get_zone_head(qpair, slba, &zone_head);
+        if (zone_head != slba && zone_head != slba + info.zone_size)
+        printf("Zone head %lu %lu %lu\n", slba/info.zone_size, zone_head, slba + info.zone_size);
+      }
       return SZD_SC_SPDK_ERROR_APPEND;
     }
     *lba = *lba + current_step_size;

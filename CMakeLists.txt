@@ -114,7 +114,7 @@ target_include_directories(szd PRIVATE "${SPDK_INCLUDE_DIRS}")
 target_link_libraries(szd PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
 target_include_directories(szd PUBLIC 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/szd/core/${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 setup_szd_project_structure(szd)
 
@@ -129,7 +129,8 @@ target_link_libraries(szd_extended PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
 target_include_directories(szd_extended PUBLIC 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/szd/core/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/szd/cpp/${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 setup_szd_project_structure(szd_extended)
 

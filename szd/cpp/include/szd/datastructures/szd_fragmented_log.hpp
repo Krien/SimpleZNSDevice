@@ -20,7 +20,8 @@ class SZDFragmentedLog {
 public:
   // TODO: Add support for multiple readers...
   SZDFragmentedLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-                   const uint64_t min_zone_nr, const uint64_t max_zone_nr);
+                   const uint64_t min_zone_nr, const uint64_t max_zone_nr,
+                   const uint8_t number_of_readers);
   SZDFragmentedLog(const SZDFragmentedLog &) = delete;
   SZDFragmentedLog &operator=(const SZDFragmentedLog &) = delete;
   ~SZDFragmentedLog();
@@ -32,7 +33,8 @@ public:
                    std::vector<std::pair<uint64_t, uint64_t>> &regions,
                    bool alligned = true);
   SZDStatus Read(const std::vector<std::pair<uint64_t, uint64_t>> &regions,
-                 char *data, uint64_t size, bool alligned = true);
+                 char *data, uint64_t size, bool alligned = true,
+                 uint8_t reader = 0);
   SZDStatus Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions);
   SZDStatus ResetAll();
   SZDStatus Recover();
@@ -51,10 +53,18 @@ public:
     return write_channel_->GetAppendOperationsCounter();
   };
   inline uint64_t GetBytesRead() const {
-    return read_channel_->GetBytesRead();
+    uint64_t read = 0;
+    for (size_t i = 0; i < number_of_readers_; i++) {
+      read += read_channel_[i]->GetBytesRead();
+    }
+    return read;
   };
   inline uint64_t GetReadOperationsCounter() const {
-    return read_channel_->GetReadOperationsCounter();
+    uint64_t read = 0;
+    for (size_t i = 0; i < number_of_readers_; i++) {
+      read += read_channel_[i]->GetReadOperationsCounter();
+    }
+    return read;
   };
   inline uint64_t GetZonesResetCounter() const {
     return write_channel_->GetZonesResetCounter();
@@ -76,6 +86,7 @@ private:
   const uint64_t zone_cap_;
   const uint64_t lba_size_;
   const uint64_t zone_bytes_;
+  const uint8_t number_of_readers_;
   // Log
   SZDFreeList *freelist_;
   SZDFreeList *seeker_;
@@ -83,7 +94,7 @@ private:
   // references
   SZDChannelFactory *channel_factory_;
   SZDChannel *write_channel_;
-  SZDChannel *read_channel_;
+  SZDChannel **read_channel_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

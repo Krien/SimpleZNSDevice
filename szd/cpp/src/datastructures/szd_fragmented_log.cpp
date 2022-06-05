@@ -5,11 +5,13 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDFragmentedLog::SZDFragmentedLog(SZDChannelFactory *channel_factory,
                                    const DeviceInfo &info,
                                    const uint64_t min_zone_nr,
-                                   const uint64_t max_zone_nr)
+                                   const uint64_t max_zone_nr,
+                                   const uint8_t number_of_readers)
     : min_zone_head_(min_zone_nr * info.zone_cap),
       max_zone_head_(max_zone_nr * info.zone_cap), zone_size_(info.zone_size),
       zone_cap_(info.zone_cap), lba_size_(info.lba_size),
-      zone_bytes_(info.zone_cap * info.lba_size), freelist_(nullptr),
+      zone_bytes_(info.zone_cap * info.lba_size),
+      number_of_readers_(number_of_readers), freelist_(nullptr),
       seeker_(nullptr), zones_left_(max_zone_nr - min_zone_nr),
       channel_factory_(channel_factory), write_channel_(nullptr),
       read_channel_(nullptr) {
@@ -17,7 +19,11 @@ SZDFragmentedLog::SZDFragmentedLog(SZDChannelFactory *channel_factory,
   seeker_ = freelist_;
   channel_factory_->Ref();
   channel_factory_->register_channel(&write_channel_, min_zone_nr, max_zone_nr);
-  channel_factory_->register_channel(&read_channel_, min_zone_nr, max_zone_nr);
+  read_channel_ = new SZD::SZDChannel *[number_of_readers_];
+  for (uint8_t i = 0; i < number_of_readers_; i++) {
+    channel_factory_->register_channel(&read_channel_[i], min_zone_nr,
+                                       max_zone_nr);
+  }
 }
 
 SZDFragmentedLog::~SZDFragmentedLog() {
@@ -25,7 +31,12 @@ SZDFragmentedLog::~SZDFragmentedLog() {
     channel_factory_->unregister_channel(write_channel_);
   }
   if (read_channel_ != nullptr) {
-    channel_factory_->unregister_channel(read_channel_);
+    for (uint8_t i = 0; i < number_of_readers_; i++) {
+      if (read_channel_[i]) {
+        channel_factory_->unregister_channel(read_channel_[i]);
+      }
+    }
+    delete[] read_channel_;
   }
   channel_factory_->Unref();
   if (seeker_ != nullptr) {
@@ -142,7 +153,10 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
 
 SZDStatus SZDFragmentedLog::Read(
     const std::vector<std::pair<uint64_t, uint64_t>> &regions, char *data,
-    uint64_t size, bool alligned) {
+    uint64_t size, bool alligned, uint8_t reader) {
+  if (reader > number_of_readers_) {
+    return SZDStatus::InvalidArguments;
+  }
   SZDStatus s = SZDStatus::Success;
   uint64_t read = 0;
   bool alligned_read = true;
@@ -154,8 +168,8 @@ SZDStatus SZDFragmentedLog::Read(
     } else {
       size_to_read = region.second * zone_cap_ * lba_size_;
     }
-    s = read_channel_->DirectRead(region.first * zone_cap_, data + read,
-                                  size_to_read, alligned_read);
+    s = read_channel_[reader]->DirectRead(region.first * zone_cap_, data + read,
+                                          size_to_read, alligned_read);
     if (s != SZDStatus::Success) {
       return s;
     }

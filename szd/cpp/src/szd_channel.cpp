@@ -114,10 +114,12 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     bytes_written_ += alligned_size;
   }
   // Diag
-  for (slba = TranslateLbaToPba(*lba); slba <= new_lba; slba += zone_size_) {
-    uint64_t step = append_operations_counter_ - prev_append_counter;
-    step = step > zone_cap_ ? zone_cap_ : step;
+  uint64_t left = alligned_size / lba_size_;
+  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
+       slba += zone_size_) {
+    uint64_t step = left > zone_cap_ ? zone_cap_ : left;
     append_operations_[(slba - min_lba_) / zone_size_] += step;
+    left -= step;
   }
   *lba = TranslatePbaToLba(new_lba);
   return s;
@@ -191,23 +193,26 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
+    printf("Invalid arguments for DirectAppend\n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer and copy normal buffer to DMA.
   void *dma_buffer = szd_calloc(lba_size_, 1, alligned_size);
   if (dma_buffer == nullptr) {
+    printf("No DMA memory left\n");
     return SZDStatus::IOError;
   }
   memcpy(dma_buffer, buffer, size);
-  uint64_t prev_append_counter = append_operations_counter_;
   SZDStatus s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer,
                                                 alligned_size,
                                                 &append_operations_counter_));
   // Diag
-  for (slba = TranslateLbaToPba(*lba); slba <= new_lba; slba += zone_size_) {
-    uint64_t step = append_operations_counter_ - prev_append_counter;
-    step = step > zone_cap_ ? zone_cap_ : step;
+  uint64_t left = alligned_size / lba_size_;
+  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
+       slba += zone_size_) {
+    uint64_t step = left > zone_cap_ ? zone_cap_ : left;
     append_operations_[(slba - min_lba_) / zone_size_] += step;
+    left -= step;
   }
   bytes_written_ += alligned_size;
   // Remove temporary buffer.
