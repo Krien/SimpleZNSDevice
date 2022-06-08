@@ -168,6 +168,8 @@ SZDStatus SZDFragmentedLog::Read(
     } else {
       size_to_read = region.second * zone_cap_ * lba_size_;
     }
+    // printf("reading %lu %lu %lu\n", region.first * zone_cap_, read,
+    //        size_to_read);
     s = read_channel_[reader]->DirectRead(region.first * zone_cap_, data + read,
                                           size_to_read, alligned_read);
     if (s != SZDStatus::Success) {

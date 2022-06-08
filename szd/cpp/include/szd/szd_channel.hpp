@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <atomic>
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
@@ -73,13 +74,21 @@ public:
   uint64_t TranslatePbaToLba(uint64_t lba);
 
   // diagnostics counters
-  uint64_t GetBytesWritten() const { return bytes_written_; }
-  uint64_t GetAppendOperationsCounter() const {
-    return append_operations_counter_;
+  uint64_t GetBytesWritten() const {
+    return bytes_written_.load(std::memory_order_relaxed);
   }
-  uint64_t GetBytesRead() const { return bytes_read_; }
-  uint64_t GetReadOperationsCounter() const { return read_operations_; }
-  uint64_t GetZonesResetCounter() const { return zones_reset_counter_; }
+  uint64_t GetAppendOperationsCounter() const {
+    return append_operations_counter_.load(std::memory_order_relaxed);
+  }
+  uint64_t GetBytesRead() const {
+    return bytes_read_.load(std::memory_order_relaxed);
+  }
+  uint64_t GetReadOperationsCounter() const {
+    return read_operations_.load(std::memory_order_relaxed);
+  }
+  uint64_t GetZonesResetCounter() const {
+    return zones_reset_counter_.load(std::memory_order_relaxed);
+  }
 
   // diagnostics for each zones
   std::vector<uint64_t> GetZonesReset() const { return zones_reset_; }
@@ -98,11 +107,11 @@ private:
   void *backed_memory_spill_;
   uint64_t lba_msb_;
   // diagnostics counters
-  uint64_t bytes_written_;
-  uint64_t append_operations_counter_;
-  uint64_t bytes_read_;
-  uint64_t read_operations_;
-  uint64_t zones_reset_counter_;
+  std::atomic<uint64_t> bytes_written_;
+  std::atomic<uint64_t> append_operations_counter_;
+  std::atomic<uint64_t> bytes_read_;
+  std::atomic<uint64_t> read_operations_;
+  std::atomic<uint64_t> zones_reset_counter_;
   // diagnostics for heat zones
   std::vector<uint64_t> zones_reset_;
   std::vector<uint64_t> append_operations_;

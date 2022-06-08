@@ -142,7 +142,7 @@ SZDStatus SZDOnceLog::RecoverPointers() {
       write_head = zone_head;
     }
     // end has been reached.
-    if (write_head > min_zone_head_ && zone_head == slba) {
+    if (zone_head == slba) {
       break;
     }
   }

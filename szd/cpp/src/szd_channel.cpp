@@ -13,15 +13,19 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), zone_cap_(info.zone_cap), min_lba_(min_lba),
       max_lba_(max_lba), can_access_all_(false), backed_memory_spill_(nullptr),
-      lba_msb_(msb(info.lba_size)), bytes_written_(0),
-      append_operations_counter_(0), bytes_read_(0), read_operations_(0),
-      zones_reset_counter_(0) {
+      lba_msb_(msb(info.lba_size)) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
     min_lba_ = max_lba_;
   }
   backed_memory_spill_ = szd_calloc(lba_size_, 1, lba_size_);
+  // diagnostics
+  bytes_written_.store(0);
+  append_operations_counter_.store(0);
+  bytes_read_.store(0);
+  read_operations_.store(0);
+  zones_reset_counter_.store(0);
   // Ensure that all diagnosed zones are
   zones_reset_.clear();
   for (size_t slba = min_lba; slba < max_lba_; slba += zone_size_) {
@@ -86,6 +90,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   }
   // Diag
   uint64_t prev_append_counter = append_operations_counter_;
+  uint64_t append_ops = 0;
   // We need two steps because it will not work with one buffer.
   if (alligned_size != size) {
     if (backed_memory_spill_ == nullptr) {
@@ -96,22 +101,21 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     int rc = 0;
     if (alligned_size > 0) {
       rc = szd_append_with_diag(qpair_, &new_lba, (char *)cbuffer + addr,
-                                alligned_size, &append_operations_counter_);
-      bytes_written_ += alligned_size;
+                                alligned_size, &append_ops);
+      bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
     }
     memset((char *)backed_memory_spill_ + postfix_size, '\0',
            lba_size_ - postfix_size);
     memcpy(backed_memory_spill_, (char *)cbuffer + addr + alligned_size,
            postfix_size);
     rc = rc | szd_append_with_diag(qpair_, &new_lba, backed_memory_spill_,
-                                   lba_size_, &append_operations_counter_);
-    bytes_written_ += lba_size_;
+                                   lba_size_, &append_ops);
+    bytes_written_.fetch_add(lba_size_, std::memory_order_relaxed);
     s = FromStatus(rc);
   } else {
-    s = FromStatus(szd_append_with_diag(qpair_, &new_lba,
-                                        (char *)cbuffer + addr, alligned_size,
-                                        &append_operations_counter_));
-    bytes_written_ += alligned_size;
+    s = FromStatus(szd_append_with_diag(
+        qpair_, &new_lba, (char *)cbuffer + addr, alligned_size, &append_ops));
+    bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
   }
   // Diag
   uint64_t left = alligned_size / lba_size_;
@@ -121,6 +125,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     append_operations_[(slba - min_lba_) / zone_size_] += step;
     left -= step;
   }
+  append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
   *lba = TranslatePbaToLba(new_lba);
   return s;
 }
@@ -159,14 +164,18 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     alligned_size -= lba_size_;
     int rc = 0;
     if (alligned_size > 0) {
+      uint64_t read_ops = 0;
       rc = szd_read_with_diag(qpair_, lba, (char *)cbuffer + addr,
-                              alligned_size, &read_operations_);
-      bytes_read_ += alligned_size;
+                              alligned_size, &read_ops);
+      bytes_read_.fetch_add(alligned_size, std::memory_order_relaxed);
+      read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
     }
+    uint64_t read_ops = 0;
     rc = rc | szd_read_with_diag(qpair_, lba + alligned_size / lba_size_,
                                  (char *)backed_memory_spill_, lba_size_,
-                                 &read_operations_);
-    bytes_read_ += lba_size_;
+                                 &read_ops);
+    bytes_read_.fetch_add(lba_size_, std::memory_order_relaxed);
+    read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
     s = FromStatus(rc);
     if (s == SZDStatus::Success) {
       memcpy((char *)cbuffer + addr + alligned_size, backed_memory_spill_,
@@ -174,9 +183,11 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     }
     return s;
   } else {
+    uint64_t read_ops = 0;
     s = FromStatus(szd_read_with_diag(qpair_, lba, (char *)cbuffer + addr,
-                                      alligned_size, &read_operations_));
-    bytes_read_ += alligned_size;
+                                      alligned_size, &read_ops));
+    bytes_read_.fetch_add(alligned_size, std::memory_order_relaxed);
+    read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
     return s;
   }
 }
@@ -203,9 +214,9 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     return SZDStatus::IOError;
   }
   memcpy(dma_buffer, buffer, size);
+  uint64_t append_ops = 0;
   SZDStatus s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer,
-                                                alligned_size,
-                                                &append_operations_counter_));
+                                                alligned_size, &append_ops));
   // Diag
   uint64_t left = alligned_size / lba_size_;
   for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
@@ -214,7 +225,8 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     append_operations_[(slba - min_lba_) / zone_size_] += step;
     left -= step;
   }
-  bytes_written_ += alligned_size;
+  bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
+  append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
   // Remove temporary buffer.
   szd_free(dma_buffer);
   *lba = TranslatePbaToLba(new_lba);
@@ -239,9 +251,11 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   if (buffer_dma == nullptr) {
     return SZDStatus::IOError;
   }
-  SZDStatus s = FromStatus(szd_read_with_diag(
-      qpair_, lba, buffer_dma, alligned_size, &read_operations_));
-  bytes_read_ += alligned_size;
+  uint64_t read_ops = 0;
+  SZDStatus s = FromStatus(
+      szd_read_with_diag(qpair_, lba, buffer_dma, alligned_size, &read_ops));
+  read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
+  bytes_read_.fetch_add(alligned_size, std::memory_order_relaxed);
   if (s == SZDStatus::Success) {
     memcpy(buffer, buffer_dma, size);
   }
@@ -256,7 +270,7 @@ SZDStatus SZDChannel::ResetZone(uint64_t slba) {
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
-  zones_reset_counter_++;
+  zones_reset_counter_.fetch_add(1, std::memory_order_relaxed);
   zones_reset_[(slba - min_lba_) / zone_size_]++;
   return s;
 }
@@ -269,13 +283,14 @@ SZDStatus SZDChannel::ResetAllZones() {
       if ((s = FromStatus(szd_reset(qpair_, slba))) != SZDStatus::Success) {
         return s;
       }
-      zones_reset_counter_++;
+      zones_reset_counter_.fetch_add(1, std::memory_order_relaxed);
       zones_reset_[(slba - min_lba_) / zone_size_]++;
     }
     return s;
   } else {
     s = FromStatus(szd_reset_all(qpair_));
-    zones_reset_counter_ += (max_lba_ - min_lba_) / zone_size_;
+    zones_reset_counter_.fetch_add((max_lba_ - min_lba_) / zone_size_,
+                                   std::memory_order_relaxed);
     for (uint64_t &z : zones_reset_) {
       z++;
     }
