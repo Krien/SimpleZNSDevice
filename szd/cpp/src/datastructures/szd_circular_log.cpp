@@ -176,7 +176,8 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
                                bool alligned, uint8_t reader) {
   // Wraparound
   if (lba > max_zone_head_ || reader >= number_of_readers_) {
-    return Read(lba - max_zone_head_ + min_zone_head_, data, size, alligned);
+    return Read(lba - max_zone_head_ + min_zone_head_, data, size, alligned,
+                reader);
   }
   // Set up proper size
   uint64_t alligned_size =
@@ -195,7 +196,8 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
       return s;
     }
     s = read_channel_[reader]->DirectRead(
-        min_zone_head_, data, alligned_size - first_phase_size, alligned);
+        min_zone_head_, data + first_phase_size,
+        alligned_size - first_phase_size, alligned);
     return s;
   } else {
     return read_channel_[reader]->DirectRead(lba, data, alligned_size,
@@ -208,7 +210,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
   // Wraparound
   if (lba > max_zone_head_ || reader >= number_of_readers_) {
     return Read(lba - max_zone_head_ + min_zone_head_, buffer, addr, size,
-                alligned);
+                alligned, reader);
   }
   // Set up proper size
   uint64_t alligned_size =
