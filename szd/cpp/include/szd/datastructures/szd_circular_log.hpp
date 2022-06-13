@@ -43,6 +43,8 @@ public:
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
 
+  uint64_t wrapped_addr(uint64_t addr);
+
   inline bool Empty() const override { return write_head_ == min_zone_head_; }
   inline uint64_t SpaceAvailable() const override { return space_left_; }
   inline bool SpaceLeft(const size_t size,
@@ -94,7 +96,7 @@ private:
   std::atomic<uint64_t> write_head_;
   std::atomic<uint64_t> write_tail_;
   uint64_t zone_tail_; // only used by writer
-  uint64_t space_left_;
+  std::atomic<uint64_t> space_left_;
   // references
   SZDChannel **read_channel_;
   SZDChannel *write_channel_;

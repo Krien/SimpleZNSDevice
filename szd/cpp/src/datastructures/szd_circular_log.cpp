@@ -39,6 +39,17 @@ SZDCircularLog::~SZDCircularLog() {
   channel_factory_->Unref();
 }
 
+uint64_t SZDCircularLog::wrapped_addr(uint64_t addr) {
+  // TODO: Should error
+  if (addr < min_zone_head_) {
+    return 0;
+  }
+  addr -= min_zone_head_;
+  addr %= (max_zone_head_ - min_zone_head_);
+  addr += min_zone_head_;
+  return addr;
+}
+
 SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
                                  uint64_t *lbas_, bool alligned) {
   SZDStatus s;
@@ -93,7 +104,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
   }
   uint64_t lbas = alligned_size / lba_size_;
   // 2 phase
-  uint64_t new_write_head = write_head_;
+  uint64_t new_write_head = write_head_.load();
   if (new_write_head + lbas > max_zone_head_ && write_tail_ > min_zone_head_) {
     uint64_t first_phase_size = (max_zone_head_ - new_write_head) * lba_size_;
     s = write_channel_->FlushBufferSection(&new_write_head, buffer, addr,
@@ -259,7 +270,7 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
     if (s != SZDStatus::Success) {
       return s;
     }
-    end_lba = end_lba - max_zone_head_ + min_zone_head_;
+    end_lba = (end_lba - max_zone_head_) + min_zone_head_;
     begin_lba = min_zone_head_;
   }
 
@@ -307,7 +318,7 @@ SZDStatus SZDCircularLog::ResetAll() {
   s = SZDStatus::Success;
   // Clean state
   write_head_ = zone_tail_ = write_tail_ = min_zone_head_;
-  space_left_ = (max_zone_head_ - write_head_) * lba_size_;
+  space_left_ = (max_zone_head_ - min_zone_head_) * lba_size_;
   return s;
 }
 
