@@ -125,7 +125,12 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
 
   info->lba_size = 1UL << ns_data->lbaf[ns_data->flbas.format].lbads;
   info->zone_size = ns_data_zns->lbafe[ns_data->flbas.format].zsze;
-  info->mdts = (uint64_t)1 << (12U + cap.bits.mpsmin + ctrlr_data->mdts);
+  // if mdts == 0, mdts is unlimited.
+  if (ctrlr_data->mdts == 0) {
+    info->mdts = info->zone_size * info->lba_size;
+  } else {
+    info->mdts = (uint64_t)1 << (12U + cap.bits.mpsmin + ctrlr_data->mdts);
+  }
   info->zasl = (uint64_t)ctrlr_data_zns->zasl;
   // If zasl is not set, it is equal to mdts.
   info->zasl = info->zasl == 0UL
