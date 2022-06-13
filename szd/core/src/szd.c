@@ -113,32 +113,15 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
   RETURN_ERR_ON_NULL(manager->ctrlr);
   RETURN_ERR_ON_NULL(manager->ns);
-  const struct spdk_nvme_ns_data *ns_data = spdk_nvme_ns_get_data(manager->ns);
-  const t_spdk_nvme_zns_ns_data *ns_data_zns =
-      spdk_nvme_zns_ns_get_data(manager->ns);
-  const t_spdk_nvme_ctrlr_data *ctrlr_data =
-      spdk_nvme_ctrlr_get_data(manager->ctrlr);
-  const t_spdk_nvme_zns_ctrlr_data *ctrlr_data_zns =
-      spdk_nvme_zns_ctrlr_get_data(manager->ctrlr);
-  union spdk_nvme_cap_register cap =
-      spdk_nvme_ctrlr_get_regs_cap(manager->ctrlr);
-
-  info->lba_size = 1UL << ns_data->lbaf[ns_data->flbas.format].lbads;
-  info->zone_size = ns_data_zns->lbafe[ns_data->flbas.format].zsze;
-  // if mdts == 0, mdts is unlimited.
-  if (ctrlr_data->mdts == 0) {
-    info->mdts = info->zone_size * info->lba_size;
-  } else {
-    info->mdts = (uint64_t)1 << (12U + cap.bits.mpsmin + ctrlr_data->mdts);
-  }
-  info->zasl = (uint64_t)ctrlr_data_zns->zasl;
-  // If zasl is not set, it is equal to mdts.
-  info->zasl = info->zasl == 0UL
-                   ? info->mdts
-                   : (uint64_t)1 << (12U + cap.bits.mpsmin + info->zasl);
-  info->lba_cap = ns_data->ncap;
+  info->lba_size = (uint64_t)spdk_nvme_ns_get_sector_size(manager->ns);
+  info->zone_size = (uint64_t)spdk_nvme_zns_ns_get_zone_size_sectors(manager->ns);
+  info->mdts = (uint64_t)spdk_nvme_ctrlr_get_max_xfer_size(manager->ctrlr);
+  info->zasl = (uint64_t)spdk_nvme_zns_ctrlr_get_max_zone_append_size(manager->ctrlr);
+  info->lba_cap = (uint64_t)spdk_nvme_ns_get_num_sectors(manager->ns);
   info->min_lba = manager->info.min_lba;
   info->max_lba = manager->info.max_lba;
+  // printf("INFO: %lu %lu %lu %lu %lu %lu %lu \n", info->lba_size, info->zone_size, info->mdts, info->zasl,
+  //   info->lba_cap, info->min_lba, info->max_lba);
   // TODO: zone cap can differ between zones... 
   QPair **temp = (QPair**)calloc(1,sizeof(QPair*));
   szd_create_qpair(manager, temp);
