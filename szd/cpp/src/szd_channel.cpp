@@ -13,7 +13,7 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
     : qpair_(qpair.release()), lba_size_(info.lba_size),
       zone_size_(info.zone_size), zone_cap_(info.zone_cap), min_lba_(min_lba),
       max_lba_(max_lba), can_access_all_(false), backed_memory_spill_(nullptr),
-      lba_msb_(msb(info.lba_size)) {
+      lba_msb_(msb(info.lba_size)), completion_(nullptr) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
@@ -261,6 +261,74 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   }
   // Remove temporary buffer.
   szd_free(buffer_dma);
+  return s;
+}
+
+SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
+                                  const uint64_t size) {
+  // Translate lba
+  uint64_t new_lba = TranslateLbaToPba(*lba);
+  // Allign
+  uint64_t alligned_size = allign_size(size);
+  // Check if in bounds...
+  uint64_t slba = (new_lba / zone_size_) * zone_size_;
+  uint64_t zones_needed =
+      (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
+  if (zones_needed > 1) {
+    printf("Invalid arguments for DirectAsyncAppend\n");
+    return SZDStatus::InvalidArguments;
+  }
+  // Create temporary DMA buffer and copy normal buffer to DMA.
+  async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
+  if (async_buffer_ == nullptr) {
+    printf("No DMA memory left\n");
+    return SZDStatus::IOError;
+  }
+  memcpy(async_buffer_, buffer, size);
+  uint64_t append_ops = 0;
+  completion_ = new Completion;
+  SZDStatus s = FromStatus(
+      szd_append_async_with_diag(qpair_, &new_lba, async_buffer_, alligned_size,
+                                 &append_ops, completion_));
+  // Diag
+  uint64_t left = alligned_size / lba_size_;
+  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
+       slba += zone_size_) {
+    uint64_t step = left > zone_cap_ ? zone_cap_ : left;
+    append_operations_[(slba - min_lba_) / zone_size_] += step;
+    left -= step;
+  }
+  bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
+  append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
+
+  *lba = TranslatePbaToLba(new_lba);
+  return s;
+}
+
+bool SZDChannel::PollOnce() {
+  if (completion_ == nullptr) {
+    return true;
+  }
+  bool status = completion_->done;
+  if (status) {
+    // Remove temporary buffer.
+    szd_free(async_buffer_);
+    delete completion_;
+    completion_ = nullptr;
+  }
+  return status;
+}
+
+SZDStatus SZDChannel::Sync() {
+  if (completion_ == nullptr) {
+    return SZDStatus::Success;
+  }
+  // poll
+  SZDStatus s = FromStatus(szd_poll_async(qpair_, completion_));
+  // Remove temporary buffer.
+  szd_free(async_buffer_);
+  delete completion_;
+  completion_ = nullptr;
   return s;
 }
 

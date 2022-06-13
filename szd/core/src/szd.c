@@ -653,6 +653,66 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   return szd_append_with_diag(qpair, lba, buffer, size, NULL);
 }
 
+int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer, 
+  uint64_t size, uint64_t *nr_appends, Completion *completion) {
+  RETURN_ERR_ON_NULL(qpair);
+  RETURN_ERR_ON_NULL(buffer);
+  int rc = SZD_SC_SUCCESS;
+  DeviceInfo info = qpair->man->info;
+
+  // Zone pointers
+  uint64_t slba = (*lba / info.zone_size) * info.zone_size;
+  uint64_t current_zone_end = slba + info.zone_cap;
+  // Oops, let me fix this for you
+  if (*lba > current_zone_end) {
+    slba += info.zone_size;
+    *lba = slba + *lba - current_zone_end;
+    current_zone_end = slba + info.zone_cap;
+  }
+  // Progress variables
+  uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
+  *completion = Completion_default;
+
+  // Error if we have an out of range or we cross a zone border.
+  uint64_t number_of_zones_traversed = (lbas_to_process + (*lba - slba)) / info.zone_cap;
+  if (*lba < info.min_lba || *lba > info.max_lba || number_of_zones_traversed > 1 
+    || lbas_to_process > info.zasl / info.lba_size) {
+    printf("Illegal async append\n");
+    return SZD_SC_SPDK_ERROR_APPEND;
+  }
+
+  completion->done = false;
+  completion->err = 0x00;
+  rc = spdk_nvme_zns_zone_append(qpair->man->ns, qpair->qpair,
+                                   (char *)buffer,
+                                   slba,         /* LBA start */
+                                   lbas_to_process, /* number of LBAs */
+                                   __append_complete, completion, 0);
+  if (nr_appends != NULL) {
+    *nr_appends+=1;
+  }
+  if (rc != 0) {
+    printf("Error creating append request\n");
+    return SZD_SC_SPDK_ERROR_APPEND;
+  }
+  *lba = *lba + lbas_to_process;
+  return SZD_SC_SUCCESS;
+}
+
+int szd_append_async(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size,
+                     Completion *completion) {
+  return szd_append_async_with_diag(qpair, lba, buffer, size, NULL, completion);
+}
+
+int szd_poll_async(QPair *qpair, Completion *completion) {
+  POLL_QPAIR(qpair->qpair, completion->done);
+  if (completion->err != 0) {
+    printf("Error during polling %x\n", completion->err);
+    return SZD_SC_SPDK_ERROR_POLLING;
+  }
+  return SZD_SC_SUCCESS;
+}
+
 int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.

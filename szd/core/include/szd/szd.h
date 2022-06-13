@@ -239,6 +239,29 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
                          uint64_t size, uint64_t *nr_appends);
 
 /**
+ * @brief Append z_calloced data asynchronously to a zone.
+ * @param qpair channel to use for I/O
+ * @param lba logical block address to write to (UNVERIFIED, but must equal
+ * write_head of zone), will be updated after each succesful write.
+ * @param buffer zcalloced data
+ * @param size size of buffer
+ * @param nr_appends ptr to variable that can be used for diagnostics, can be
+ * set to NULL.
+ * @param completion can be used to poll for completion later on (sync)
+ */
+int szd_append_async(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size,
+                     Completion *completion);
+int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
+                               uint64_t size, uint64_t *nr_appends,
+                               Completion *completion);
+/**
+ * @brief
+ * Can be used on an asynchronously function to ensure that is synced to the
+ * storage.
+ */
+int szd_poll_async(QPair *qpair, Completion *completion);
+
+/**
  * @brief Resets a zone synchronously, allowing it to be reused.
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to reset

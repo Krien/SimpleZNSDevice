@@ -17,8 +17,7 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDLog {
 public:
   SZDLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
-         const uint64_t min_zone_nr, const uint64_t max_zone_nr,
-         const uint8_t number_of_readers);
+         const uint64_t min_zone_nr, const uint64_t max_zone_nr);
   SZDLog(const SZDLog &) = delete;
   SZDLog &operator=(const SZDLog &) = delete;
   virtual ~SZDLog() = default;
@@ -48,7 +47,7 @@ public:
   virtual uint64_t GetWriteHead() const = 0;
   virtual uint64_t GetWriteTail() const = 0;
 
-  inline uint8_t GetNumberOfReaders() const { return number_of_readers_; }
+  virtual uint8_t GetNumberOfReaders() const = 0;
 
   // diagnostics (NOT threadsafe, meant to be called at the END)
   virtual uint64_t GetBytesWritten() const = 0;
@@ -68,7 +67,6 @@ protected:
   const uint64_t zone_size_;
   const uint64_t zone_cap_;
   const uint64_t lba_size_;
-  const uint8_t number_of_readers_;
   // references
   SZD::SZDChannelFactory *channel_factory_;
 };

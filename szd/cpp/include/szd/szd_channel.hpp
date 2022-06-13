@@ -9,10 +9,10 @@
 #include "szd/szd.h"
 #include "szd/szd_status.hpp"
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
-#include <atomic>
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
@@ -63,6 +63,16 @@ public:
   SZDStatus DirectRead(uint64_t lba, void *buffer, uint64_t size,
                        bool alligned = true);
 
+  // Async I/O operations. Currently only supports Direct
+  // writes < ZASL to ONE zone at a time. WARNINGS:
+  //  1. next write operation should be a sync, as we can not write again till
+  //  synced.
+  //  2. writing more than 1 ZASL is undefined behaviour.
+  //  3. CHECK that the write does not cross zones, this will break.
+  SZDStatus AsyncAppend(uint64_t *lba, void *buffer, const uint64_t size);
+  bool PollOnce();
+  SZDStatus Sync();
+
   // Management of zones
   SZDStatus ResetZone(uint64_t slba);
   SZDStatus ResetAllZones();
@@ -106,6 +116,9 @@ private:
   bool can_access_all_;
   void *backed_memory_spill_;
   uint64_t lba_msb_;
+  // async IO
+  Completion *completion_;
+  void *async_buffer_;
   // diagnostics counters
   std::atomic<uint64_t> bytes_written_;
   std::atomic<uint64_t> append_operations_counter_;

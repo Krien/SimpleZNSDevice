@@ -10,10 +10,9 @@ SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                const uint64_t min_zone_nr,
                                const uint64_t max_zone_nr,
                                const uint8_t number_of_readers)
-    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr,
-             number_of_readers),
-      write_head_(min_zone_head_), write_tail_(min_zone_head_),
-      zone_tail_(min_zone_nr * info.zone_cap),
+    : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
+      number_of_readers_(number_of_readers), write_head_(min_zone_head_),
+      write_tail_(min_zone_head_), zone_tail_(min_zone_nr * info.zone_cap),
       space_left_((max_zone_nr - min_zone_nr) * info.zone_cap * info.lba_size) {
   channel_factory_->Ref();
   read_channel_ = new SZD::SZDChannel *[number_of_readers_];

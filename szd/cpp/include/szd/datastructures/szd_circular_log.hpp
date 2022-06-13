@@ -56,6 +56,9 @@ public:
 
   inline uint64_t GetWriteHead() const override { return write_head_; }
   inline uint64_t GetWriteTail() const override { return write_tail_; }
+  inline uint8_t GetNumberOfReaders() const override {
+    return number_of_readers_;
+  };
 
   inline uint64_t GetBytesWritten() const override {
     return write_channel_->GetBytesWritten();
@@ -93,6 +96,7 @@ private:
   void RecalculateSpaceLeft();
 
   // log
+  const uint8_t number_of_readers_;
   std::atomic<uint64_t> write_head_;
   std::atomic<uint64_t> write_tail_;
   uint64_t zone_tail_; // only used by writer
