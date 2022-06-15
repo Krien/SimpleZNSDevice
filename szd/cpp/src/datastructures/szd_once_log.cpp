@@ -194,7 +194,7 @@ SZDStatus SZDOnceLog::ResetAll() {
   SZDStatus s;
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_cap_) {
-    s = read_channel_->ResetZone(slba);
+    s = write_channel_[0]->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
     }
