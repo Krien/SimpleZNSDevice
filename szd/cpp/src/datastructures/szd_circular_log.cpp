@@ -36,6 +36,7 @@ SZDCircularLog::~SZDCircularLog() {
     channel_factory_->unregister_channel(write_channel_);
   }
   channel_factory_->Unref();
+  // printf("Ended at %lu %lu \n", write_tail_.load(), write_head_.load());
 }
 
 uint64_t SZDCircularLog::wrapped_addr(uint64_t addr) {
@@ -169,6 +170,8 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
   if (write_head_snapshot >= write_tail_snapshot) {
     // [---------------WTvvvvWH--]
     if (addr < write_tail_snapshot || addr + lbas > write_head_snapshot) {
+      printf("ERROR ADDR out of centre, %lu %lu %lu %lu \n",
+             write_tail_snapshot, addr, addr + lbas, write_head_snapshot);
       return false;
     }
   } else {
@@ -176,6 +179,8 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
     if ((addr > write_head_snapshot && addr < write_tail_snapshot) ||
         (addr + lbas > write_head_snapshot &&
          addr + lbas < write_tail_snapshot)) {
+      printf("ERROR ADDR in of centre, %lu %lu %lu %lu \n", write_tail_snapshot,
+             addr, addr + lbas, write_head_snapshot);
       return false;
     }
   }
@@ -195,6 +200,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
   uint64_t lbas = alligned_size / lba_size_;
   // Ensure data is written
   if (!IsValidReadAddress(lba, lbas)) {
+    printf("Invalid circular log address\n");
     return SZDStatus::InvalidArguments;
   }
   // 2 phase (wraparound) or 1 phase read needed?
@@ -203,6 +209,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
     SZDStatus s = read_channel_[reader]->DirectRead(lba, data, first_phase_size,
                                                     alligned);
     if (s != SZDStatus::Success) {
+      printf("Error during 2 phase read part1 \n");
       return s;
     }
     s = read_channel_[reader]->DirectRead(
@@ -393,6 +400,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   write_head_ = log_head;
   zone_tail_ = write_tail_ = log_tail;
   RecalculateSpaceLeft();
+  // printf("Restored at %lu %lu \n", write_tail_.load(), write_head_.load());
   return SZDStatus::Success;
 }
 

@@ -488,7 +488,7 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size, 
   uint64_t slba = (lba / info.zone_size) * info.zone_size;
   uint64_t current_zone_end = slba + info.zone_cap;
   // Oops, let me fix this for you
-  if (lba > current_zone_end) {
+  if (lba >= current_zone_end) {
     slba += info.zone_size;
     lba = slba + lba - current_zone_end;
     current_zone_end = slba + info.zone_cap;
@@ -564,7 +564,7 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
   uint64_t slba = (*lba / info.zone_size) * info.zone_size;
   uint64_t current_zone_end = slba + info.zone_cap;
   // Oops, let me fix this for you
-  if (*lba > current_zone_end) {
+  if (*lba >= current_zone_end) {
     slba += info.zone_size;
     *lba = slba + *lba - current_zone_end;
     current_zone_end = slba + info.zone_cap;

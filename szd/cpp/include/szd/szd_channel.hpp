@@ -109,6 +109,8 @@ public:
 private:
   QPair *qpair_;
   uint64_t lba_size_;
+  uint64_t zasl_;
+  uint64_t mdts_;
   uint64_t zone_size_;
   uint64_t zone_cap_;
   uint64_t min_lba_;

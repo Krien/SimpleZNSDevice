@@ -10,10 +10,11 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba)
-    : qpair_(qpair.release()), lba_size_(info.lba_size),
-      zone_size_(info.zone_size), zone_cap_(info.zone_cap), min_lba_(min_lba),
-      max_lba_(max_lba), can_access_all_(false), backed_memory_spill_(nullptr),
-      lba_msb_(msb(info.lba_size)), completion_(nullptr) {
+    : qpair_(qpair.release()), lba_size_(info.lba_size), zasl_(info.zasl),
+      mdts_(info.mdts), zone_size_(info.zone_size), zone_cap_(info.zone_cap),
+      min_lba_(min_lba), max_lba_(max_lba), can_access_all_(false),
+      backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)),
+      completion_(nullptr) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
@@ -207,16 +208,39 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     printf("Invalid arguments for DirectAppend\n");
     return SZDStatus::InvalidArguments;
   }
-  // Create temporary DMA buffer and copy normal buffer to DMA.
-  void *dma_buffer = szd_calloc(lba_size_, 1, alligned_size);
+  // Create temporary DMA buffer of ZASL size
+  void *dma_buffer = szd_calloc(lba_size_, 1, zasl_);
   if (dma_buffer == nullptr) {
     printf("No DMA memory left\n");
     return SZDStatus::IOError;
   }
-  memcpy(dma_buffer, buffer, size);
-  uint64_t append_ops = 0;
-  SZDStatus s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer,
-                                                alligned_size, &append_ops));
+  // Write in steps of ZASL
+  uint64_t begin = 0;
+  uint64_t stepsize = zasl_;
+  SZDStatus s;
+  while (begin < size) {
+    if (begin + zasl_ > alligned_size) {
+      stepsize = alligned_size - begin;
+      memset(dma_buffer, 0, zasl_);
+      memcpy(dma_buffer, (char *)buffer + begin, size - begin);
+    } else {
+      stepsize = zasl_;
+      memcpy(dma_buffer, (char *)buffer + begin, stepsize);
+    }
+    uint64_t append_ops = 0;
+    s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer, stepsize,
+                                        &append_ops));
+    if (s != SZDStatus::Success) {
+      printf("DirectWrite error \n");
+      break;
+    }
+    begin += stepsize;
+    // Diag
+    bytes_written_.fetch_add(stepsize, std::memory_order_relaxed);
+    append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
+  }
+  // Remove temporary buffer.
+  szd_free(dma_buffer);
   // Diag
   uint64_t left = alligned_size / lba_size_;
   for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
@@ -225,10 +249,6 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     append_operations_[(slba - min_lba_) / zone_size_] += step;
     left -= step;
   }
-  bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
-  append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
-  // Remove temporary buffer.
-  szd_free(dma_buffer);
   *lba = TranslatePbaToLba(new_lba);
   return s;
 }
@@ -244,20 +264,49 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
+    printf("Directread invalid arguments \n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer to copy other DMA buffer data into.
-  void *buffer_dma = szd_calloc(lba_size_, 1, alligned_size);
+  void *buffer_dma = szd_calloc(lba_size_, 1, mdts_);
   if (buffer_dma == nullptr) {
+    printf("No DMA memory left for reading\n");
     return SZDStatus::IOError;
   }
-  uint64_t read_ops = 0;
-  SZDStatus s = FromStatus(
-      szd_read_with_diag(qpair_, lba, buffer_dma, alligned_size, &read_ops));
-  read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
-  bytes_read_.fetch_add(alligned_size, std::memory_order_relaxed);
-  if (s == SZDStatus::Success) {
-    memcpy(buffer, buffer_dma, size);
+  // Read in steps of MDTS
+  uint64_t begin = 0;
+  uint64_t lba_to_read = lba;
+  slba = (lba_to_read / zone_size_) * zone_size_;
+  uint64_t current_zone_end = slba + zone_cap_;
+  uint64_t stepsize = mdts_;
+  uint64_t alligned_step = mdts_;
+  SZDStatus s;
+  while (begin < size) {
+    if (begin + mdts_ > alligned_size) {
+      alligned_step = size - begin;
+      stepsize = alligned_size - begin;
+    } else {
+      stepsize = mdts_;
+      alligned_step = begin + mdts_ > size ? size - begin : mdts_;
+    }
+    uint64_t read_ops = 0;
+    s = FromStatus(szd_read_with_diag(qpair_, lba_to_read, buffer_dma, stepsize,
+                                      &read_ops));
+    read_operations_.fetch_add(read_ops, std::memory_order_relaxed);
+    bytes_read_.fetch_add(stepsize, std::memory_order_relaxed);
+    if (s == SZDStatus::Success) {
+      memcpy((char *)buffer + begin, buffer_dma, alligned_step);
+    } else {
+      printf("Error in DirectRead\n");
+      break;
+    }
+    begin += stepsize;
+    lba_to_read += stepsize / lba_size_;
+    if (lba_to_read >= current_zone_end) {
+      slba += zone_size_;
+      lba_to_read = slba + lba_to_read - current_zone_end;
+      current_zone_end = slba + zone_cap_;
+    }
   }
   // Remove temporary buffer.
   szd_free(buffer_dma);
