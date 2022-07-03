@@ -358,8 +358,9 @@ bool SZDChannel::PollOnce() {
   if (completion_ == nullptr) {
     return true;
   }
+  szd_poll_once(qpair_, completion_);
   bool status = completion_->done;
-  if (status) {
+  if (status || completion_->err != 0) {
     // Remove temporary buffer.
     szd_free(async_buffer_);
     delete completion_;

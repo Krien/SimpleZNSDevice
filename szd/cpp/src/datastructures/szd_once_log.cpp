@@ -8,24 +8,37 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
                        const DeviceInfo &info, const uint64_t min_zone_nr,
                        const uint64_t max_zone_nr,
-                       const uint8_t number_of_writers)
+                       const uint8_t number_of_writers,
+                       SZDChannel **write_channel)
     : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
       number_of_writers_(number_of_writers),
       block_range_((max_zone_nr - min_zone_nr) * info.zone_cap),
       space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_),
-      zasl_(info.zasl) {
+      zasl_(info.zasl), write_channel_(write_channel),
+      write_channels_owned_(false) {
   channel_factory_->Ref();
-  write_channel_ = new SZD::SZDChannel *[number_of_writers_];
-  for (uint8_t i = 0; i < number_of_writers_; i++) {
-    channel_factory_->register_channel(&write_channel_[i], min_zone_nr,
-                                       max_zone_nr);
+  if (write_channel_ == nullptr) {
+    write_channel_ = new SZD::SZDChannel *[number_of_writers_];
+    for (uint8_t i = 0; i < number_of_writers_; i++) {
+      channel_factory_->register_channel(&write_channel_[i], min_zone_nr,
+                                         max_zone_nr);
+    }
+  } else {
+    write_channels_owned_ = true;
   }
+
+#ifdef EstimatedQueue
+  // Create free queue
+  for (uint8_t i = 0; i < number_of_writers_; i++) {
+    frees.push_back(i);
+  }
+#endif
   channel_factory_->register_channel(&read_channel_, min_zone_nr, max_zone_nr);
 }
 
 SZDOnceLog::~SZDOnceLog() {
   Sync();
-  if (write_channel_ != nullptr) {
+  if (!write_channels_owned_ && write_channel_ != nullptr) {
     for (uint8_t i = 0; i < number_of_writers_; i++) {
       if (write_channel_[i]) {
         channel_factory_->unregister_channel(write_channel_[i]);
@@ -121,29 +134,40 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
   // We need to sync all previous writes first, then do a direct append
   // printf("checking if sync mode %lu %lu %lu %lu\n", blocks_needed,
   //        zasl_ / lba_size_, write_head_, zone_end);
+
+  // Try to claim a channel
+  uint8_t claimed_nr = 0;
   if (!can_do_async) {
-    // printf("Going sync mode %lu %lu %lu %lu\n", blocks_needed,
-    //        zasl_ / lba_size_, write_head_, zone_end);
+    // printf("Going sync mode %lu %lu %lu %lu %lu\n", blocks_needed,
+    //        zasl_ / lba_size_, write_head_, zone_end, max_zone_head_);
     s = Sync();
-    s = write_channel_[0]->DirectAppend(&write_head_, (void *)data, size,
-                                        alligned);
+    claimed_nr = 0;
+    s = write_channel_[claimed_nr]->DirectAppend(&write_head_, (void *)data,
+                                                 size, alligned);
   } else {
-    // Try to claim a channel
-    bool claimed = false;
-    uint8_t claimed_nr = 0;
-    for (uint8_t i = 0; i < number_of_writers_; i++) {
+#ifdef EstimatedQueue
+    if (frees.empty()) {
+      claimed_nr = waits.front();
+      waits.pop_front();
+      write_channel_[claimed_nr]->Sync();
+      waits.push_back(claimed_nr);
+    } else {
+      claimed_nr = frees.front();
+      frees.pop_front();
+      waits.push_back(claimed_nr);
+    }
+#else
+    // Spinlock-like, but over all queues one by one each time.
+    uint8_t i = 0;
+    while (true) {
       if (write_channel_[i]->PollOnce()) {
-        claimed = true;
         claimed_nr = i;
-        // printf("claimed nr %u \n", claimed_nr);
         break;
       }
+      i = i + 1 == number_of_writers_ ? 0 : i + 1;
     }
-    // No channel available, sync and go back to first channel
-    if (!claimed) {
-      s = Sync();
-      claimed_nr = 0;
-    }
+#endif
+    // printf("claimed nr %u \n", claimed_nr);
     s = write_channel_[claimed_nr]->AsyncAppend(&write_head_, (void *)data,
                                                 size);
   }
@@ -151,13 +175,22 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
     *lbas = blocks_needed;
   }
   space_left_ -= blocks_needed * lba_size_;
+  // printf("Space left %lu - %lu - %lu\n", write_head_, max_zone_head_,
+  //        space_left_);
   return s;
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 
 SZDStatus SZDOnceLog::Sync() {
   SZDStatus s = SZDStatus::Success;
+#ifdef EstimatedQueue
+  frees.clear();
+  waits.clear();
+#endif
   for (uint8_t i = 0; i < number_of_writers_; i++) {
     s = write_channel_[i]->Sync();
+#ifdef EstimatedQueue
+    frees.push_back(i);
+#endif
   }
   return s;
 }
@@ -192,9 +225,9 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
 
 SZDStatus SZDOnceLog::ResetAll() {
   SZDStatus s;
-  for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
-       slba += zone_cap_) {
-    s = write_channel_[0]->ResetZone(slba);
+  for (uint64_t slba = min_zone_head_;
+       slba < max_zone_head_ && slba < write_head_; slba += zone_cap_) {
+    s = read_channel_->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
     }
@@ -232,7 +265,7 @@ SZDStatus SZDOnceLog::RecoverPointers() {
 SZDStatus SZDOnceLog::MarkInactive() {
   SZDStatus s = SZDStatus::Success;
   if ((write_head_ / zone_size_) * zone_size_ != write_head_) {
-    s = write_channel_[0]->FinishZone((write_head_ / zone_size_) * zone_size_);
+    s = read_channel_->FinishZone((write_head_ / zone_size_) * zone_size_);
   }
   return s;
 }

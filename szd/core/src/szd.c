@@ -701,6 +701,18 @@ int szd_poll_async(QPair *qpair, Completion *completion) {
   return SZD_SC_SUCCESS;
 }
 
+int szd_poll_once(QPair *qpair, Completion *completion) {
+  if (!completion->done) {
+    spdk_nvme_qpair_process_completions(qpair->qpair, 0);  
+  }
+  if (completion->err != 0) {
+    printf("Error during polling once %x\n", completion->err);
+    return SZD_SC_SPDK_ERROR_POLLING;
+  }
+  return SZD_SC_SUCCESS;
+}
+
+
 int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
