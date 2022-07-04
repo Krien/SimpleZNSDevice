@@ -21,6 +21,7 @@ SZDCircularLog::SZDCircularLog(SZDChannelFactory *channel_factory,
                                        max_zone_nr);
   }
   channel_factory_->register_channel(&write_channel_, min_zone_nr, max_zone_nr);
+  channel_factory_->register_channel(&reset_channel_, min_zone_nr, max_zone_nr);
 }
 
 SZDCircularLog::~SZDCircularLog() {
@@ -34,6 +35,9 @@ SZDCircularLog::~SZDCircularLog() {
   }
   if (write_channel_ != nullptr) {
     channel_factory_->unregister_channel(write_channel_);
+  }
+  if (reset_channel_ != nullptr) {
+    channel_factory_->unregister_channel(reset_channel_);
   }
   channel_factory_->Unref();
   // printf("Ended at %lu %lu \n", write_tail_.load(), write_head_.load());
@@ -295,7 +299,7 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
   uint64_t cur_zone = (write_tail_snapshot / zone_cap_) * zone_cap_;
   SZDStatus s;
   for (uint64_t slba = zone_tail_; slba != cur_zone; slba += zone_cap_) {
-    if ((s = write_channel_->ResetZone(slba)) != SZDStatus::Success) {
+    if ((s = reset_channel_->ResetZone(slba)) != SZDStatus::Success) {
       return s;
     }
     space_left_ += zone_cap_ * lba_size_;
@@ -316,7 +320,7 @@ SZDStatus SZDCircularLog::ResetAll() {
   // individual resetting.
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_cap_) {
-    s = write_channel_->ResetZone(slba);
+    s = reset_channel_->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
     }
@@ -350,7 +354,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   uint64_t slba;
   uint64_t zone_head = min_zone_head_, old_zone_head = min_zone_head_;
   for (slba = min_zone_head_; slba < max_zone_head_; slba += zone_cap_) {
-    if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
+    if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
         SZDStatus::Success) {
       return s;
     }
@@ -365,7 +369,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   }
   // Scan for head
   for (; slba < max_zone_head_; slba += zone_cap_) {
-    if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
+    if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
         SZDStatus::Success) {
       return s;
     }
@@ -387,7 +391,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   // start AFTER head.
   if (log_head > min_zone_head_ && log_tail == min_zone_head_) {
     for (slba += zone_cap_; slba < max_zone_head_; slba += zone_cap_) {
-      if ((s = write_channel_->ZoneHead(slba, &zone_head)) !=
+      if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
           SZDStatus::Success) {
         return s;
       }

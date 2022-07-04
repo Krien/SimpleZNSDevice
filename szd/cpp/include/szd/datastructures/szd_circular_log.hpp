@@ -81,10 +81,10 @@ public:
     return read;
   };
   inline uint64_t GetZonesResetCounter() const override {
-    return write_channel_->GetZonesResetCounter();
+    return reset_channel_->GetZonesResetCounter();
   };
   inline std::vector<uint64_t> GetZonesReset() const override {
-    return write_channel_->GetZonesReset();
+    return reset_channel_->GetZonesReset();
   };
   inline std::vector<uint64_t> GetAppendOperations() const override {
     return write_channel_->GetAppendOperations();
@@ -103,6 +103,7 @@ private:
   std::atomic<uint64_t> space_left_;
   // references
   SZDChannel **read_channel_;
+  SZDChannel *reset_channel_;
   SZDChannel *write_channel_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE

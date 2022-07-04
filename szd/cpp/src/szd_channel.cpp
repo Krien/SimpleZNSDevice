@@ -123,7 +123,8 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
        slba += zone_size_) {
     uint64_t step = left > zone_cap_ ? zone_cap_ : left;
-    append_operations_[(slba - min_lba_) / zone_size_] += step;
+    append_operations_[(slba - min_lba_) / zone_size_] +=
+        ((step * lba_size_ + zasl_ - 1) / zasl_);
     left -= step;
   }
   append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
@@ -228,8 +229,16 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
       memcpy(dma_buffer, (char *)buffer + begin, stepsize);
     }
     uint64_t append_ops = 0;
+    uint64_t prev_lba = new_lba;
     s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer, stepsize,
                                         &append_ops));
+    // Diag
+    if ((prev_lba / zone_size_) * zone_size_ !=
+        (new_lba / zone_size_) * zone_size_) {
+      append_operations_[(prev_lba - min_lba_) / zone_size_] += 1;
+    }
+    append_operations_[(new_lba - min_lba_) / zone_size_] += 1;
+
     if (s != SZDStatus::Success) {
       printf("DirectWrite error \n");
       break;
@@ -241,14 +250,6 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   }
   // Remove temporary buffer.
   szd_free(dma_buffer);
-  // Diag
-  uint64_t left = alligned_size / lba_size_;
-  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
-       slba += zone_size_) {
-    uint64_t step = left > zone_cap_ ? zone_cap_ : left;
-    append_operations_[(slba - min_lba_) / zone_size_] += step;
-    left -= step;
-  }
   *lba = TranslatePbaToLba(new_lba);
   return s;
 }
@@ -344,7 +345,8 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
        slba += zone_size_) {
     uint64_t step = left > zone_cap_ ? zone_cap_ : left;
-    append_operations_[(slba - min_lba_) / zone_size_] += step;
+    append_operations_[(slba - min_lba_) / zone_size_] +=
+        ((step * lba_size_ + zasl_ - 1) / zasl_);
     left -= step;
   }
   bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
@@ -359,8 +361,8 @@ bool SZDChannel::PollOnce() {
     return true;
   }
   szd_poll_once(qpair_, completion_);
-  bool status = completion_->done;
-  if (status || completion_->err != 0) {
+  bool status = completion_->done || completion_->err != 0;
+  if (status) {
     // Remove temporary buffer.
     szd_free(async_buffer_);
     delete completion_;
