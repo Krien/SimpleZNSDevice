@@ -48,6 +48,8 @@ public:
                  bool alligned = true, uint8_t reader = 0) override;
   SZDStatus Read(uint64_t lba, SZDBuffer *buffer, size_t addr, size_t size,
                  bool alligned = true, uint8_t reader = 0) override;
+  SZDStatus ReadAll(std::string &out);
+
   SZDStatus ResetAll() override;
   SZDStatus RecoverPointers() override;
   SZDStatus MarkInactive();

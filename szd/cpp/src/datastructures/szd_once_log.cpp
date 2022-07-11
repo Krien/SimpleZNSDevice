@@ -223,6 +223,22 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
   return read_channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
 }
 
+SZDStatus SZDOnceLog::ReadAll(std::string &out) {
+  size_t size_needed = (GetWriteHead() - GetWriteTail()) * lba_size_;
+  if (size_needed == 0) {
+    return SZDStatus::Success;
+  }
+  char *dat = new char[size_needed + 1];
+  SZDStatus s =
+      read_channel_->DirectRead(GetWriteTail(), dat, size_needed, true);
+  if (s != SZDStatus::Success) {
+    return s;
+  }
+  out.append(dat, size_needed);
+  delete[] dat;
+  return s;
+}
+
 SZDStatus SZDOnceLog::ResetAll() {
   SZDStatus s;
   for (uint64_t slba = min_zone_head_;
