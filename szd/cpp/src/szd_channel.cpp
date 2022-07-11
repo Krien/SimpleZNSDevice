@@ -9,12 +9,14 @@
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
-                       uint64_t min_lba, uint64_t max_lba)
+                       uint64_t min_lba, uint64_t max_lba,
+                       bool keep_async_buffer)
     : qpair_(qpair.release()), lba_size_(info.lba_size), zasl_(info.zasl),
       mdts_(info.mdts), zone_size_(info.zone_size), zone_cap_(info.zone_cap),
       min_lba_(min_lba), max_lba_(max_lba), can_access_all_(false),
       backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)),
-      completion_(nullptr) {
+      completion_(nullptr), async_buffer_(nullptr),
+      keep_async_buffer_(keep_async_buffer), async_buffer_size_(0) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
@@ -35,12 +37,16 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
   }
 }
 
-SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info)
-    : SZDChannel(std::move(qpair), info, 0, info.lba_cap) {
+SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
+                       bool keep_async_buffer)
+    : SZDChannel(std::move(qpair), info, 0, info.lba_cap, keep_async_buffer) {
   can_access_all_ = true;
 }
 
 SZDChannel::~SZDChannel() {
+  if (keep_async_buffer_ && async_buffer_ != nullptr) {
+    szd_free(async_buffer_);
+  }
   if (backed_memory_spill_ != nullptr) {
     szd_free(backed_memory_spill_);
     backed_memory_spill_ = nullptr;
@@ -329,7 +335,17 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer and copy normal buffer to DMA.
-  async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
+  if (keep_async_buffer_ && async_buffer_size_ < alligned_size) {
+    if (async_buffer_ != nullptr) {
+      szd_free(async_buffer_);
+    }
+    async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
+    async_buffer_size_ = alligned_size;
+  } else if (!keep_async_buffer_) {
+    async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
+  } else {
+    memset(async_buffer_, 0, async_buffer_size_);
+  }
   if (async_buffer_ == nullptr) {
     printf("No DMA memory left\n");
     return SZDStatus::IOError;
@@ -364,7 +380,10 @@ bool SZDChannel::PollOnce() {
   bool status = completion_->done || completion_->err != 0;
   if (status) {
     // Remove temporary buffer.
-    szd_free(async_buffer_);
+    if (!keep_async_buffer_) {
+      szd_free(async_buffer_);
+      async_buffer_ = nullptr;
+    }
     delete completion_;
     completion_ = nullptr;
   }
@@ -378,7 +397,10 @@ SZDStatus SZDChannel::Sync() {
   // poll
   SZDStatus s = FromStatus(szd_poll_async(qpair_, completion_));
   // Remove temporary buffer.
-  szd_free(async_buffer_);
+  if (!keep_async_buffer_) {
+    szd_free(async_buffer_);
+    async_buffer_ = nullptr;
+  }
   delete completion_;
   completion_ = nullptr;
   return s;

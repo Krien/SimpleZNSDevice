@@ -16,14 +16,16 @@
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 /**
- * @brief Simple abstraction on top of a QPair to make the code more Cxx like.
- * Comes with helper functions and performance optimisations.
+ * @brief
+ * *Comes with helper functions and performance optimisations.* /
  */
 class SZDChannel {
 public:
   SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
-             uint64_t min_lba, uint64_t max_lba);
-  SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info);
+             uint64_t min_lba, uint64_t max_lba,
+             bool keep_async_buffer = false);
+  SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
+             bool keep_async_buffer = false);
   // No copying or implicits
   SZDChannel(const SZDChannel &) = delete;
   SZDChannel &operator=(const SZDChannel &) = delete;
@@ -121,6 +123,8 @@ private:
   // async IO
   Completion *completion_;
   void *async_buffer_;
+  bool keep_async_buffer_;
+  size_t async_buffer_size_;
   // diagnostics counters
   std::atomic<uint64_t> bytes_written_;
   std::atomic<uint64_t> append_operations_counter_;

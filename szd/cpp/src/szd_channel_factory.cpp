@@ -34,7 +34,8 @@ SZDStatus SZDChannelFactory::unregister_raw_qpair(QPair *qpair) {
 
 SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
                                               uint64_t min_zone_nr,
-                                              uint64_t max_zone_nr) {
+                                              uint64_t max_zone_nr,
+                                              bool preserve_async_buffer) {
   if (channel_count_ >= max_channel_count_) {
     return SZDStatus::InvalidArguments;
   }
@@ -44,20 +45,22 @@ SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
       SZDStatus::Success) {
     return s;
   }
-  *channel =
-      new SZDChannel(std::unique_ptr<QPair>(*qpair), device_manager_->info,
-                     min_zone_nr * device_manager_->info.zone_size,
-                     max_zone_nr * device_manager_->info.zone_size);
+  *channel = new SZDChannel(
+      std::unique_ptr<QPair>(*qpair), device_manager_->info,
+      min_zone_nr * device_manager_->info.zone_size,
+      max_zone_nr * device_manager_->info.zone_size, preserve_async_buffer);
 
   channel_count_++;
   delete qpair;
   return SZDStatus::Success;
 }
 
-SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel) {
+SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
+                                              bool preserve_async_buffer) {
   return register_channel(
       channel, device_manager_->info.min_lba / device_manager_->info.zone_size,
-      device_manager_->info.max_lba / device_manager_->info.zone_size);
+      device_manager_->info.max_lba / device_manager_->info.zone_size,
+      preserve_async_buffer);
 }
 
 SZDStatus SZDChannelFactory::unregister_channel(SZDChannel *channel) {
