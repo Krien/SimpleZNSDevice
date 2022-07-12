@@ -26,6 +26,7 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
   } else {
     write_channels_owned_ = true;
   }
+  qpair_depth_ = write_channel_[0]->GetQueueDepth();
 
 #ifdef EstimatedQueue
   // Create free queue
@@ -136,40 +137,27 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
   //        zasl_ / lba_size_, write_head_, zone_end);
 
   // Try to claim a channel
-  uint8_t claimed_nr = 0;
+  uint32_t claimed_nr = 0;
   if (!can_do_async) {
     // printf("Going sync mode %lu %lu %lu %lu %lu\n", blocks_needed,
     //        zasl_ / lba_size_, write_head_, zone_end, max_zone_head_);
     s = Sync();
     claimed_nr = 0;
-    s = write_channel_[claimed_nr]->DirectAppend(&write_head_, (void *)data,
-                                                 size, alligned);
+    s = write_channel_[0]->DirectAppend(&write_head_, (void *)data, size,
+                                        alligned);
   } else {
-#ifdef EstimatedQueue
-    if (frees.empty()) {
-      claimed_nr = waits.front();
-      waits.pop_front();
-      write_channel_[claimed_nr]->Sync();
-      waits.push_back(claimed_nr);
-    } else {
-      claimed_nr = frees.front();
-      frees.pop_front();
-      waits.push_back(claimed_nr);
-    }
-#else
     // Spinlock-like, but over all queues one by one each time.
-    uint8_t i = 0;
+    uint32_t i = 0;
+    uint64_t waiting = 0;
     while (true) {
-      if (write_channel_[i]->PollOnce()) {
-        claimed_nr = i;
+      if (write_channel_[0]->PollOnce(&claimed_nr)) {
         break;
       }
-      i = i + 1 == number_of_writers_ ? 0 : i + 1;
+      waiting++;
     }
-#endif
-    // printf("claimed nr %u \n", claimed_nr);
-    s = write_channel_[claimed_nr]->AsyncAppend(&write_head_, (void *)data,
-                                                size);
+    // printf("claimed nr %u %lu \n", claimed_nr, waiting);
+    s = write_channel_[0]->AsyncAppend(&write_head_, (void *)data, size,
+                                       claimed_nr);
   }
   if (lbas != nullptr) {
     *lbas = blocks_needed;

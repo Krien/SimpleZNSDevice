@@ -156,7 +156,7 @@ SZDStatus SZDFragmentedLog::AsyncAppend(
           }
         } else {
           s = write_channel_[z.writer_number]->AsyncAppend(
-              &slba, (void *)(buffer + z.offset + z.pos), bytes_to_write);
+              &slba, (void *)(buffer + z.offset + z.pos), bytes_to_write, 0);
           if (s != SZDStatus::Success) {
             printf("error writing to fragmented zone %lu %lu %lu %u %lu\n",
                    slba, offset, bytes_to_write, write_alligned, size);

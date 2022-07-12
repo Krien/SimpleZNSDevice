@@ -17,8 +17,6 @@
 #include <functional>
 #include <string>
 
-#define EstimatedQueue
-
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDOnceLog : public SZDLog {
 public:
@@ -117,13 +115,12 @@ private:
   // stall writes
   // SZDBuffer write_buffer_;
   // references
+  // TODO: cleanup, we only use 1 channel at most, we have moved logic to queue
+  // pairs
   SZDChannel **write_channel_;
+  uint32_t qpair_depth_;
   SZDChannel *read_channel_;
   bool write_channels_owned_;
-#ifdef EstimatedQueue
-  std::deque<uint8_t> frees;
-  std::deque<uint8_t> waits;
-#endif
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

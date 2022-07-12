@@ -22,10 +22,10 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDChannel {
 public:
   SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
-             uint64_t min_lba, uint64_t max_lba,
-             bool keep_async_buffer = false);
+             uint64_t min_lba, uint64_t max_lba, bool keep_async_buffer = false,
+             uint32_t queue_depth = 1);
   SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
-             bool keep_async_buffer = false);
+             bool keep_async_buffer = false, uint32_t queue_depth = 1);
   // No copying or implicits
   SZDChannel(const SZDChannel &) = delete;
   SZDChannel &operator=(const SZDChannel &) = delete;
@@ -71,9 +71,13 @@ public:
   //  synced.
   //  2. writing more than 1 ZASL is undefined behaviour.
   //  3. CHECK that the write does not cross zones, this will break.
-  SZDStatus AsyncAppend(uint64_t *lba, void *buffer, const uint64_t size);
-  bool PollOnce();
+  SZDStatus AsyncAppend(uint64_t *lba, void *buffer, const uint64_t size,
+                        uint32_t writer);
+  bool PollOnce(uint32_t writer);
+  // Pick any writer, if available
+  bool PollOnce(uint32_t *writer);
   SZDStatus Sync();
+  inline uint32_t GetQueueDepth() { return queue_depth_; }
 
   // Management of zones
   SZDStatus ResetZone(uint64_t slba);
@@ -121,10 +125,11 @@ private:
   void *backed_memory_spill_;
   uint64_t lba_msb_;
   // async IO
-  Completion *completion_;
-  void *async_buffer_;
+  uint32_t queue_depth_;
+  Completion **completion_;
+  void **async_buffer_;
   bool keep_async_buffer_;
-  size_t async_buffer_size_;
+  size_t *async_buffer_size_;
   // diagnostics counters
   std::atomic<uint64_t> bytes_written_;
   std::atomic<uint64_t> append_operations_counter_;

@@ -261,6 +261,8 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
  */
 int szd_poll_async(QPair *qpair, Completion *completion);
 int szd_poll_once(QPair *qpair, Completion *completion);
+// Rawest poll, no error handling or finish checks
+void szd_poll_once_raw(QPair *qpair);
 
 /**
  * @brief Resets a zone synchronously, allowing it to be reused.

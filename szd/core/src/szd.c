@@ -712,6 +712,9 @@ int szd_poll_once(QPair *qpair, Completion *completion) {
   return SZD_SC_SUCCESS;
 }
 
+void szd_poll_once_raw(QPair *qpair) {
+  spdk_nvme_qpair_process_completions(qpair->qpair, 0);  
+}
 
 int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);

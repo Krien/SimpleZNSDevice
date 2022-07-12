@@ -16,7 +16,8 @@
 #include <functional>
 #include <string>
 
-#define ALLOW_ASYNC_APPEND
+// Disabled, hampered maintainability and performance gain where ~1ns
+//#define ALLOW_ASYNC_APPEND
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDFragmentedLog {

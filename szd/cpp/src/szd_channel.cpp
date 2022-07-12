@@ -10,12 +10,12 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                        uint64_t min_lba, uint64_t max_lba,
-                       bool keep_async_buffer)
+                       bool keep_async_buffer, uint32_t queue_depth)
     : qpair_(qpair.release()), lba_size_(info.lba_size), zasl_(info.zasl),
       mdts_(info.mdts), zone_size_(info.zone_size), zone_cap_(info.zone_cap),
       min_lba_(min_lba), max_lba_(max_lba), can_access_all_(false),
       backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)),
-      completion_(nullptr), async_buffer_(nullptr),
+      queue_depth_(queue_depth), completion_(nullptr), async_buffer_(nullptr),
       keep_async_buffer_(keep_async_buffer), async_buffer_size_(0) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
@@ -35,18 +35,34 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
     zones_reset_.push_back(0);
     append_operations_.push_back(0);
   }
+  completion_ = new Completion *[queue_depth_];
+  async_buffer_ = (void **)(new char **[queue_depth_]);
+  async_buffer_size_ = new size_t[queue_depth_];
+  for (uint32_t i = 0; i < queue_depth_; i++) {
+    async_buffer_[i] = nullptr;
+    completion_[i] = nullptr;
+    async_buffer_size_[i] = 0;
+  }
 }
 
 SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
-                       bool keep_async_buffer)
-    : SZDChannel(std::move(qpair), info, 0, info.lba_cap, keep_async_buffer) {
+                       bool keep_async_buffer, uint32_t queue_depth)
+    : SZDChannel(std::move(qpair), info, 0, info.lba_cap, keep_async_buffer,
+                 queue_depth) {
   can_access_all_ = true;
 }
 
 SZDChannel::~SZDChannel() {
   if (keep_async_buffer_ && async_buffer_ != nullptr) {
-    szd_free(async_buffer_);
+    for (uint32_t i = 0; i < queue_depth_; i++) {
+      if (async_buffer_[i] != nullptr) {
+        szd_free(async_buffer_[i]);
+      }
+    }
   }
+  delete[] completion_;
+  delete[] async_buffer_;
+  delete[] async_buffer_size_;
   if (backed_memory_spill_ != nullptr) {
     szd_free(backed_memory_spill_);
     backed_memory_spill_ = nullptr;
@@ -321,7 +337,10 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
 }
 
 SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
-                                  const uint64_t size) {
+                                  const uint64_t size, uint32_t writer) {
+  if (writer > queue_depth_) {
+    return SZDStatus::InvalidArguments;
+  }
   // Translate lba
   uint64_t new_lba = TranslateLbaToPba(*lba);
   // Allign
@@ -335,27 +354,30 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer and copy normal buffer to DMA.
-  if (keep_async_buffer_ && async_buffer_size_ < alligned_size) {
-    if (async_buffer_ != nullptr) {
-      szd_free(async_buffer_);
+  if (keep_async_buffer_ && async_buffer_size_[writer] < alligned_size) {
+    if (async_buffer_[writer] != nullptr) {
+      szd_free(async_buffer_[writer]);
     }
-    async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
-    async_buffer_size_ = alligned_size;
+    async_buffer_[writer] = szd_calloc(lba_size_, 1, alligned_size);
+    async_buffer_size_[writer] = alligned_size;
   } else if (!keep_async_buffer_) {
-    async_buffer_ = szd_calloc(lba_size_, 1, alligned_size);
+    async_buffer_[writer] = szd_calloc(lba_size_, 1, alligned_size);
   } else {
-    memset(async_buffer_, 0, async_buffer_size_);
+    memset(async_buffer_[writer], 0, async_buffer_size_[writer]);
   }
-  if (async_buffer_ == nullptr) {
+  if (async_buffer_[writer] == nullptr) {
     printf("No DMA memory left\n");
     return SZDStatus::IOError;
   }
-  memcpy(async_buffer_, buffer, size);
+  memcpy(async_buffer_[writer], buffer, size);
   uint64_t append_ops = 0;
-  completion_ = new Completion;
-  SZDStatus s = FromStatus(
-      szd_append_async_with_diag(qpair_, &new_lba, async_buffer_, alligned_size,
-                                 &append_ops, completion_));
+  if (completion_[writer] != nullptr) {
+    delete completion_[writer];
+  }
+  completion_[writer] = new Completion;
+  SZDStatus s = FromStatus(szd_append_async_with_diag(
+      qpair_, &new_lba, async_buffer_[writer], alligned_size, &append_ops,
+      completion_[writer]));
   // Diag
   uint64_t left = alligned_size / lba_size_;
   for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
@@ -372,37 +394,74 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   return s;
 }
 
-bool SZDChannel::PollOnce() {
-  if (completion_ == nullptr) {
+bool SZDChannel::PollOnce(uint32_t writer) {
+  if (writer > queue_depth_) {
+    return false;
+  }
+  if (completion_[writer] == nullptr) {
     return true;
   }
-  szd_poll_once(qpair_, completion_);
-  bool status = completion_->done || completion_->err != 0;
+  szd_poll_once(qpair_, completion_[writer]);
+  bool status = completion_[writer]->done || completion_[writer]->err != 0;
   if (status) {
     // Remove temporary buffer.
     if (!keep_async_buffer_) {
-      szd_free(async_buffer_);
-      async_buffer_ = nullptr;
+      szd_free(async_buffer_[writer]);
+      async_buffer_[writer] = nullptr;
     }
-    delete completion_;
-    completion_ = nullptr;
+    delete completion_[writer];
+    completion_[writer] = nullptr;
   }
   return status;
 }
 
+bool SZDChannel::PollOnce(uint32_t *writer) {
+  szd_poll_once_raw(qpair_);
+  for (uint32_t i = 0; i < queue_depth_; i++) {
+    if (completion_[i] == nullptr) {
+      *writer = i;
+      return true;
+    }
+    if (completion_[i]->err != 0x0 || completion_[i]->done) {
+      bool status = completion_[i]->done || completion_[i]->err != 0;
+      if (status) {
+        // Remove temporary buffer.
+        if (!keep_async_buffer_) {
+          szd_free(async_buffer_[i]);
+          async_buffer_[i] = nullptr;
+        }
+        delete completion_[i];
+        completion_[i] = nullptr;
+      }
+      *writer = i;
+      return true;
+    }
+  }
+  return false;
+}
+
 SZDStatus SZDChannel::Sync() {
+  SZDStatus s = SZDStatus::Success;
   if (completion_ == nullptr) {
-    return SZDStatus::Success;
+    return s;
   }
   // poll
-  SZDStatus s = FromStatus(szd_poll_async(qpair_, completion_));
-  // Remove temporary buffer.
-  if (!keep_async_buffer_) {
-    szd_free(async_buffer_);
-    async_buffer_ = nullptr;
+  for (uint32_t i = 0; i < queue_depth_; i++) {
+    if (completion_[i] == nullptr) {
+      continue;
+    }
+    s = FromStatus(szd_poll_async(qpair_, completion_[i]));
+    if (s != SZDStatus::Success) {
+      break;
+    }
+    // Remove temporary buffer.
+    if (!keep_async_buffer_) {
+      szd_free(async_buffer_[i]);
+      async_buffer_[i] = nullptr;
+    }
+    delete completion_[i];
+    completion_[i] = nullptr;
   }
-  delete completion_;
-  completion_ = nullptr;
   return s;
 }
 
