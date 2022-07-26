@@ -14,6 +14,7 @@
 #include "szd/szd_status.hpp"
 
 #include <functional>
+#include <mutex>
 #include <string>
 
 // Disabled, hampered maintainability and performance gain where ~1ns
@@ -25,17 +26,18 @@ public:
   // TODO: Add support for multiple readers...
   SZDFragmentedLog(SZDChannelFactory *channel_factory, const DeviceInfo &info,
                    const uint64_t min_zone_nr, const uint64_t max_zone_nr,
-                   const uint8_t number_of_readers);
+                   const uint8_t number_of_readers,
+                   const uint8_t number_of_writers);
   SZDFragmentedLog(const SZDFragmentedLog &) = delete;
   SZDFragmentedLog &operator=(const SZDFragmentedLog &) = delete;
   ~SZDFragmentedLog();
 
   SZDStatus Append(const char *buffer, size_t size,
                    std::vector<std::pair<uint64_t, uint64_t>> &regions,
-                   bool alligned = true);
+                   bool alligned = true, uint8_t writer = 0);
   SZDStatus Append(const SZDBuffer &buffer, size_t addr, size_t size,
                    std::vector<std::pair<uint64_t, uint64_t>> &regions,
-                   bool alligned = true);
+                   bool alligned = true, uint8_t writer = 0);
   SZDStatus Read(const std::vector<std::pair<uint64_t, uint64_t>> &regions,
                  char *data, uint64_t size, bool alligned = true,
                  uint8_t reader = 0);
@@ -79,10 +81,10 @@ public:
     return read;
   };
   inline uint64_t GetZonesResetCounter() const {
-    return write_channel_[0]->GetZonesResetCounter();
+    return write_channel_[1]->GetZonesResetCounter();
   };
   inline std::vector<uint64_t> GetZonesReset() const {
-    return write_channel_[0]->GetZonesReset();
+    return write_channel_[1]->GetZonesReset();
   };
   inline std::vector<uint64_t> GetAppendOperations() const {
     std::vector<uint64_t> resets = write_channel_[0]->GetAppendOperations();
@@ -112,6 +114,7 @@ private:
   const uint64_t zone_bytes_;
   const uint8_t number_of_readers_;
   const uint8_t number_of_writers_;
+  std::mutex mut_;
   // Log
   SZDFreeList *freelist_;
   SZDFreeList *seeker_;
