@@ -1,20 +1,25 @@
 #include "szd/datastructures/szd_fragmented_log.hpp"
 #include "szd/szd.h"
 #include "szd/szd_channel_factory.hpp"
+
+#include <mutex>
+
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 SZDFragmentedLog::SZDFragmentedLog(SZDChannelFactory *channel_factory,
                                    const DeviceInfo &info,
                                    const uint64_t min_zone_nr,
                                    const uint64_t max_zone_nr,
-                                   const uint8_t number_of_readers)
+                                   const uint8_t number_of_readers,
+                                   const uint8_t number_of_writers)
     : min_zone_head_(min_zone_nr * info.zone_cap),
       max_zone_head_(max_zone_nr * info.zone_cap), zone_size_(info.zone_size),
       zone_cap_(info.zone_cap), lba_size_(info.lba_size), zasl_(info.zasl),
       zone_bytes_(info.zone_cap * info.lba_size),
-      number_of_readers_(number_of_readers), number_of_writers_(4),
-      freelist_(nullptr), seeker_(nullptr),
-      zones_left_(max_zone_nr - min_zone_nr), channel_factory_(channel_factory),
-      write_channel_(nullptr), read_channel_(nullptr) {
+      number_of_readers_(number_of_readers),
+      number_of_writers_(number_of_writers), freelist_(nullptr),
+      seeker_(nullptr), zones_left_(max_zone_nr - min_zone_nr),
+      channel_factory_(channel_factory), write_channel_(nullptr),
+      read_channel_(nullptr) {
   SZDFreeListFunctions::Init(&freelist_, min_zone_nr, max_zone_nr);
   seeker_ = freelist_;
   channel_factory_->Ref();
@@ -176,12 +181,16 @@ SZDStatus SZDFragmentedLog::AsyncAppend(
 SZDStatus
 SZDFragmentedLog::Append(const char *buffer, size_t size,
                          std::vector<std::pair<uint64_t, uint64_t>> &regions,
-                         bool alligned) {
+                         bool alligned, uint8_t writer) {
 #ifdef ALLOW_ASYNC_APPEND
   return AsyncAppend(buffer, size, regions, alligned);
 #endif
+  if (writer > number_of_writers_) {
+    return SZDStatus::InvalidArguments;
+  }
   // Check buffer space
-  size_t alligned_size = alligned ? size : write_channel_[0]->allign_size(size);
+  size_t alligned_size =
+      alligned ? size : write_channel_[writer]->allign_size(size);
   // Check zone space
   size_t zones_needed =
       (alligned_size + zone_bytes_ - 1) / zone_cap_ / lba_size_;
@@ -192,12 +201,26 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   }
 
   // Reserve zones
+  if (number_of_writers_ > 1) {
+    mut_.lock();
+  }
+  // 2 writers reserve at same time, but there is no space.
+  if (zones_left_ < zones_needed) {
+    mut_.unlock();
+    return SZDStatus::IOError;
+  }
   if (SZDFreeListFunctions::AllocZones(regions, &seeker_, zones_needed) !=
       SZDStatus::Success) {
+    if (number_of_writers_ > 1) {
+      mut_.unlock();
+    }
     // printf("Fragmented log freelist reports no space left\n");
     return SZDStatus::Unknown;
   }
   zones_left_ -= zones_needed;
+  if (number_of_writers_ > 1) {
+    mut_.unlock();
+  }
 
   // Write to zones
   SZDStatus s = SZDStatus::Success;
@@ -213,8 +236,8 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
       bytes_to_write = size - offset;
       write_alligned = alligned;
     }
-    s = write_channel_[0]->DirectAppend(&slba, (void *)(buffer + offset),
-                                        bytes_to_write, write_alligned);
+    s = write_channel_[writer]->DirectAppend(&slba, (void *)(buffer + offset),
+                                             bytes_to_write, write_alligned);
     if (s != SZDStatus::Success) {
       printf("error writing to fragmented zone %lu %lu %lu %u %lu\n", slba,
              offset, bytes_to_write, write_alligned, size);
@@ -225,20 +248,25 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
 
   // Ensure that resources are released
   if ((slba / zone_cap_) * zone_cap_ != slba) {
-    s = write_channel_[0]->FinishZone((slba / zone_cap_) * zone_cap_);
+    s = write_channel_[writer]->FinishZone((slba / zone_cap_) * zone_cap_);
     if (s != SZDStatus::Success) {
       printf("error finishing zone\n");
     }
   }
+
   return s;
 }
 
 SZDStatus
 SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                          std::vector<std::pair<uint64_t, uint64_t>> &regions,
-                         bool alligned) {
+                         bool alligned, uint8_t writer) {
+  if (writer > number_of_writers_) {
+    return SZDStatus::InvalidArguments;
+  }
   // Check buffer space
-  size_t alligned_size = alligned ? size : write_channel_[0]->allign_size(size);
+  size_t alligned_size =
+      alligned ? size : write_channel_[writer]->allign_size(size);
   if (addr + size > buffer.GetBufferSize()) {
     return SZDStatus::InvalidArguments;
   }
@@ -251,9 +279,18 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
   }
 
   // Reserve zones
+  if (number_of_writers_ > 1) {
+    mut_.lock();
+  }
   if (SZDFreeListFunctions::AllocZones(regions, &seeker_, zones_needed) !=
       SZDStatus::Success) {
+    if (number_of_writers_ > 1) {
+      mut_.unlock();
+    }
     return SZDStatus::Unknown;
+  }
+  if (number_of_writers_ > 1) {
+    mut_.unlock();
   }
   zones_left_ -= zones_needed;
 
@@ -270,8 +307,8 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
       bytes_to_write = size - offset;
       write_alligned = alligned;
     }
-    s = write_channel_[0]->FlushBufferSection(&slba, buffer, addr + offset,
-                                              bytes_to_write, write_alligned);
+    s = write_channel_[writer]->FlushBufferSection(
+        &slba, buffer, addr + offset, bytes_to_write, write_alligned);
     if (s != SZDStatus::Success) {
       return s;
     }
@@ -280,7 +317,7 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
 
   // Ensure that resources are released
   if ((slba / zone_size_) * zone_size_ != slba) {
-    s = write_channel_[0]->FinishZone((slba / zone_size_) * zone_size_);
+    s = write_channel_[writer]->FinishZone((slba / zone_size_) * zone_size_);
   }
   return s;
 }
@@ -322,7 +359,7 @@ SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions) {
     uint64_t begin = region.first * zone_cap_;
     uint64_t end = begin + region.second * zone_cap_;
     for (uint64_t slba = begin; slba < end; slba += zone_cap_) {
-      s = write_channel_[0]->ResetZone(slba);
+      s = write_channel_[1]->ResetZone(slba);
       if (s != SZDStatus::Success) {
         return s;
       }
@@ -339,7 +376,7 @@ SZDStatus SZDFragmentedLog::ResetAll() {
   SZDStatus s;
   for (uint64_t slba = min_zone_head_; slba != max_zone_head_;
        slba += zone_cap_) {
-    s = write_channel_[0]->ResetZone(slba);
+    s = write_channel_[1]->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
     }
