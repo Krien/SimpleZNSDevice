@@ -13,6 +13,7 @@
 
 int main(int argc, char** argv) {
     std::string device_to_use = argc <= 1 ? "" : argv[1];
+    bool fill  = argc <= 2 ? false : argv[2] == "1";
 
     // Setup SZD
     SZD::SZDDevice dev("ResetPerfTest");
@@ -50,23 +51,25 @@ int main(int argc, char** argv) {
     channel->ResetAllZones();
 
     // Logs make writes easier
-    SZD::SZDOnceLog *log = new SZD::SZDOnceLog(&factory,info,0,info.max_lba/info.zone_size,1,&channel);
-    // Create the write buffer
-    size_t range_to_write = info.zasl;
-    char fill_buff[range_to_write + 1];
-    for (size_t i = 0; i < range_to_write; i++) {
-     	fill_buff[i] = i % 256;
-    }
+    if (fill) {
+	    SZD::SZDOnceLog *log = new SZD::SZDOnceLog(&factory,info,0,info.max_lba/info.zone_size,1,&channel);
+	    // Create the write buffer
+	    size_t range_to_write = info.zasl;
+	    char fill_buff[range_to_write + 1];
+	    for (size_t i = 0; i < range_to_write; i++) {
+		fill_buff[i] = i % 256;
+	    }
 
-    // Iteratively write
-    printf("Filling device...\n");
-    uint64_t lba = 0;
-    while(log->SpaceLeft(range_to_write)) {
-     log->Append(fill_buff, range_to_write, &lba, true);
-     printf("Space available %lu \n", log->SpaceAvailable());
-    }
-    if (log->SpaceAvailable() > 0) {
-      log->Append(fill_buff, log->SpaceAvailable(),&lba, true);
+	    // Iteratively write
+	    printf("Filling device...\n");
+	    uint64_t lba = 0;
+	    while(log->SpaceLeft(range_to_write)) {
+	     log->Append(fill_buff, range_to_write, &lba, true);
+	     printf("Space available %lu \n", log->SpaceAvailable());
+	    }
+	    if (log->SpaceAvailable() > 0) {
+	      log->Append(fill_buff, log->SpaceAvailable(),&lba, true);
+	    }
     }
 
     uint64_t begin=0;
@@ -80,13 +83,11 @@ int main(int argc, char** argv) {
     	gettimeofday(&tv, nullptr);
         begin = static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
 	
-	channel->ResetZone(i);
+	// Workaround for zse translation
+	channel->ResetZone((i / info.zone_size) * info.zone_cap);
 
         gettimeofday(&tv, nullptr);
         end = static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
-    
-        if (end - begin < 3)
-		continue;
 
         ti += end - begin;
         tisq += (end - begin) * (end - begin);
