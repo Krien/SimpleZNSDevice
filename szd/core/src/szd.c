@@ -720,7 +720,7 @@ int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (slba < info.min_lba || slba > info.lba_cap) {
+  if (slba < info.min_lba || slba >= info.lba_cap) {
     return SZD_SC_SPDK_ERROR_READ;
   }
   Completion completion = Completion_default;
@@ -735,6 +735,7 @@ int szd_reset(QPair *qpair, uint64_t slba) {
   // Busy wait
   POLL_QPAIR(qpair->qpair, completion.done);
   if (completion.err != 0) {
+    printf("Reset err %x \n", completion.err);
     return SZD_SC_SPDK_ERROR_RESET;
   }
   return rc;

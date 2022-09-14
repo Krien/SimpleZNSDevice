@@ -194,9 +194,8 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   // Check zone space
   size_t zones_needed =
       (alligned_size + zone_bytes_ - 1) / zone_cap_ / lba_size_;
-  // printf("Zones needed %lu \n", zones_needed);
   if (zones_needed > zones_left_) {
-    // printf("Invalid arguments fragmented log append");
+    printf("Invalid arguments fragmented log append");
     return SZDStatus::InvalidArguments;
   }
 
@@ -214,7 +213,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
     if (number_of_writers_ > 1) {
       mut_.unlock();
     }
-    // printf("Fragmented log freelist reports no space left\n");
+    printf("Fragmented log freelist reports no space left\n");
     return SZDStatus::Unknown;
   }
   zones_left_ -= zones_needed;
@@ -289,10 +288,10 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     }
     return SZDStatus::Unknown;
   }
+  zones_left_ -= zones_needed;
   if (number_of_writers_ > 1) {
     mut_.unlock();
   }
-  zones_left_ -= zones_needed;
 
   // Write to zones
   SZDStatus s = SZDStatus::Success;
@@ -352,41 +351,62 @@ SZDStatus SZDFragmentedLog::Read(
 }
 
 SZDStatus
-SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions) {
+SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                        uint8_t writer) {
+  if (writer > number_of_writers_) {
+    return SZDStatus::InvalidArguments;
+  }
   SZDStatus s = SZDStatus::Success;
   // Erase data
   for (auto region : regions) {
     uint64_t begin = region.first * zone_cap_;
     uint64_t end = begin + region.second * zone_cap_;
+    printf("BEGIN %lu STEP %lu END %lu \n", begin, zone_cap_, end);
     for (uint64_t slba = begin; slba < end; slba += zone_cap_) {
-      s = write_channel_[1]->ResetZone(slba);
+      s = write_channel_[writer]->ResetZone(slba);
       if (s != SZDStatus::Success) {
+        printf("Error resetting fragmented zone at %lu\n", slba);
         return s;
       }
       zones_left_++;
     }
     SZDFreeList *to_delete;
+    if (number_of_writers_ > 1) {
+      mut_.lock();
+    }
     SZDFreeListFunctions::FindRegion(region.first, seeker_, &to_delete);
     SZDFreeListFunctions::FreeZones(to_delete, &seeker_);
+    if (number_of_writers_ > 1) {
+      mut_.unlock();
+    }
   }
   return s;
 }
 
-SZDStatus SZDFragmentedLog::ResetAll() {
-  SZDStatus s;
+SZDStatus SZDFragmentedLog::ResetAll(uint8_t writer) {
+  if (writer > number_of_writers_) {
+    return SZDStatus::InvalidArguments;
+  }
+  SZDStatus s = SZDStatus::Success;
   for (uint64_t slba = min_zone_head_; slba != max_zone_head_;
        slba += zone_cap_) {
-    s = write_channel_[1]->ResetZone(slba);
+    s = write_channel_[writer]->ResetZone(slba);
     if (s != SZDStatus::Success) {
       return s;
     }
   }
   // Reset list
+  if (number_of_writers_ > 1) {
+    mut_.lock();
+  }
   SZDFreeListFunctions::Destroy(seeker_);
   SZDFreeListFunctions::Init(&freelist_, min_zone_head_ / zone_cap_,
                              max_zone_head_ / zone_cap_);
   seeker_ = freelist_;
   zones_left_ = (max_zone_head_ - min_zone_head_) / zone_cap_;
+  if (number_of_writers_ > 1) {
+    mut_.unlock();
+  }
   return s;
 }
 

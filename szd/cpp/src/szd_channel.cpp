@@ -468,6 +468,7 @@ SZDStatus SZDChannel::Sync() {
 SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
+    printf("Reset out of range %lu  - %lu -  %lu\n", min_lba_, slba, max_lba_);
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
