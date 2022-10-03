@@ -240,11 +240,12 @@ if(DOXYGEN)
             
         # request to configure the file
         configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)
-        add_custom_target( docs
+        add_custom_target(docs
             COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
             WORKING_DIRECTORY ${DOCS_DIR}
             COMMENT "Generating API documentation with Doxygen"
             VERBATIM )
+        message("Doxygen found")
     else(DOXYGEN_FOUND)
         message("No documentation can be generated, DOXYGEN is not found")
     endif(DOXYGEN_FOUND)
