@@ -66,8 +66,9 @@ const Completion Completion_default = {false, SZD_SC_SUCCESS};
 const DeviceManagerInternal DeviceManagerInternal_default = {0, 0};
 const DeviceInfo DeviceInfo_default = {0, 0, 0, 0, 0, 0, 0, 0, "SZD"};
 
-// Needed because of DPDK and reattaching, we need to remember what we have seen...
-static char* found_devices[MAX_DEVICE_COUNT];
+// Needed because of DPDK and reattaching, we need to remember what we have
+// seen...
+static char *found_devices[MAX_DEVICE_COUNT];
 static size_t found_devices_len[MAX_DEVICE_COUNT];
 static size_t found_devices_number = 0;
 
@@ -114,16 +115,19 @@ int szd_get_device_info(DeviceInfo *info, DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager->ctrlr);
   RETURN_ERR_ON_NULL(manager->ns);
   info->lba_size = (uint64_t)spdk_nvme_ns_get_sector_size(manager->ns);
-  info->zone_size = (uint64_t)spdk_nvme_zns_ns_get_zone_size_sectors(manager->ns);
+  info->zone_size =
+      (uint64_t)spdk_nvme_zns_ns_get_zone_size_sectors(manager->ns);
   info->mdts = (uint64_t)spdk_nvme_ctrlr_get_max_xfer_size(manager->ctrlr);
-  info->zasl = (uint64_t)spdk_nvme_zns_ctrlr_get_max_zone_append_size(manager->ctrlr);
+  info->zasl =
+      (uint64_t)spdk_nvme_zns_ctrlr_get_max_zone_append_size(manager->ctrlr);
   info->lba_cap = (uint64_t)spdk_nvme_ns_get_num_sectors(manager->ns);
   info->min_lba = manager->info.min_lba;
   info->max_lba = manager->info.max_lba;
-  // printf("INFO: %lu %lu %lu %lu %lu %lu %lu \n", info->lba_size, info->zone_size, info->mdts, info->zasl,
+  // printf("INFO: %lu %lu %lu %lu %lu %lu %lu \n", info->lba_size,
+  // info->zone_size, info->mdts, info->zasl,
   //   info->lba_cap, info->min_lba, info->max_lba);
-  // TODO: zone cap can differ between zones... 
-  QPair **temp = (QPair**)calloc(1,sizeof(QPair*));
+  // TODO: zone cap can differ between zones...
+  QPair **temp = (QPair **)calloc(1, sizeof(QPair *));
   szd_create_qpair(manager, temp);
   szd_get_zone_cap(*temp, info->min_lba, &info->zone_cap);
   szd_destroy_qpair(*temp);
@@ -217,19 +221,22 @@ int szd_open(DeviceManager *manager, const char *traddr,
   DeviceTarget prober = {.manager = manager,
                          .traddr = traddr,
                          .traddr_len = strlen(traddr),
-                         .found = false};  
-  // This is needed because of DPDK not properly recognising reattached devices. So force traddr.
+                         .found = false};
+  // This is needed because of DPDK not properly recognising reattached devices.
+  // So force traddr.
   bool already_found_once = false;
-  for (size_t i = 0; i< found_devices_number; i++) {
-    if (found_devices_len[i] == strlen(traddr) && 
-      memcmp(found_devices[i], traddr, found_devices_len[i])) {
-        already_found_once = true;
-      }
+  for (size_t i = 0; i < found_devices_number; i++) {
+    if (found_devices_len[i] == strlen(traddr) &&
+        memcmp(found_devices[i], traddr, found_devices_len[i])) {
+      already_found_once = true;
+    }
   }
   if (already_found_once) {
     memset(manager->g_trid, 0, sizeof(*(manager->g_trid)));
-	  spdk_nvme_trid_populate_transport(manager->g_trid, SPDK_NVME_TRANSPORT_PCIE);
-    memcpy(manager->g_trid->traddr, traddr, spdk_min(strlen(traddr), sizeof(manager->g_trid->traddr)));
+    spdk_nvme_trid_populate_transport(manager->g_trid,
+                                      SPDK_NVME_TRANSPORT_PCIE);
+    memcpy(manager->g_trid->traddr, traddr,
+           spdk_min(strlen(traddr), sizeof(manager->g_trid->traddr)));
   }
   // Find controller.
   int probe_ctx;
@@ -240,14 +247,14 @@ int szd_open(DeviceManager *manager, const char *traddr,
   // Dettach if broken.
   if (probe_ctx != 0) {
     if (manager->ctrlr != NULL) {
-        return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
+      return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
     } else {
       return SZD_SC_SPDK_ERROR_OPEN;
-    }  
+    }
   }
   if (!prober.found) {
     if (manager->ctrlr != NULL) {
-        return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
+      return spdk_nvme_detach(manager->ctrlr) || SZD_SC_SPDK_ERROR_OPEN;
     } else {
       return SZD_SC_SPDK_ERROR_OPEN;
     }
@@ -347,17 +354,18 @@ void __szd_probe_attach_cb(void *cb_ctx,
     prober->devices++;
     // hidden global state...
     bool found = false;
-    for (size_t i = 0; i< found_devices_number; i++) {
-      if (found_devices_len[i] == strlen(trid->traddr) && 
-        memcmp(found_devices[i], trid->traddr, found_devices_len[i])) {
-          found = true;
-        }
+    for (size_t i = 0; i < found_devices_number; i++) {
+      if (found_devices_len[i] == strlen(trid->traddr) &&
+          memcmp(found_devices[i], trid->traddr, found_devices_len[i])) {
+        found = true;
+      }
     }
     if (!found) {
       found_devices_len[found_devices_number] = strlen(trid->traddr);
-      found_devices[found_devices_number] = (char*)calloc(found_devices_len[found_devices_number], 
-        sizeof(char));
-      memcpy(found_devices[found_devices_number], trid->traddr, found_devices_len[found_devices_number]);
+      found_devices[found_devices_number] =
+          (char *)calloc(found_devices_len[found_devices_number], sizeof(char));
+      memcpy(found_devices[found_devices_number], trid->traddr,
+             found_devices_len[found_devices_number]);
       found_devices_number++;
     }
   }
@@ -478,7 +486,8 @@ void __get_zone_head_complete(void *arg,
     }                                                                          \
   } while (0)
 
-int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size, uint64_t *nr_reads) {
+int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+                       uint64_t *nr_reads) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -497,20 +506,24 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size, 
   uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
   uint64_t lbas_processed = 0;
   // Used to determine next IO call
-  uint64_t step_size = (info.mdts / info.lba_size);   // If lba_size > mdts, we have a big problem, but not because of the read.
+  uint64_t step_size =
+      (info.mdts / info.lba_size); // If lba_size > mdts, we have a big problem,
+                                   // but not because of the read.
   uint64_t current_step_size = step_size;
   Completion completion = Completion_default;
 
   // Otherwise we have an out of range.
-  uint64_t number_of_zones_traversed = (lbas_to_process + (lba - slba)) / info.zone_cap;
-  if (lba < info.min_lba || slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
+  uint64_t number_of_zones_traversed =
+      (lbas_to_process + (lba - slba)) / info.zone_cap;
+  if (lba < info.min_lba ||
+      slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
   // Read in steps of max MDTS bytess and respect boundaries
   while (lbas_processed < lbas_to_process) {
     // Read accross a zone border.
-    if (lba + step_size  >= current_zone_end) {
+    if (lba + step_size >= current_zone_end) {
       current_step_size = current_zone_end - lba;
     } else {
       current_step_size = step_size;
@@ -524,11 +537,11 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size, 
     completion.err = 0x00;
     rc = spdk_nvme_ns_cmd_read(qpair->man->ns, qpair->qpair,
                                (char *)buffer + lbas_processed * info.lba_size,
-                               lba,         /* LBA start */
+                               lba,               /* LBA start */
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
     if (nr_reads != NULL) {
-      *nr_reads+=1;
+      *nr_reads += 1;
     }
     if (rc != 0) {
       return SZD_SC_SPDK_ERROR_READ;
@@ -554,7 +567,8 @@ int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size) {
   return szd_read_with_diag(qpair, lba, buffer, size, NULL);
 }
 
-int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size, uint64_t *nr_appends) {
+int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
+                         uint64_t size, uint64_t *nr_appends) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -573,13 +587,17 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
   uint64_t lbas_to_process = (size + info.lba_size - 1) / info.lba_size;
   uint64_t lbas_processed = 0;
   // Used to determine next IO call
-  uint64_t step_size = (info.zasl / info.lba_size); // < If lba_size > zasl, we have a big problem, but not because of the append.
+  uint64_t step_size =
+      (info.zasl / info.lba_size); // < If lba_size > zasl, we have a big
+                                   // problem, but not because of the append.
   uint64_t current_step_size = step_size;
   Completion completion = Completion_default;
 
   // Error if we have an out of range.
-  uint64_t number_of_zones_traversed = (lbas_to_process + (*lba - slba)) / info.zone_cap;
-  if (*lba < info.min_lba || slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
+  uint64_t number_of_zones_traversed =
+      (lbas_to_process + (*lba - slba)) / info.zone_cap;
+  if (*lba < info.min_lba ||
+      slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
     printf("Out of range append\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
@@ -600,14 +618,13 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
     completion.done = false;
     completion.err = 0x00;
 
-    rc = spdk_nvme_zns_zone_append(qpair->man->ns, qpair->qpair,
-                                   (char *)buffer +
-                                       lbas_processed * info.lba_size,
-                                   slba,         /* LBA start */
-                                   current_step_size, /* number of LBAs */
-                                   __append_complete, &completion, 0);
+    rc = spdk_nvme_zns_zone_append(
+        qpair->man->ns, qpair->qpair,
+        (char *)buffer + lbas_processed * info.lba_size, slba, /* LBA start */
+        current_step_size, /* number of LBAs */
+        __append_complete, &completion, 0);
     if (nr_appends != NULL) {
-      *nr_appends+=1;
+      *nr_appends += 1;
     }
     if (rc != 0) {
       printf("Error creating append request\n");
@@ -617,11 +634,13 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer, uint64_t siz
     POLL_QPAIR(qpair->qpair, completion.done);
     if (completion.err != 0) {
       printf("Error during append %x\n", completion.err);
-      for (uint64_t slba = info.min_lba; slba != info.max_lba; slba+=info.zone_size) {
+      for (uint64_t slba = info.min_lba; slba != info.max_lba;
+           slba += info.zone_size) {
         uint64_t zone_head;
         szd_get_zone_head(qpair, slba, &zone_head);
         if (zone_head != slba && zone_head != slba + info.zone_size)
-        printf("Zone head %lu %lu %lu\n", slba/info.zone_size, zone_head, slba + info.zone_size);
+          printf("Zone head %lu %lu %lu\n", slba / info.zone_size, zone_head,
+                 slba + info.zone_size);
       }
       return SZD_SC_SPDK_ERROR_APPEND;
     }
@@ -641,8 +660,9 @@ int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size) {
   return szd_append_with_diag(qpair, lba, buffer, size, NULL);
 }
 
-int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer, 
-  uint64_t size, uint64_t *nr_appends, Completion *completion) {
+int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
+                               uint64_t size, uint64_t *nr_appends,
+                               Completion *completion) {
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(buffer);
   int rc = SZD_SC_SUCCESS;
@@ -662,22 +682,23 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   *completion = Completion_default;
 
   // Error if we have an out of range or we cross a zone border.
-  uint64_t number_of_zones_traversed = (lbas_to_process + (*lba - slba)) / info.zone_cap;
-  if (*lba < info.min_lba || *lba > info.max_lba || number_of_zones_traversed > 1 
-    || lbas_to_process > info.zasl / info.lba_size) {
+  uint64_t number_of_zones_traversed =
+      (lbas_to_process + (*lba - slba)) / info.zone_cap;
+  if (*lba < info.min_lba || *lba > info.max_lba ||
+      number_of_zones_traversed > 1 ||
+      lbas_to_process > info.zasl / info.lba_size) {
     printf("Illegal async append\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
 
   completion->done = false;
   completion->err = 0x00;
-  rc = spdk_nvme_zns_zone_append(qpair->man->ns, qpair->qpair,
-                                   (char *)buffer,
-                                   slba,         /* LBA start */
-                                   lbas_to_process, /* number of LBAs */
-                                   __append_complete, completion, 0);
+  rc = spdk_nvme_zns_zone_append(qpair->man->ns, qpair->qpair, (char *)buffer,
+                                 slba,            /* LBA start */
+                                 lbas_to_process, /* number of LBAs */
+                                 __append_complete, completion, 0);
   if (nr_appends != NULL) {
-    *nr_appends+=1;
+    *nr_appends += 1;
   }
   if (rc != 0) {
     printf("Error creating append request\n");
@@ -703,7 +724,7 @@ int szd_poll_async(QPair *qpair, Completion *completion) {
 
 int szd_poll_once(QPair *qpair, Completion *completion) {
   if (!completion->done) {
-    spdk_nvme_qpair_process_completions(qpair->qpair, 0);  
+    spdk_nvme_qpair_process_completions(qpair->qpair, 0);
   }
   if (completion->err != 0) {
     printf("Error during polling once %x\n", completion->err);
@@ -713,7 +734,7 @@ int szd_poll_once(QPair *qpair, Completion *completion) {
 }
 
 void szd_poll_once_raw(QPair *qpair) {
-  spdk_nvme_qpair_process_completions(qpair->qpair, 0);  
+  spdk_nvme_qpair_process_completions(qpair->qpair, 0);
 }
 
 int szd_reset(QPair *qpair, uint64_t slba) {
@@ -786,9 +807,9 @@ int szd_finish_zone(QPair *qpair, uint64_t slba) {
   Completion completion = Completion_default;
   int rc =
       spdk_nvme_zns_finish_zone(qpair->man->ns, qpair->qpair,
-                               slba,  /* starting LBA of the zone to finish */
-                               false, /* don't finish all zones */
-                               __finish_zone_complete, &completion);
+                                slba,  /* starting LBA of the zone to finish */
+                                false, /* don't finish all zones */
+                                __finish_zone_complete, &completion);
   if (rc != 0) {
     return SZD_SC_SPDK_ERROR_FINISH;
   }
@@ -844,7 +865,6 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   free(report_buf);
   return SZD_SC_SUCCESS;
 }
-
 
 int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {
   RETURN_ERR_ON_NULL(qpair);

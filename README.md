@@ -26,8 +26,9 @@ In principal only CMake and SPDK and its dependencies (DPDK, etc...) are needed.
 ## Example of building the project with CMake
 After dependencies are installed, it should compile (tested on Ubuntu 20.04 LTS), but no guarantees are made. The next line is a minimal setup with CMake and make:
 ```bash
+mkdir -p build && cd build
 rm -f CMakeCache.txt
-cmake .
+cmake ..
 make <TARGET>
 ```
 if the output does not change, try cleaning the build first with:
@@ -39,7 +40,7 @@ Tools are not built by default. To allow tools to be set, these all need to be i
 This can be done by providing a ";" seperated list of desired tool directories to the CMake flag `SZD_TOOLS`. This unfortunately requires removing the CMakeCache.txt if not done from the start. For example:
 ```bash
 rm -f CMakeCache.txt
-cmake -DSZD_TOOLS="szdcli" .
+cmake -DSZD_TOOLS="szdcli" ..
 # The rest is as usual
 ```
 
