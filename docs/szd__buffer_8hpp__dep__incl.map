@@ -1,10 +1,10 @@
-<map id="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_buffer.hpp" name="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_buffer.hpp">
-<area shape="rect" id="node1" title=" " alt="" coords="543,5,794,91"/>
-<area shape="rect" id="node2" href="$szd__circular__log_8hpp.html" title=" " alt="" coords="731,524,982,609"/>
-<area shape="rect" id="node3" href="$szd__fragmented__log_8hpp.html" title=" " alt="" coords="122,524,372,609"/>
-<area shape="rect" id="node4" href="$szd__freezone__list_8hpp.html" title=" " alt="" coords="31,391,282,476"/>
-<area shape="rect" id="node5" href="$szd__log_8hpp.html" title=" " alt="" coords="559,391,810,476"/>
-<area shape="rect" id="node6" href="$szd__once__log_8hpp.html" title=" " alt="" coords="416,524,667,609"/>
-<area shape="rect" id="node7" href="$szd__channel_8hpp.html" title=" " alt="" coords="403,139,667,209"/>
-<area shape="rect" id="node8" href="$szd__channel__factory_8hpp.html" title=" " alt="" coords="417,257,653,343"/>
+<map id="szd_buffer.hpp" name="szd_buffer.hpp">
+<area shape="rect" id="node1" title=" " alt="" coords="458,5,574,32"/>
+<area shape="rect" id="node2" href="$szd__circular__log_8hpp.html" title=" " alt="" coords="563,304,717,331"/>
+<area shape="rect" id="node3" href="$szd__fragmented__log_8hpp.html" title=" " alt="" coords="90,304,273,331"/>
+<area shape="rect" id="node4" href="$szd__freezone__list_8hpp.html" title=" " alt="" coords="23,229,185,256"/>
+<area shape="rect" id="node5" href="$szd__log_8hpp.html" title=" " alt="" coords="480,229,579,256"/>
+<area shape="rect" id="node6" href="$szd__once__log_8hpp.html" title=" " alt="" coords="349,304,486,331"/>
+<area shape="rect" id="node7" href="$szd__channel_8hpp.html" title=" " alt="" coords="336,80,467,107"/>
+<area shape="rect" id="node8" href="$szd__channel__factory_8hpp.html" title=" " alt="" coords="311,155,492,181"/>
 </map>

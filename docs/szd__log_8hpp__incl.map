@@ -1,18 +1,18 @@
-<map id="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_log.hpp" name="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_log.hpp">
-<area shape="rect" id="node1" title=" " alt="" coords="289,5,540,91"/>
-<area shape="rect" id="node2" href="$szd__buffer_8hpp.html" title=" " alt="" coords="678,288,821,329"/>
-<area shape="rect" id="node3" href="$szd_8h.html" title=" " alt="" coords="149,377,232,404"/>
-<area shape="rect" id="node10" href="$szd__status_8hpp.html" title=" " alt="" coords="413,377,558,404"/>
-<area shape="rect" id="node11" title=" " alt="" coords="829,377,888,404"/>
-<area shape="rect" id="node12" href="$szd__channel_8hpp.html" title=" " alt="" coords="402,213,558,240"/>
-<area shape="rect" id="node16" href="$szd__channel__factory_8hpp.html" title=" " alt="" coords="105,139,311,165"/>
-<area shape="rect" id="node4" href="$szd__namespace_8h.html" title=" " alt="" coords="371,527,535,553"/>
-<area shape="rect" id="node5" href="$szd__status__code_8h.html" title=" " alt="" coords="370,452,537,479"/>
-<area shape="rect" id="node6" title=" " alt="" coords="105,527,188,553"/>
-<area shape="rect" id="node7" title=" " alt="" coords="25,452,109,479"/>
-<area shape="rect" id="node8" title=" " alt="" coords="133,452,203,479"/>
-<area shape="rect" id="node9" title=" " alt="" coords="228,452,295,479"/>
-<area shape="rect" id="node13" title=" " alt="" coords="587,295,653,322"/>
-<area shape="rect" id="node14" title=" " alt="" coords="347,295,424,322"/>
-<area shape="rect" id="node15" title=" " alt="" coords="449,295,511,322"/>
+<map id="szd_log.hpp" name="szd_log.hpp">
+<area shape="rect" id="node1" title=" " alt="" coords="365,5,464,32"/>
+<area shape="rect" id="node2" href="$szd__buffer_8hpp.html" title=" " alt="" coords="678,229,821,271"/>
+<area shape="rect" id="node3" href="$szd_8h.html" title=" " alt="" coords="149,319,232,345"/>
+<area shape="rect" id="node10" href="$szd__status_8hpp.html" title=" " alt="" coords="413,319,558,345"/>
+<area shape="rect" id="node11" title=" " alt="" coords="829,319,888,345"/>
+<area shape="rect" id="node12" href="$szd__channel_8hpp.html" title=" " alt="" coords="402,155,558,181"/>
+<area shape="rect" id="node16" href="$szd__channel__factory_8hpp.html" title=" " alt="" coords="105,80,311,107"/>
+<area shape="rect" id="node4" href="$szd__namespace_8h.html" title=" " alt="" coords="371,468,535,495"/>
+<area shape="rect" id="node5" href="$szd__status__code_8h.html" title=" " alt="" coords="370,393,537,420"/>
+<area shape="rect" id="node6" title=" " alt="" coords="105,468,188,495"/>
+<area shape="rect" id="node7" title=" " alt="" coords="25,393,109,420"/>
+<area shape="rect" id="node8" title=" " alt="" coords="133,393,203,420"/>
+<area shape="rect" id="node9" title=" " alt="" coords="228,393,295,420"/>
+<area shape="rect" id="node13" title=" " alt="" coords="587,237,653,263"/>
+<area shape="rect" id="node14" title=" " alt="" coords="347,237,424,263"/>
+<area shape="rect" id="node15" title=" " alt="" coords="449,237,511,263"/>
 </map>

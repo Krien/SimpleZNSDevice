@@ -1,12 +1,12 @@
-<map id="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_buffer.hpp" name="/home/kd/targets/TropoDB/implementation/rocksdb/third&#45;party/SimpleZNSDevice/szd/cpp/include/szd/datastructures/szd_buffer.hpp">
-<area shape="rect" id="node1" title=" " alt="" coords="172,5,423,91"/>
-<area shape="rect" id="node2" href="$szd_8h.html" title=" " alt="" coords="256,139,339,165"/>
-<area shape="rect" id="node9" href="$szd__status_8hpp.html" title=" " alt="" coords="33,139,178,165"/>
-<area shape="rect" id="node10" title=" " alt="" coords="363,139,422,165"/>
-<area shape="rect" id="node3" href="$szd__namespace_8h.html" title=" " alt="" coords="24,288,188,315"/>
-<area shape="rect" id="node4" href="$szd__status__code_8h.html" title=" " alt="" coords="22,213,189,240"/>
-<area shape="rect" id="node5" title=" " alt="" coords="324,288,407,315"/>
-<area shape="rect" id="node6" title=" " alt="" coords="356,213,440,240"/>
-<area shape="rect" id="node7" title=" " alt="" coords="516,213,586,240"/>
-<area shape="rect" id="node8" title=" " alt="" coords="264,213,331,240"/>
+<map id="szd_buffer.hpp" name="szd_buffer.hpp">
+<area shape="rect" id="node1" title=" " alt="" coords="240,5,356,32"/>
+<area shape="rect" id="node2" href="$szd_8h.html" title=" " alt="" coords="256,80,339,107"/>
+<area shape="rect" id="node9" href="$szd__status_8hpp.html" title=" " alt="" coords="33,80,178,107"/>
+<area shape="rect" id="node10" title=" " alt="" coords="363,80,422,107"/>
+<area shape="rect" id="node3" href="$szd__namespace_8h.html" title=" " alt="" coords="24,229,188,256"/>
+<area shape="rect" id="node4" href="$szd__status__code_8h.html" title=" " alt="" coords="22,155,189,181"/>
+<area shape="rect" id="node5" title=" " alt="" coords="324,229,407,256"/>
+<area shape="rect" id="node6" title=" " alt="" coords="356,155,440,181"/>
+<area shape="rect" id="node7" title=" " alt="" coords="516,155,586,181"/>
+<area shape="rect" id="node8" title=" " alt="" coords="264,155,331,181"/>
 </map>

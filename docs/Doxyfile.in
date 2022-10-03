@@ -4,3 +4,4 @@ GENERATE_HTML          = YES
 GENERATE_MAN           = NO
 GENERATE_LATEX         = NO
 RECURSIVE              = YES
+FULL_PATH_NAMES        = NO
