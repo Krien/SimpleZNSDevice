@@ -54,13 +54,13 @@ set(szd_core_include_files
     "${szd_core_include_dir}/szd_status_code.h"
     "${szd_core_include_dir}/szd.h"
 )
-list(APPEND szd_all_files szd_core_include_files)
+list(APPEND szd_all_files "${szd_core_include_files}")
 set(szd_core_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/src")
 set(szd_core_src_files
     "${szd_core_src_dir}/szd_status_code.c"
     "${szd_core_src_dir}/szd.c"
 )
-list(APPEND szd_all_files szd_core_src_files)
+list(APPEND szd_all_files "${szd_core_src_files}")
 
 set(szd_cpp_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include/szd")
 set(szd_cpp_include_files
@@ -75,7 +75,7 @@ set(szd_cpp_include_files
     "${szd_cpp_include_dir}/datastructures/szd_freezone_list.hpp"
     "${szd_cpp_include_dir}/datastructures/szd_fragmented_log.hpp"
 )
-list(APPEND szd_all_files szd_cpp_include_files)
+list(APPEND szd_all_files "${szd_cpp_include_files}")
 set(szd_cpp_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/src")
 set(szd_cpp_src_files
     "${szd_cpp_src_dir}/szd_status.cpp"
@@ -89,7 +89,7 @@ set(szd_cpp_src_files
     "${szd_cpp_src_dir}/datastructures/szd_freezone_list.cpp"
     "${szd_cpp_src_dir}/datastructures/szd_fragmented_log.cpp"
 )
-list(APPEND szd_all_files szd_cpp_src_files)
+list(APPEND szd_all_files "${szd_cpp_src_files}")
 
 # Use for each library and executable, it ensures more homogenous builds.
 function(SETUP_SZD_PROJECT_STRUCTURE project_name)
@@ -146,6 +146,7 @@ if (SZD_TOOLS)
     string(REPLACE " " ";" TOOLS ${SZD_TOOLS})
     foreach (tool ${TOOLS})
         add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}")
+        message("Enabling tool: ${tool}")
         add_executable(${tool} "${${tool}_sources}")
         setup_szd_project_structure(${tool})
         if (${tool}_core_only)
@@ -154,7 +155,7 @@ if (SZD_TOOLS)
             target_link_libraries(${tool} PUBLIC szd_extended)
         endif()
         list(APPEND tool_files "${${tool}_sources}")
-        list(APPEND szd_all_files tool_files)
+        list(APPEND szd_all_files "${tool_files}")
     endforeach()
 endif()
 
@@ -167,7 +168,7 @@ if (TESTING)
     add_executable(szd_full_path_test
         "${szd_core_test_dir}/szd_full_path_test.c"
     )
-    list(APPEND szd_all_files "${test_dir}/szd_full_path_test.c")
+    list(APPEND szd_all_files "${szd_core_test_dir}/szd_full_path_test.c")
     target_link_libraries(szd_full_path_test PUBLIC szd)
     setup_szd_project_structure(szd_full_path_test)
     add_test(
@@ -191,9 +192,9 @@ if (TESTING)
         "szd_circular_log_test"
         "szd_fragmented_log_test"
     )
-    list(APPEND szd_all_files cpp_tests)
     function(add_cpp_test filename dir)
         add_executable("${filename}" "${dir}/${filename}.cpp")
+        list(APPEND szd_all_files "${dir}/${filename}.cpp")
         target_link_libraries("${filename}" PRIVATE szd_extended gtest_main)
         setup_szd_project_structure("${filename}")
         gtest_add_tests(TARGET "${filename}")
@@ -221,7 +222,6 @@ add_custom_target(
     -i
     "-style=file"
     ${szd_all_files}
-    ${tool_files}
     COMMENT "Formatting files"
 )
 
