@@ -1,3 +1,4 @@
+PROJECT_NAME           = SimpleZNSDevice
 OUTPUT_DIRECTORY       = @DOCS_DIR@/generated/
 INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/szd @DOCS_DIR@
 GENERATE_HTML          = YES
