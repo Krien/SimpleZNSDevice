@@ -112,7 +112,6 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     return s;
   }
   // Diag
-  uint64_t prev_append_counter = append_operations_counter_;
   uint64_t append_ops = 0;
   // We need two steps because it will not work with one buffer.
   if (alligned_size != size) {

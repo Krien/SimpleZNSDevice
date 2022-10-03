@@ -147,7 +147,6 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
                                         alligned);
   } else {
     // Spinlock-like, but over all queues one by one each time.
-    uint32_t i = 0;
     uint64_t waiting = 0;
     while (true) {
       if (write_channel_[0]->PollOnce(&claimed_nr)) {
