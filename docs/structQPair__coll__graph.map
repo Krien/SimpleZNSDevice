@@ -1,0 +1,5 @@
+<map id="QPair" name="QPair">
+<area shape="rect" id="node1" title="Thread unsafe I/O channel. Can be used for writing and reading of data." alt="" coords="39,184,95,211"/>
+<area shape="rect" id="node2" href="$structDeviceManager.html" title="General structure that aids in managing one ZNS namespace. The core structure in SimpleZnsDevice." alt="" coords="5,95,129,121"/>
+<area shape="rect" id="node3" href="$structDeviceInfo.html" title="Holds general information about a ZNS device." alt="" coords="21,5,113,32"/>
+</map>
