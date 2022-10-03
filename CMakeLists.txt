@@ -146,6 +146,7 @@ if (SZD_TOOLS)
     string(REPLACE " " ";" TOOLS ${SZD_TOOLS})
     foreach (tool ${TOOLS})
         add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}")
+        message("Enabling tool: ${tool}")
         add_executable(${tool} "${${tool}_sources}")
         setup_szd_project_structure(${tool})
         if (${tool}_core_only)
@@ -167,7 +168,7 @@ if (TESTING)
     add_executable(szd_full_path_test
         "${szd_core_test_dir}/szd_full_path_test.c"
     )
-    list(APPEND szd_all_files "${test_dir}/szd_full_path_test.c")
+    list(APPEND szd_all_files "${szd_core_test_dir}/szd_full_path_test.c")
     target_link_libraries(szd_full_path_test PUBLIC szd)
     setup_szd_project_structure(szd_full_path_test)
     add_test(
@@ -191,9 +192,9 @@ if (TESTING)
         "szd_circular_log_test"
         "szd_fragmented_log_test"
     )
-    list(APPEND szd_all_files "${cpp_tests}")
     function(add_cpp_test filename dir)
         add_executable("${filename}" "${dir}/${filename}.cpp")
+        list(APPEND szd_all_files "${dir}/${filename}.cpp")
         target_link_libraries("${filename}" PRIVATE szd_extended gtest_main)
         setup_szd_project_structure("${filename}")
         gtest_add_tests(TARGET "${filename}")

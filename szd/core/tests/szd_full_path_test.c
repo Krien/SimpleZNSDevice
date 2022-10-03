@@ -1,7 +1,8 @@
 
 /**
- * \file general tests for the core SZD source. 
- * As it needs to deeply test state as well, the test is quite large and has unfortunately become messy.
+ * \file general tests for the core SZD source.
+ * As it needs to deeply test state as well, the test is quite large and has
+ * unfortunately become messy.
  * TODO: cleanup...
  */
 #ifdef __cplusplus
@@ -15,10 +16,10 @@ extern "C" {
 
 // TODO: use a testing framework or something else than raw assert
 #include <assert.h>
-#include <string.h>
 #include <stdlib.h>
-#include <szd/szd_namespace.h>
+#include <string.h>
 #include <szd/szd.h>
+#include <szd/szd_namespace.h>
 
 // TODO: disable by default
 #define DEBUG
@@ -40,8 +41,7 @@ extern "C" {
 #define VALID(rc) assert((rc) == 0)
 #define INVALID(rc) assert((rc) != 0)
 
-int write_pattern(char **pattern, QPair *qpair, int32_t size,
-                  int32_t jump) {
+int write_pattern(char **pattern, QPair *qpair, int32_t size, int32_t jump) {
   // if (*pattern != NULL) {
   //   szd_free(*pattern);
   // }
@@ -79,8 +79,7 @@ void *worker_thread(void *arg) {
   thread_data *dat = (thread_data *)arg;
   DeviceManager **manager = dat->manager;
   int rc;
-  QPair **qpair =
-      (QPair **)calloc(1, sizeof(QPair *));
+  QPair **qpair = (QPair **)calloc(1, sizeof(QPair *));
   rc = szd_create_qpair(*manager, qpair);
   if (rc != 0) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
@@ -96,8 +95,8 @@ void *worker_thread(void *arg) {
     dat->rc = rc;
     pthread_exit(NULL);
   }
-  char *pattern_read_1 =
-      (char *)szd_calloc((*qpair)->man->info.lba_size, zone_size_bytes, sizeof(char *));
+  char *pattern_read_1 = (char *)szd_calloc((*qpair)->man->info.lba_size,
+                                            zone_size_bytes, sizeof(char *));
   if (pattern_read_1 == NULL) {
     PLUS_THREAD_BARRIER(mut, thread_barrier);
     dat->rc = rc;
@@ -106,24 +105,23 @@ void *worker_thread(void *arg) {
   // hammering
   for (uint16_t i = 0; i < 200; i++) {
     uint64_t wstart = dat->write_slba_start;
-    rc = szd_append(*qpair, &wstart, *pattern_1,
-                             zone_size_bytes);
+    rc = szd_append(*qpair, &wstart, *pattern_1, zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
       dat->rc = rc;
       pthread_exit(NULL);
     }
     rc = szd_read(*qpair, dat->write_slba_start, pattern_read_1,
-                           zone_size_bytes);
+                  zone_size_bytes);
     if (rc != 0) {
       PLUS_THREAD_BARRIER(mut, thread_barrier);
       dat->rc = rc;
       pthread_exit(NULL);
     }
     if (memcmp(pattern_read_1, *pattern_1, zone_size_bytes) != 0) {
-        PLUS_THREAD_BARRIER(mut, thread_barrier);
-        dat->rc = 1;
-        pthread_exit(NULL);
+      PLUS_THREAD_BARRIER(mut, thread_barrier);
+      dat->rc = 1;
+      pthread_exit(NULL);
     }
     if (i != 199) {
       rc = szd_reset(*qpair, dat->write_slba_start);
@@ -144,12 +142,11 @@ void *worker_thread(void *arg) {
   pthread_mutex_unlock(&mut);
 
   szd_free(pattern_read_1);
-  pattern_read_1 =
-      (char *)szd_calloc((*qpair)->man->info.lba_size, zone_size_bytes, sizeof(char *));
+  pattern_read_1 = (char *)szd_calloc((*qpair)->man->info.lba_size,
+                                      zone_size_bytes, sizeof(char *));
   szd_free(*pattern_1);
   rc = write_pattern(pattern_1, *qpair, zone_size_bytes, dat->alt_offset);
-  rc = szd_read(*qpair, dat->alt_slba_start, pattern_read_1,
-                         zone_size_bytes);
+  rc = szd_read(*qpair, dat->alt_slba_start, pattern_read_1, zone_size_bytes);
   if (rc != 0) {
     dat->rc = rc;
     pthread_exit(NULL);
@@ -170,9 +167,8 @@ int main(int argc, char **argv) {
   int rc;
   printf("----------------------INIT----------------------\n");
   uint64_t min_zone = 2, max_zone = 10;
-  DeviceOpenOptions open_opts = { min_zone, max_zone };
-  DeviceManager **manager =
-      (DeviceManager **)calloc(1, sizeof(DeviceManager));
+  DeviceOpenOptions open_opts = {min_zone, max_zone};
+  DeviceManager **manager = (DeviceManager **)calloc(1, sizeof(DeviceManager));
   DeviceOptions opts = DeviceOptions_default;
   rc = szd_init(manager, &opts);
   DEBUG_TEST_PRINT("SPDK init ", rc);
@@ -181,8 +177,8 @@ int main(int argc, char **argv) {
   // find devices
   printf("----------------------PROBE----------------------\n");
   char *device_to_use = NULL;
-  ProbeInformation **prober = (ProbeInformation **)calloc(
-      1, sizeof(ProbeInformation *));
+  ProbeInformation **prober =
+      (ProbeInformation **)calloc(1, sizeof(ProbeInformation *));
   rc = szd_probe(*manager, prober);
   DEBUG_TEST_PRINT("probe return code ", rc);
   VALID(rc);
@@ -196,8 +192,7 @@ int main(int argc, char **argv) {
       }
       device_to_use =
           (char *)calloc(strlen((*prober)->traddr[i]) + 1, sizeof(char));
-      memcpy(device_to_use, (*prober)->traddr[i],
-              strlen((*prober)->traddr[i]));
+      memcpy(device_to_use, (*prober)->traddr[i], strlen((*prober)->traddr[i]));
     }
   }
   // dangerous! we must be absolutely sure that no other process is using this
@@ -241,8 +236,7 @@ int main(int argc, char **argv) {
   assert((*manager)->info.lba_cap > 0);
 
   // create qpair
-  QPair **qpair =
-      (QPair **)calloc(1, sizeof(QPair *));
+  QPair **qpair = (QPair **)calloc(1, sizeof(QPair *));
   rc = szd_create_qpair(*manager, qpair);
   DEBUG_TEST_PRINT("Qpair creation code ", rc);
   VALID(rc);
@@ -269,32 +263,34 @@ int main(int argc, char **argv) {
   rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all code ", rc);
   VALID(rc);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   DEBUG_TEST_PRINT("min zone head ", rc);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size);
+  assert(write_head == min_zone * info.zone_size);
   char **pattern_1 = (char **)calloc(1, sizeof(char **));
   rc = write_pattern(pattern_1, *qpair, info.lba_size, 10);
   VALID(rc);
-  append_head = min_zone*info.zone_size;
+  append_head = min_zone * info.zone_size;
   rc = szd_append(*qpair, &append_head, *pattern_1, info.lba_size);
   DEBUG_TEST_PRINT("append alligned ", rc);
   VALID(rc);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + 1);
+  assert(write_head == min_zone * info.zone_size + 1);
   char **pattern_2 = (char **)calloc(1, sizeof(char **));
   rc = write_pattern(pattern_2, *qpair, info.zasl, 13);
   VALID(rc);
   rc = szd_append(*qpair, &append_head, *pattern_2, info.zasl);
   DEBUG_TEST_PRINT("append zasl ", rc);
   VALID(rc);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + 1 + info.zasl / info.lba_size);
-  char *pattern_read_1 =
-      (char *)szd_calloc((*qpair)->man->info.lba_size, info.lba_size, sizeof(char *));
-  rc = szd_read(*qpair, min_zone*info.zone_size, pattern_read_1, info.lba_size);
+  assert(write_head ==
+         min_zone * info.zone_size + 1 + info.zasl / info.lba_size);
+  char *pattern_read_1 = (char *)szd_calloc((*qpair)->man->info.lba_size,
+                                            info.lba_size, sizeof(char *));
+  rc = szd_read(*qpair, min_zone * info.zone_size, pattern_read_1,
+                info.lba_size);
   DEBUG_TEST_PRINT("read alligned ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.lba_size; i++) {
@@ -302,9 +298,10 @@ int main(int argc, char **argv) {
   }
   szd_free(*pattern_1);
   szd_free(pattern_read_1);
-  char *pattern_read_2 =
-      (char *)szd_calloc((*qpair)->man->info.lba_size, info.zasl, sizeof(char *));
-  rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
+  char *pattern_read_2 = (char *)szd_calloc((*qpair)->man->info.lba_size,
+                                            info.zasl, sizeof(char *));
+  rc = szd_read(*qpair, min_zone * info.zone_size + 1, pattern_read_2,
+                info.zasl);
   DEBUG_TEST_PRINT("read zasl ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.zasl; i++) {
@@ -314,7 +311,8 @@ int main(int argc, char **argv) {
   rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
   VALID(rc);
-  rc = szd_read(*qpair, min_zone*info.zone_size + 1, pattern_read_2, info.zasl);
+  rc = szd_read(*qpair, min_zone * info.zone_size + 1, pattern_read_2,
+                info.zasl);
   DEBUG_TEST_PRINT("verify empty first zone ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.zasl; i++) {
@@ -322,70 +320,77 @@ int main(int argc, char **argv) {
   }
   szd_free(pattern_read_2);
 
-  append_head = min_zone*info.zone_size;
+  append_head = min_zone * info.zone_size;
   printf("----------------------WORKLOAD FILL----------------------\n");
   uint64_t number_of_zones = (info.max_lba - info.min_lba) / info.zone_size;
   char **pattern_3 = (char **)calloc(1, sizeof(char **));
-  rc = write_pattern(pattern_3, *qpair, info.lba_size * number_of_zones * info.zone_cap, 19);
+  rc = write_pattern(pattern_3, *qpair,
+                     info.lba_size * number_of_zones * info.zone_cap, 19);
   VALID(rc);
-  rc = szd_append(*qpair, &append_head, *pattern_3, info.lba_size * number_of_zones * info.zone_cap);
+  rc = szd_append(*qpair, &append_head, *pattern_3,
+                  info.lba_size * number_of_zones * info.zone_cap);
   DEBUG_TEST_PRINT("fill entire device ", rc);
   VALID(rc);
-  for (uint64_t i = info.min_lba; i < info.max_lba; i+=info.zone_size) {
+  for (uint64_t i = info.min_lba; i < info.max_lba; i += info.zone_size) {
     rc = szd_get_zone_head(*qpair, i, &write_head);
     VALID(rc);
     assert(write_head == i + info.zone_size);
   }
   szd_free(*pattern_3);
   char *pattern_read_3 = (char *)szd_calloc(
-      (*qpair)->man->info.lba_size, info.lba_size * number_of_zones * info.zone_cap, sizeof(char *));
+      (*qpair)->man->info.lba_size,
+      info.lba_size * number_of_zones * info.zone_cap, sizeof(char *));
   assert(pattern_read_3 != NULL);
   rc = szd_read(*qpair, min_zone * info.zone_size, pattern_read_3,
-                         info.lba_size * number_of_zones * info.zone_cap);
+                info.lba_size * number_of_zones * info.zone_cap);
   DEBUG_TEST_PRINT("read entire device ", rc);
   VALID(rc);
-  for (uint64_t i = 0; i < info.lba_size * number_of_zones * info.zone_cap; i++) {
+  for (uint64_t i = 0; i < info.lba_size * number_of_zones * info.zone_cap;
+       i++) {
     assert((char)(pattern_read_3)[i] == (char)(*pattern_3)[i]);
   }
   szd_free(pattern_read_3);
-  rc = szd_reset(*qpair, min_zone*info.zone_size + info.zone_size);
-  rc = szd_reset(*qpair, min_zone*info.zone_size + info.zone_size * 2) | rc;
+  rc = szd_reset(*qpair, min_zone * info.zone_size + info.zone_size);
+  rc = szd_reset(*qpair, min_zone * info.zone_size + info.zone_size * 2) | rc;
   DEBUG_TEST_PRINT("reset zone 2,3 ", rc);
   VALID(rc);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + info.zone_size);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size, &write_head);
+  assert(write_head == min_zone * info.zone_size + info.zone_size);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size,
+                         &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + info.zone_size);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size * 2, &write_head);
+  assert(write_head == min_zone * info.zone_size + info.zone_size);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size * 2,
+                         &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + info.zone_size * 2);
-  char *pattern_read_4 = (char *)szd_calloc(
-      (*qpair)->man->info.lba_size, info.lba_size * info.zone_cap, sizeof(char *));
+  assert(write_head == min_zone * info.zone_size + info.zone_size * 2);
+  char *pattern_read_4 =
+      (char *)szd_calloc((*qpair)->man->info.lba_size,
+                         info.lba_size * info.zone_cap, sizeof(char *));
   rc = szd_read(*qpair, info.zone_size * min_zone, pattern_read_4,
-                         info.lba_size * info.zone_cap);
+                info.lba_size * info.zone_cap);
   DEBUG_TEST_PRINT("read zone 1 ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.lba_size * info.zone_cap; i++) {
     assert((char)(pattern_read_4)[i] == (char)(*pattern_3)[i]);
   }
-  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size, pattern_read_4,
-                         info.lba_size * info.zone_cap);
+  rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_size,
+                pattern_read_4, info.lba_size * info.zone_cap);
   DEBUG_TEST_PRINT("read zone 2 ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.lba_size * info.zone_cap; i++) {
     assert((char)(pattern_read_4)[i] == 0);
   }
-  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 2, pattern_read_4,
-                         info.lba_size * info.zone_cap);
+  rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_size * 2,
+                pattern_read_4, info.lba_size * info.zone_cap);
   DEBUG_TEST_PRINT("read zone 3 ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.lba_size * info.zone_cap; i++) {
     assert((char)(pattern_read_4)[i] == 0);
   }
-  rc = szd_read(*qpair, min_zone*info.zone_size + info.zone_size * 3, pattern_read_4,
-                         info.lba_size * info.zone_cap);
+  rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_size * 3,
+                pattern_read_4, info.lba_size * info.zone_cap);
   DEBUG_TEST_PRINT("read zone 4 ", rc);
   VALID(rc);
   // This ugly loop is necessary to prevent over-allocating DMA. We only want
@@ -399,54 +404,55 @@ int main(int argc, char **argv) {
                          19 + i + info.zone_cap * 3 * info.lba_size);
       VALID(rc);
     }
-    assert((char)(pattern_read_4)[i] ==
-           (char)(*pattern_3)[i % info.lba_size]);
+    assert((char)(pattern_read_4)[i] == (char)(*pattern_3)[i % info.lba_size]);
   }
   rc = szd_reset_all(*qpair);
   DEBUG_TEST_PRINT("reset all ", rc);
   VALID(rc);
 
-  append_head = min_zone*info.zone_size;
+  append_head = min_zone * info.zone_size;
   printf("----------------------WORKLOAD ZONE EDGE----------------------\n");
   rc = write_pattern(pattern_3, *qpair, info.lba_size * info.zone_cap * 2, 19);
   rc = szd_append(*qpair, &append_head, *pattern_3,
-                           info.lba_size * (info.zone_cap - 3));
+                  info.lba_size * (info.zone_cap - 3));
   DEBUG_TEST_PRINT("zone friction part 1: append 1 zoneborder - 3 ", rc);
   VALID(rc);
   rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + info.zone_cap - 3);
+  assert(write_head == min_zone * info.zone_size + info.zone_cap - 3);
   rc = szd_append(*qpair, &append_head,
-                           *pattern_3 + info.lba_size * (info.zone_cap - 3),
-                           info.lba_size * 6);
+                  *pattern_3 + info.lba_size * (info.zone_cap - 3),
+                  info.lba_size * 6);
   DEBUG_TEST_PRINT("zone friction part 2: append 1 zoneborder + 6 ", rc);
   VALID(rc);
   rc = szd_get_zone_head(*qpair, min_zone * info.zone_size, &write_head);
   VALID(rc);
   assert(write_head == min_zone * info.zone_size + info.zone_size);
-  rc = szd_get_zone_head(*qpair, min_zone*info.zone_size + info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size,
+                         &write_head);
   VALID(rc);
   assert(write_head == min_zone * info.zone_size + info.zone_size + 3);
   rc = szd_append(*qpair, &append_head,
-                           *pattern_3 + info.lba_size * (info.zone_cap + 3),
-                           info.lba_size * 13);
+                  *pattern_3 + info.lba_size * (info.zone_cap + 3),
+                  info.lba_size * 13);
   DEBUG_TEST_PRINT("zone friction part 3: append 1 zoneborder + 16 ", rc);
   VALID(rc);
-  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size, &write_head);
+  rc = szd_get_zone_head(*qpair, min_zone * info.zone_size + info.zone_size,
+                         &write_head);
   VALID(rc);
-  assert(write_head == min_zone*info.zone_size + info.zone_size + 16);
+  assert(write_head == min_zone * info.zone_size + info.zone_size + 16);
   rc = szd_read(*qpair, min_zone * info.zone_size, pattern_read_4,
-                         info.lba_size * (info.zone_cap - 3));
+                info.lba_size * (info.zone_cap - 3));
   DEBUG_TEST_PRINT("zone friction part 4: read 1 zoneborder - 3 ", rc);
   VALID(rc);
   rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_cap - 3,
-                         pattern_read_4 + info.lba_size * (info.zone_cap - 3),
-                         info.lba_size * 6);
+                pattern_read_4 + info.lba_size * (info.zone_cap - 3),
+                info.lba_size * 6);
   DEBUG_TEST_PRINT("zone friction part 5: read 1 zoneborder + 3 ", rc);
   VALID(rc);
   rc = szd_read(*qpair, min_zone * info.zone_size + info.zone_cap + 3,
-                         pattern_read_4 + info.lba_size * (info.zone_cap + 3),
-                         info.lba_size * 13);
+                pattern_read_4 + info.lba_size * (info.zone_cap + 3),
+                info.lba_size * 13);
   DEBUG_TEST_PRINT("zone friction part 6: read 1 zoneborder + 16 ", rc);
   VALID(rc);
   for (uint64_t i = 0; i < info.lba_size * (info.zone_cap + 15); i++) {
@@ -464,20 +470,22 @@ int main(int argc, char **argv) {
   pthread_mutex_init(&mut, NULL);
   pthread_t thread1;
   thread_data first_thread_dat = {.manager = manager,
-                                  .write_slba_start = min_zone*info.zone_size,
-                                  .alt_slba_start = min_zone*info.zone_size + 2 * info.zone_size,
+                                  .write_slba_start = min_zone * info.zone_size,
+                                  .alt_slba_start = min_zone * info.zone_size +
+                                                    2 * info.zone_size,
                                   .data_offset = 3,
                                   .alt_offset = 9,
                                   .rc = 0};
   rc = pthread_create(&thread1, NULL, worker_thread, (void *)&first_thread_dat);
   VALID(rc);
   pthread_t thread2;
-  thread_data second_thread_dat = {.manager = manager,
-                                   .write_slba_start = min_zone*info.zone_size + 2 * info.zone_size,
-                                   .alt_slba_start = min_zone*info.zone_size,
-                                   .data_offset = 9,
-                                   .alt_offset = 3,
-                                   .rc = 0};
+  thread_data second_thread_dat = {
+      .manager = manager,
+      .write_slba_start = min_zone * info.zone_size + 2 * info.zone_size,
+      .alt_slba_start = min_zone * info.zone_size,
+      .data_offset = 9,
+      .alt_offset = 3,
+      .rc = 0};
   rc =
       pthread_create(&thread2, NULL, worker_thread, (void *)&second_thread_dat);
   VALID(rc);
