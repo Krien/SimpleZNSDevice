@@ -41,8 +41,9 @@ public:
   SZDStatus Read(const std::vector<std::pair<uint64_t, uint64_t>> &regions,
                  char *data, uint64_t size, bool alligned = true,
                  uint8_t reader = 0);
-  SZDStatus Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions);
-  SZDStatus ResetAll();
+  SZDStatus Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
+                  uint8_t writer);
+  SZDStatus ResetAll(uint8_t writer);
   SZDStatus Recover();
 
   bool Empty() const;
@@ -81,19 +82,29 @@ public:
     return read;
   };
   inline uint64_t GetZonesResetCounter() const {
-    return write_channel_[1]->GetZonesResetCounter();
+    uint64_t resets = 0;
+    for (size_t i = 0; i < number_of_writers_; i++) {
+      resets += write_channel_[i]->GetZonesResetCounter();
+    }
+    return resets;
   };
   inline std::vector<uint64_t> GetZonesReset() const {
-    return write_channel_[1]->GetZonesReset();
-  };
-  inline std::vector<uint64_t> GetAppendOperations() const {
-    std::vector<uint64_t> resets = write_channel_[0]->GetAppendOperations();
+    std::vector<uint64_t> resets = write_channel_[0]->GetZonesReset();
     for (uint8_t i = 1; i < number_of_writers_; i++) {
-      std::vector<uint64_t> tmp = write_channel_[i]->GetAppendOperations();
+      std::vector<uint64_t> tmp = write_channel_[i]->GetZonesReset();
       std::transform(resets.begin(), resets.end(), tmp.begin(), tmp.begin(),
                      std::plus<uint64_t>());
     }
     return resets;
+  };
+  inline std::vector<uint64_t> GetAppendOperations() const {
+    std::vector<uint64_t> appends = write_channel_[0]->GetAppendOperations();
+    for (uint8_t i = 1; i < number_of_writers_; i++) {
+      std::vector<uint64_t> tmp = write_channel_[i]->GetAppendOperations();
+      std::transform(appends.begin(), appends.end(), tmp.begin(), tmp.begin(),
+                     std::plus<uint64_t>());
+    }
+    return appends;
   }
 
   bool TESTEncodingDecoding() const;
