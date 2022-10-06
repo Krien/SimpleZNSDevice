@@ -57,7 +57,7 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
                                  uint64_t *lbas_, bool alligned) {
   SZDStatus s;
   size_t alligned_size = alligned ? size : write_channel_->allign_size(size);
-  if (!SpaceLeft(alligned_size)) {
+  if (szd_unlikely(!SpaceLeft(alligned_size))) {
     if (lbas_ != nullptr) {
       *lbas_ = 0;
     }
@@ -71,7 +71,7 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
     uint64_t first_phase_size = (max_zone_head_ - new_write_head) * lba_size_;
     s = write_channel_->DirectAppend(&new_write_head, (void *)data,
                                      first_phase_size, alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR(
           "SZD: Circular log: Apppend: Wraparound (end->begin) failed\n");
       return s;
@@ -81,13 +81,13 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
     s = write_channel_->DirectAppend(&new_write_head,
                                      (void *)(data + first_phase_size),
                                      size - first_phase_size, alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Apppend: Wraparound (begin) failed\n");
     }
   } else {
     s = write_channel_->DirectAppend(&new_write_head, (void *)data, size,
                                      alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Apppend: Failed\n");
     }
   }
@@ -108,7 +108,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
                                  size_t size, uint64_t *lbas_, bool alligned) {
   SZDStatus s;
   size_t alligned_size = alligned ? size : write_channel_->allign_size(size);
-  if (!SpaceLeft(alligned_size)) {
+  if (szd_unlikely(!SpaceLeft(alligned_size))) {
     if (lbas_ != nullptr) {
       *lbas_ = 0;
     }
@@ -122,7 +122,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
     uint64_t first_phase_size = (max_zone_head_ - new_write_head) * lba_size_;
     s = write_channel_->FlushBufferSection(&new_write_head, buffer, addr,
                                            first_phase_size);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Append (buffered) wraparound "
                     "(end->begin): Failed\n");
       return s;
@@ -132,7 +132,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
     s = write_channel_->FlushBufferSection(&new_write_head, buffer,
                                            addr + first_phase_size,
                                            size - first_phase_size, alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR(
           "SZD: Circular log: Append (buffered) wraparound (begin): Failed\n");
     }
@@ -154,7 +154,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
 SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
   SZDStatus s;
   size_t size = buffer.GetBufferSize();
-  if (!SpaceLeft(size)) {
+  if (szd_unlikely(!SpaceLeft(size))) {
     if (lbas_ != nullptr) {
       *lbas_ = 0;
     }
@@ -168,7 +168,7 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
     uint64_t first_phase_size = (max_zone_head_ - new_write_head) * lba_size_;
     s = write_channel_->FlushBufferSection(&new_write_head, buffer, 0,
                                            first_phase_size);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Append (buffered) wraparound "
                     "(end->begin): Failed\n");
       return s;
@@ -177,13 +177,13 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
     new_write_head = min_zone_head_;
     s = write_channel_->FlushBufferSection(
         &new_write_head, buffer, first_phase_size, size - first_phase_size);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR(
           "SZD: Circular log: Append (buffered) wraparound (begin): Failed\n");
     }
   } else {
     s = write_channel_->FlushBuffer(&new_write_head, buffer);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Append (buffered): Failed\n");
     }
   }
@@ -201,7 +201,8 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
   uint64_t write_tail_snapshot = write_tail_;
   if (write_head_snapshot >= write_tail_snapshot) {
     // [---------------WTvvvvWH--]
-    if (addr < write_tail_snapshot || addr + lbas > write_head_snapshot) {
+    if (szd_unlikely(addr < write_tail_snapshot ||
+                     addr + lbas > write_head_snapshot)) {
       SZD_LOG_ERROR("SZD: Circular log: Read: addr out of valid centre, %lu "
                     "%lu %lu %lu \n",
                     write_tail_snapshot, addr, addr + lbas,
@@ -210,9 +211,10 @@ bool SZDCircularLog::IsValidReadAddress(const uint64_t addr,
     }
   } else {
     // [vvvvvvvvvvvvvvvvWH---WTvv]
-    if ((addr > write_head_snapshot && addr < write_tail_snapshot) ||
-        (addr + lbas > write_head_snapshot &&
-         addr + lbas < write_tail_snapshot)) {
+    if (szd_unlikely(
+            (addr > write_head_snapshot && addr < write_tail_snapshot) ||
+            (addr + lbas > write_head_snapshot &&
+             addr + lbas < write_tail_snapshot))) {
       SZD_LOG_ERROR("SZD: Circular log: Read: addr in invalid centree, %lu %lu "
                     "%lu %lu \n",
                     write_tail_snapshot, addr, addr + lbas,
@@ -235,7 +237,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
       alligned ? size : read_channel_[reader]->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
   // Ensure data is written
-  if (!IsValidReadAddress(lba, lbas)) {
+  if (szd_unlikely(!IsValidReadAddress(lba, lbas))) {
     SZD_LOG_ERROR("SZD: Circular log: Read: invalid circular log address\n");
     return SZDStatus::InvalidArguments;
   }
@@ -244,7 +246,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, char *data, uint64_t size,
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
     SZDStatus s = read_channel_[reader]->DirectRead(lba, data, first_phase_size,
                                                     alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Read: Error during wraparound\n");
       return s;
     }
@@ -270,7 +272,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
       alligned ? size : read_channel_[reader]->allign_size(size);
   uint64_t lbas = alligned_size / lba_size_;
   // Ensure data is written
-  if (!IsValidReadAddress(lba, lbas)) {
+  if (szd_unlikely(!IsValidReadAddress(lba, lbas))) {
     SZD_LOG_ERROR("SZD: Circular log: Read: Invalid arguments\n");
     return SZDStatus::InvalidArguments;
   }
@@ -279,7 +281,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
     uint64_t first_phase_size = (max_zone_head_ - lba) * lba_size_;
     SZDStatus s = read_channel_[reader]->ReadIntoBuffer(
         lba, buffer, addr, first_phase_size, alligned);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Read wraparound: Failed\n");
       return s;
     }
@@ -299,7 +301,7 @@ SZDStatus SZDCircularLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
 }
 
 SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
-  if (begin_lba != write_tail_ || end_lba < min_zone_head_) {
+  if (szd_unlikely(begin_lba != write_tail_ || end_lba < min_zone_head_)) {
     return SZDStatus::InvalidArguments;
   }
   // We want to force wrap apparently, we do not allow this.
@@ -309,7 +311,7 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
     end_lba = end_lba - min_zone_head_ + max_zone_head_;
   }
   // Manual wrapping. First up to max and then up from start.
-  if (end_lba > max_zone_head_) {
+  if (szd_unlikely(end_lba > max_zone_head_)) {
     SZDStatus s = ConsumeTail(begin_lba, max_zone_head_);
     if (s != SZDStatus::Success) {
       SZD_LOG_ERROR("SZD: Circular log: Consume tail: Internal Error\n");
@@ -322,10 +324,11 @@ SZDStatus SZDCircularLog::ConsumeTail(uint64_t begin_lba, uint64_t end_lba) {
   // Nothing to consume.
   uint64_t write_head_snapshot = write_head_;
   uint64_t write_tail_snapshot = write_tail_;
-  if ((write_tail_snapshot <= write_head_snapshot &&
-       end_lba > write_head_snapshot) ||
-      (write_tail_snapshot > write_head_snapshot &&
-       end_lba > write_head_snapshot && end_lba < write_tail_snapshot)) {
+  if (szd_unlikely((write_tail_snapshot <= write_head_snapshot &&
+                    end_lba > write_head_snapshot) ||
+                   (write_tail_snapshot > write_head_snapshot &&
+                    end_lba > write_head_snapshot &&
+                    end_lba < write_tail_snapshot))) {
     SZD_LOG_ERROR("SZD: Circular log: Consume Tail: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }

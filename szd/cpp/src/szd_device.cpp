@@ -34,6 +34,7 @@ SZDStatus SZDDevice::Init() {
 
 SZDStatus SZDDevice::Reinit() {
   if (initialised_device_ != true) {
+    SZD_LOG_ERROR("SZD: Device: Reinit: Not initialised\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_reinit(manager_));
@@ -45,11 +46,13 @@ SZDStatus SZDDevice::Reinit() {
 
 SZDStatus SZDDevice::Probe(std::vector<DeviceOpenInfo> &info) {
   if (!initialised_device_) {
+    SZD_LOG_ERROR("SZD: Device: Probe: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
   ProbeInformation **prober = new ProbeInformation *;
   SZDStatus s = FromStatus(szd_probe(*manager_, prober));
   if (s != SZDStatus::Success) {
+    SZD_LOG_ERROR("SZD: Device: Probe: Failed probing\n");
     return s;
   }
   for (uint8_t dev = 0; dev < (*prober)->devices; dev++) {
@@ -68,6 +71,7 @@ SZDStatus SZDDevice::Probe(std::vector<DeviceOpenInfo> &info) {
 SZDStatus SZDDevice::Open(const std::string &device_name, uint64_t min_zone,
                           uint64_t max_zone) {
   if (!initialised_device_ || device_opened_) {
+    SZD_LOG_ERROR("SZD: Device: Open: Invalid args/state\n");
     return SZDStatus::InvalidArguments;
   }
   opened_device_.assign(device_name);
@@ -85,6 +89,7 @@ SZDStatus SZDDevice::Open(const std::string &device_name) {
 
 SZDStatus SZDDevice::Close() {
   if (!initialised_device_ || !device_opened_) {
+    SZD_LOG_ERROR("SZD: Device: Close: Nothing to close\n");
     return SZDStatus::InvalidArguments;
   }
   device_opened_ = false;
@@ -93,6 +98,7 @@ SZDStatus SZDDevice::Close() {
 
 SZDStatus SZDDevice::GetInfo(DeviceInfo *info) const {
   if (!device_opened_) {
+    SZD_LOG_ERROR("SZD: Device: GetInfo: Not initialised\n");
     return SZDStatus::InvalidArguments;
   }
   *info = (*manager_)->info;
@@ -101,6 +107,7 @@ SZDStatus SZDDevice::GetInfo(DeviceInfo *info) const {
 
 SZDStatus SZDDevice::Destroy() {
   if (!initialised_device_) {
+    SZD_LOG_ERROR("SZD: Device: Destroy: Not initialised\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_destroy(*manager_));

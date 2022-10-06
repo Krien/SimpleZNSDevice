@@ -56,7 +56,7 @@ SZDOnceLog::~SZDOnceLog() {
 SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
@@ -82,7 +82,7 @@ SZDStatus SZDOnceLog::Append(const std::string string, uint64_t *lbas,
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
@@ -103,7 +103,7 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
   SZDStatus s;
   size_t size = buffer.GetBufferSize();
-  if (!SpaceLeft(size)) {
+  if (szd_unlikely(!SpaceLeft(size))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
@@ -123,7 +123,7 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
 SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
                                   uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
@@ -184,7 +184,8 @@ bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
                            bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
     SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
@@ -193,7 +194,8 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                            bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
     SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
@@ -202,7 +204,8 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
                            size_t size, bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
     SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
@@ -211,14 +214,14 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
 
 SZDStatus SZDOnceLog::ReadAll(std::string &out) {
   size_t size_needed = (GetWriteHead() - GetWriteTail()) * lba_size_;
-  if (size_needed == 0) {
+  if (szd_unlikely(size_needed == 0)) {
     SZD_LOG_ERROR("SZD: Once log: ReadAll: Invalid args\n");
     return SZDStatus::Success;
   }
   char *dat = new char[size_needed + 1];
   SZDStatus s =
       read_channel_->DirectRead(GetWriteTail(), dat, size_needed, true);
-  if (s != SZDStatus::Success) {
+  if (szd_unlikely(s != SZDStatus::Success)) {
     SZD_LOG_ERROR("SZD: Once log: ReadAll: Failed\n");
     return s;
   }
@@ -232,7 +235,7 @@ SZDStatus SZDOnceLog::ResetAll() {
   for (uint64_t slba = min_zone_head_;
        slba < max_zone_head_ && slba < write_head_; slba += zone_cap_) {
     s = read_channel_->ResetZone(slba);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Once log: ResetZone\n");
       return s;
     }
@@ -250,7 +253,7 @@ SZDStatus SZDOnceLog::RecoverPointers() {
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_cap_) {
     s = read_channel_->ZoneHead(slba, &zone_head);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
       return s;
     }

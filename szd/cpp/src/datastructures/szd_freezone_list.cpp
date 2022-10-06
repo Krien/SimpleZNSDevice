@@ -50,7 +50,7 @@ SZDFreeList *lastZoneRegion(SZDFreeList *target) {
 }
 
 void FreeZones(SZDFreeList *target, SZDFreeList **orig) {
-  if (!target->used_) {
+  if (szd_unlikely(!target->used_)) {
     // This, this is highly illegal!
     SZD_LOG_ERROR("SZD: Freezone: double free\n");
     return;
@@ -89,7 +89,7 @@ void FreeZones(SZDFreeList *target, SZDFreeList **orig) {
 }
 
 void AllocZonesFromRegion(SZDFreeList *target, uint64_t zones) {
-  if (target->used_ || target->zones_ < zones) {
+  if (szd_unlikely(target->used_ || target->zones_ < zones)) {
     // Should not happen obviously
     SZD_LOG_ERROR("SZD: Freezone: double alloc\n");
     return;
@@ -215,14 +215,14 @@ char *EncodeFreelist(SZDFreeList *target, uint64_t *size) {
 
 SZDStatus DecodeFreelist(const char *buffer, uint64_t buffer_size,
                          SZDFreeList **target, uint32_t *zones_free) {
-  if (buffer_size < sizeof(uint64_t)) {
+  if (szd_unlikely(buffer_size < sizeof(uint64_t))) {
     SZD_LOG_ERROR("SZD: Freelist: DecodeFreeList: Invalid buffersize\n");
     return SZDStatus::InvalidArguments;
   }
   // Size of original encoded string.
   uint64_t true_size;
   true_size = Decode64(buffer);
-  if (true_size > buffer_size) {
+  if (szd_unlikely(true_size > buffer_size)) {
     SZD_LOG_ERROR("SZD: Freelist: DecodeFreeList: Size mismatch\n");
     return SZDStatus::InvalidArguments;
   }
