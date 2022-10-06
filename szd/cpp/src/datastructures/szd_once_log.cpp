@@ -56,10 +56,11 @@ SZDOnceLog::~SZDOnceLog() {
 SZDStatus SZDOnceLog::Append(const char *data, const size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
+    SZD_LOG_ERROR("SZD: Once log: Append: No space left\n");
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
@@ -81,10 +82,11 @@ SZDStatus SZDOnceLog::Append(const std::string string, uint64_t *lbas,
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                              uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
+    SZD_LOG_ERROR("SZD: Once log: Append: No space left\n");
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
@@ -101,10 +103,11 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
 SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
   SZDStatus s;
   size_t size = buffer.GetBufferSize();
-  if (!SpaceLeft(size)) {
+  if (szd_unlikely(!SpaceLeft(size))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
+    SZD_LOG_ERROR("SZD: Once log: Append: No space left\n");
     return SZDStatus::IOError;
   }
   uint64_t write_head_old = write_head_;
@@ -120,10 +123,11 @@ SZDStatus SZDOnceLog::Append(const SZDBuffer &buffer, uint64_t *lbas) {
 SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
                                   uint64_t *lbas, bool alligned) {
   SZDStatus s;
-  if (!SpaceLeft(size, alligned)) {
+  if (szd_unlikely(!SpaceLeft(size, alligned))) {
     if (lbas != nullptr) {
       *lbas = 0;
     }
+    SZD_LOG_ERROR("SZD: Once log: Async Append: No space left\n");
     return SZDStatus::IOError;
   }
   uint64_t zone_end = (write_head_ / zone_cap_) * zone_cap_ + zone_cap_;
@@ -133,14 +137,9 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
   bool can_do_async = blocks_needed <= zasl_ / lba_size_ &&
                       write_head_ + blocks_needed < zone_end;
   // We need to sync all previous writes first, then do a direct append
-  // printf("checking if sync mode %lu %lu %lu %lu\n", blocks_needed,
-  //        zasl_ / lba_size_, write_head_, zone_end);
-
   // Try to claim a channel
   uint32_t claimed_nr = 0;
   if (!can_do_async) {
-    // printf("Going sync mode %lu %lu %lu %lu %lu\n", blocks_needed,
-    //        zasl_ / lba_size_, write_head_, zone_end, max_zone_head_);
     s = Sync();
     claimed_nr = 0;
     s = write_channel_[0]->DirectAppend(&write_head_, (void *)data, size,
@@ -154,7 +153,6 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
       }
       waiting++;
     }
-    // printf("claimed nr %u %lu \n", claimed_nr, waiting);
     s = write_channel_[0]->AsyncAppend(&write_head_, (void *)data, size,
                                        claimed_nr);
   }
@@ -162,10 +160,8 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
     *lbas = blocks_needed;
   }
   space_left_ -= blocks_needed * lba_size_;
-  // printf("Space left %lu - %lu - %lu\n", write_head_, max_zone_head_,
-  //        space_left_);
   return s;
-} // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
+}
 
 SZDStatus SZDOnceLog::Sync() {
   SZDStatus s = SZDStatus::Success;
@@ -188,7 +184,9 @@ bool SZDOnceLog::IsValidAddress(uint64_t lba, uint64_t lbas) {
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
                            bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
+    SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
   return read_channel_->DirectRead(lba, data, size, alligned);
@@ -196,7 +194,9 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, char *data, uint64_t size,
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
                            bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
+    SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
   return read_channel_->ReadIntoBuffer(lba, buffer, 0, size, alligned);
@@ -204,7 +204,9 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, uint64_t size,
 
 SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
                            size_t size, bool alligned, uint8_t /*reader*/) {
-  if (!IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_)) {
+  if (szd_unlikely(
+          !IsValidAddress(lba, read_channel_->allign_size(size) / lba_size_))) {
+    SZD_LOG_ERROR("SZD: Once log: Read: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
   return read_channel_->ReadIntoBuffer(lba, buffer, addr, size, alligned);
@@ -212,13 +214,15 @@ SZDStatus SZDOnceLog::Read(uint64_t lba, SZDBuffer *buffer, size_t addr,
 
 SZDStatus SZDOnceLog::ReadAll(std::string &out) {
   size_t size_needed = (GetWriteHead() - GetWriteTail()) * lba_size_;
-  if (size_needed == 0) {
+  if (szd_unlikely(size_needed == 0)) {
+    SZD_LOG_ERROR("SZD: Once log: ReadAll: Invalid args\n");
     return SZDStatus::Success;
   }
   char *dat = new char[size_needed + 1];
   SZDStatus s =
       read_channel_->DirectRead(GetWriteTail(), dat, size_needed, true);
-  if (s != SZDStatus::Success) {
+  if (szd_unlikely(s != SZDStatus::Success)) {
+    SZD_LOG_ERROR("SZD: Once log: ReadAll: Failed\n");
     return s;
   }
   out.append(dat, size_needed);
@@ -231,7 +235,8 @@ SZDStatus SZDOnceLog::ResetAll() {
   for (uint64_t slba = min_zone_head_;
        slba < max_zone_head_ && slba < write_head_; slba += zone_cap_) {
     s = read_channel_->ResetZone(slba);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
+      SZD_LOG_ERROR("SZD: Once log: ResetZone\n");
       return s;
     }
   }
@@ -248,7 +253,8 @@ SZDStatus SZDOnceLog::RecoverPointers() {
   for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
        slba += zone_cap_) {
     s = read_channel_->ZoneHead(slba, &zone_head);
-    if (s != SZDStatus::Success) {
+    if (szd_unlikely(s != SZDStatus::Success)) {
+      SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
       return s;
     }
     // head is at last zone that is not empty

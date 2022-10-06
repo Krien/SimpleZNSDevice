@@ -924,6 +924,17 @@ long int szd_spdk_strtol(const char *nptr, int base) {
   return spdk_strtol(nptr, base);
 }
 
+void __szd_error_log(const char *file, const int line, const char *func,
+                     const char *format, ...) {
+  // TODO: cleanup
+  // For now resort to SPDK's internal error printing (not-maintainable)
+  va_list ap;
+
+  va_start(ap, format);
+  spdk_vlog(SPDK_LOG_ERROR, file, line, func, format, ap);
+  va_end(ap);
+}
+
 #ifdef __cplusplus
 }
 } // namespace SimpleZNSDeviceNamespace

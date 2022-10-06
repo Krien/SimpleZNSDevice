@@ -1,3 +1,36 @@
+/*-
+ *   BSD LICENSE
+ *
+ *   Copyright (c) Intel Corporation. All rights reserved.
+ *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
+ *
+ *   Redistribution and use in source and binary forms, with or without
+ *   modification, are permitted provided that the following conditions
+ *   are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided with the
+ *       distribution.
+ *     * Neither the name of Intel Corporation nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ *   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 /** \file
  * Main SZD interface.
  */
@@ -315,6 +348,22 @@ void szd_print_zns_status(int status);
  * helper for strings to unsigned longs.
  */
 long int szd_spdk_strtol(const char *nptr, int base);
+
+#ifdef NDBEUG
+#define SZD_LOG_ERROR(...)                                                     \
+  do {                                                                         \
+  } while (0)
+#else
+#define SZD_LOG_ERROR(...)                                                     \
+  __szd_error_log(__FILE__, __LINE__, __func__, __VA_ARGS__)
+#endif
+
+// Taken directly (renamed) from spdk/likely (no leakage)
+#define szd_unlikely(cond) __builtin_expect((cond), 0)
+#define szd_likely(cond) __builtin_expect(!!(cond), 1)
+
+void __szd_error_log(const char *file, const int line, const char *func,
+                     const char *format, ...);
 
 bool __szd_probe_probe_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
                           t_spdk_nvme_ctrlr_opts *opts);
