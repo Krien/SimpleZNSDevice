@@ -15,6 +15,7 @@ SZDChannelFactory::~SZDChannelFactory() {}
 
 SZDStatus SZDChannelFactory::register_raw_qpair(QPair **qpair) {
   if (channel_count_ >= max_channel_count_ || qpair == nullptr) {
+    SZD_LOG_ERROR("SZD: Channel factory: Too many QPairs\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_create_qpair(device_manager_, qpair));
@@ -38,12 +39,14 @@ SZDStatus SZDChannelFactory::register_channel(SZDChannel **channel,
                                               bool preserve_async_buffer,
                                               uint32_t channel_depth) {
   if (channel_count_ >= max_channel_count_) {
+    SZD_LOG_ERROR("SZD: Channel factory: Too many Channels\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s;
   QPair **qpair = new QPair *;
   if ((s = FromStatus(szd_create_qpair(device_manager_, qpair))) !=
       SZDStatus::Success) {
+    SZD_LOG_ERROR("SZD: Channel factory: Could not create QPair\n");
     return s;
   }
   *channel =

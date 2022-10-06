@@ -76,7 +76,6 @@ uint64_t SZDChannel::TranslateLbaToPba(uint64_t lba) {
   // determine lba by going to actual zone offset and readding offset.
   uint64_t slba = (lba / zone_cap_) * zone_size_;
   uint64_t slba_offset = lba % zone_cap_;
-  // printf("translate lba to pba %lu %lu %lu\n", lba, slba, slba_offset);
   return slba + slba_offset;
 }
 
@@ -84,7 +83,6 @@ uint64_t SZDChannel::TranslatePbaToLba(uint64_t lba) {
   // determine lba by going to fake zone offset and readding offset.
   uint64_t slba = (lba / zone_size_) * zone_cap_;
   uint64_t slba_offset = lba % zone_size_;
-  // printf("translate pba to lba %lu %lu %lu\n", lba, slba, slba_offset);
   return slba + slba_offset;
 }
 
@@ -109,6 +107,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   void *cbuffer;
   SZDStatus s = SZDStatus::Success;
   if ((s = buffer.GetBuffer(&cbuffer)) != SZDStatus::Success) {
+    SZD_LOG_ERROR("SZD: Channel: FlushBufferSection: GetBuffer\n");
     return s;
   }
   // Diag
@@ -116,6 +115,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   // We need two steps because it will not work with one buffer.
   if (alligned_size != size) {
     if (backed_memory_spill_ == nullptr) {
+      SZD_LOG_ERROR("SZD: Channel: FlushBufferSection: No spill buffer\n");
       return SZDStatus::IOError;
     }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
@@ -176,11 +176,13 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   void *cbuffer;
   SZDStatus s = SZDStatus::Success;
   if ((s = buffer->GetBuffer(&cbuffer)) != SZDStatus::Success) {
+    SZD_LOG_ERROR("SZD: Channel: ReadIntoBuffer: GetBuffer\n");
     return s;
   }
   // We need two steps because it will not work with one buffer.
   if (alligned_size != size) {
     if (backed_memory_spill_ == nullptr) {
+      SZD_LOG_ERROR("SZD: Channel: ReadIntoBuffer: No spill buffer\n");
       return SZDStatus::IOError;
     }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
@@ -227,13 +229,13 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
-    printf("Invalid arguments for DirectAppend\n");
+    SZD_LOG_ERROR("SZD: Channel: DirectAppend: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer of ZASL size
   void *dma_buffer = szd_calloc(lba_size_, 1, zasl_);
   if (dma_buffer == nullptr) {
-    printf("No DMA memory left\n");
+    SZD_LOG_ERROR("SZD: Channel: DirectAppend: No DMA buffer\n");
     return SZDStatus::IOError;
   }
   // Write in steps of ZASL
@@ -261,7 +263,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     append_operations_[(new_lba - min_lba_) / zone_size_] += 1;
 
     if (s != SZDStatus::Success) {
-      printf("DirectWrite error \n");
+      SZD_LOG_ERROR("SZD: Channel: DirectAppend: Could not write\n");
       break;
     }
     begin += stepsize;
@@ -286,13 +288,13 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
-    printf("Directread invalid arguments \n");
+    SZD_LOG_ERROR("SZD: Channel: DirectRead: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer to copy other DMA buffer data into.
   void *buffer_dma = szd_calloc(lba_size_, 1, mdts_);
   if (buffer_dma == nullptr) {
-    printf("No DMA memory left for reading\n");
+    SZD_LOG_ERROR("SZD: Channel: DirectRead: OOM\n");
     return SZDStatus::IOError;
   }
   // Read in steps of MDTS
@@ -319,7 +321,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
     if (s == SZDStatus::Success) {
       memcpy((char *)buffer + begin, buffer_dma, alligned_step);
     } else {
-      printf("Error in DirectRead\n");
+      SZD_LOG_ERROR("SZD: Channel: DirectRead: Could not read\n");
       break;
     }
     begin += stepsize;
@@ -349,7 +351,7 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   uint64_t zones_needed =
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (zones_needed > 1) {
-    printf("Invalid arguments for DirectAsyncAppend\n");
+    SZD_LOG_ERROR("SZD: Channel: AsyncAppend: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer and copy normal buffer to DMA.
@@ -365,7 +367,7 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
     memset(async_buffer_[writer], 0, async_buffer_size_[writer]);
   }
   if (async_buffer_[writer] == nullptr) {
-    printf("No DMA memory left\n");
+    SZD_LOG_ERROR("SZD: Channel: AsyncAppend: OOM\n");
     return SZDStatus::IOError;
   }
   memcpy(async_buffer_[writer], buffer, size);
@@ -451,6 +453,7 @@ SZDStatus SZDChannel::Sync() {
     }
     s = FromStatus(szd_poll_async(qpair_, completion_[i]));
     if (s != SZDStatus::Success) {
+      SZD_LOG_ERROR("SZD: Channel: Sync: Failed a poll\n");
       break;
     }
     // Remove temporary buffer.
@@ -467,7 +470,7 @@ SZDStatus SZDChannel::Sync() {
 SZDStatus SZDChannel::ResetZone(uint64_t slba) {
   slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
-    printf("Reset out of range %lu  - %lu -  %lu\n", min_lba_, slba, max_lba_);
+    SZD_LOG_ERROR("SZD: Channel: ResetZone: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_reset(qpair_, slba));
@@ -482,6 +485,7 @@ SZDStatus SZDChannel::ResetAllZones() {
   if (!can_access_all_) {
     for (uint64_t slba = min_lba_; slba != max_lba_; slba += zone_size_) {
       if ((s = FromStatus(szd_reset(qpair_, slba))) != SZDStatus::Success) {
+        SZD_LOG_ERROR("SZD: Channel: ResetAllZones: OOB\n");
         return s;
       }
       zones_reset_counter_.fetch_add(1, std::memory_order_relaxed);
@@ -502,6 +506,7 @@ SZDStatus SZDChannel::ResetAllZones() {
 SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
   slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
+    SZD_LOG_ERROR("SZD: Channel: ZoneHead: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_get_zone_head(qpair_, slba, zone_head));
@@ -512,6 +517,7 @@ SZDStatus SZDChannel::ZoneHead(uint64_t slba, uint64_t *zone_head) {
 SZDStatus SZDChannel::FinishZone(uint64_t slba) {
   slba = TranslateLbaToPba(slba);
   if (slba < min_lba_ || slba > max_lba_) {
+    SZD_LOG_ERROR("SZD: Channel: FinishZone: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = FromStatus(szd_finish_zone(qpair_, slba));

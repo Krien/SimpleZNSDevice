@@ -28,6 +28,7 @@ SZDBuffer::~SZDBuffer() {
 
 SZDStatus SZDBuffer::GetBuffer(void **buffer) const {
   if (backed_memory_ == nullptr) {
+    SZD_LOG_ERROR("SZD: Buffer: GetBuffer: NULL\n");
     return SZDStatus::IOError;
   }
   *buffer = backed_memory_;
@@ -36,6 +37,7 @@ SZDStatus SZDBuffer::GetBuffer(void **buffer) const {
 SZDStatus SZDBuffer::AppendToBuffer(void *data, size_t *write_head,
                                     size_t size) {
   if (*write_head + size > backed_memory_size_) {
+    SZD_LOG_ERROR("SZD: Buffer: AppendToBuffer: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   memmove((char *)backed_memory_ + *write_head, data, size);
@@ -45,6 +47,7 @@ SZDStatus SZDBuffer::AppendToBuffer(void *data, size_t *write_head,
 
 SZDStatus SZDBuffer::WriteToBuffer(void *data, size_t addr, size_t size) {
   if (addr + size > backed_memory_size_) {
+    SZD_LOG_ERROR("SZD: Buffer: WriteToBuffer: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   memmove((char *)backed_memory_ + addr, data, size);
@@ -54,6 +57,7 @@ SZDStatus SZDBuffer::WriteToBuffer(void *data, size_t addr, size_t size) {
 SZDStatus SZDBuffer::ReadFromBuffer(void *data, size_t addr,
                                     size_t size) const {
   if (addr + size > backed_memory_size_) {
+    SZD_LOG_ERROR("SZD: Buffer: ReadFromBuffer: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   memmove(data, (char *)backed_memory_ + addr, size);
@@ -73,12 +77,14 @@ SZDStatus SZDBuffer::ReallocBuffer(uint64_t size) {
   if (backed_memory_size_ > 0) {
     memcpy(tmp, backed_memory_, backed_memory_size_);
     if ((s = FreeBuffer()) != SZDStatus::Success) {
+      SZD_LOG_ERROR("SZD: Buffer: ReallocBuffer: Failed free\n");
       return s;
     }
   }
   backed_memory_ = szd_calloc(lba_size_, alligned_size, sizeof(char));
   if (backed_memory_ == nullptr) {
     backed_memory_size_ = 0;
+    SZD_LOG_ERROR("SZD: Buffer: ReallocBuffer: Failed allocating memory\n");
     return SZDStatus::IOError;
   }
   if (backed_memory_size_ > 0) {

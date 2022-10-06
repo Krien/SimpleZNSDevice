@@ -186,6 +186,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   return AsyncAppend(buffer, size, regions, alligned);
 #endif
   if (writer > number_of_writers_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: Invalid writer\n");
     return SZDStatus::InvalidArguments;
   }
   // Check buffer space
@@ -195,7 +196,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   size_t zones_needed =
       (alligned_size + zone_bytes_ - 1) / zone_cap_ / lba_size_;
   if (zones_needed > zones_left_) {
-    printf("Invalid arguments fragmented log append");
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: No space left\n");
     return SZDStatus::InvalidArguments;
   }
 
@@ -213,7 +214,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
     if (number_of_writers_ > 1) {
       mut_.unlock();
     }
-    printf("Fragmented log freelist reports no space left\n");
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: No space left\n");
     return SZDStatus::Unknown;
   }
   zones_left_ -= zones_needed;
@@ -238,8 +239,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
     s = write_channel_[writer]->DirectAppend(&slba, (void *)(buffer + offset),
                                              bytes_to_write, write_alligned);
     if (s != SZDStatus::Success) {
-      printf("error writing to fragmented zone %lu %lu %lu %u %lu\n", slba,
-             offset, bytes_to_write, write_alligned, size);
+      SZD_LOG_ERROR("SZD: Fragmented log: Append: Invalid append\n");
       return s;
     }
     offset += bytes_to_write;
@@ -249,7 +249,7 @@ SZDFragmentedLog::Append(const char *buffer, size_t size,
   if ((slba / zone_cap_) * zone_cap_ != slba) {
     s = write_channel_[writer]->FinishZone((slba / zone_cap_) * zone_cap_);
     if (s != SZDStatus::Success) {
-      printf("error finishing zone\n");
+      SZD_LOG_ERROR("SZD: Fragmented log: Append: Failed to finish zone\n");
     }
   }
 
@@ -261,12 +261,14 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
                          std::vector<std::pair<uint64_t, uint64_t>> &regions,
                          bool alligned, uint8_t writer) {
   if (writer > number_of_writers_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: Invalid writer\n");
     return SZDStatus::InvalidArguments;
   }
   // Check buffer space
   size_t alligned_size =
       alligned ? size : write_channel_[writer]->allign_size(size);
   if (addr + size > buffer.GetBufferSize()) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: Invalid buffer\n");
     return SZDStatus::InvalidArguments;
   }
 
@@ -274,6 +276,7 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
   size_t zones_needed =
       (alligned_size + zone_bytes_ - 1) / zone_cap_ / lba_size_;
   if (zones_needed > zones_left_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: out of space\n");
     return SZDStatus::InvalidArguments;
   }
 
@@ -286,6 +289,7 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     if (number_of_writers_ > 1) {
       mut_.unlock();
     }
+    SZD_LOG_ERROR("SZD: Fragmented log: Append: Failed allocation\n");
     return SZDStatus::Unknown;
   }
   zones_left_ -= zones_needed;
@@ -309,6 +313,8 @@ SZDFragmentedLog::Append(const SZDBuffer &buffer, size_t addr, size_t size,
     s = write_channel_[writer]->FlushBufferSection(
         &slba, buffer, addr + offset, bytes_to_write, write_alligned);
     if (s != SZDStatus::Success) {
+      SZD_LOG_ERROR(
+          "SZD: Fragmented log: Append: Could not flush buffer section\n");
       return s;
     }
     offset += bytes_to_write;
@@ -325,6 +331,7 @@ SZDStatus SZDFragmentedLog::Read(
     const std::vector<std::pair<uint64_t, uint64_t>> &regions, char *data,
     uint64_t size, bool alligned, uint8_t reader) {
   if (reader > number_of_readers_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Read: Invalid reader\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = SZDStatus::Success;
@@ -338,11 +345,10 @@ SZDStatus SZDFragmentedLog::Read(
     } else {
       size_to_read = region.second * zone_cap_ * lba_size_;
     }
-    // printf("reading %lu %lu %lu\n", region.first * zone_cap_, read,
-    //        size_to_read);
     s = read_channel_[reader]->DirectRead(region.first * zone_cap_, data + read,
                                           size_to_read, alligned_read);
     if (s != SZDStatus::Success) {
+      SZD_LOG_ERROR("SZD: Fragmented log: Read: Failed reading from storage\n");
       return s;
     }
     read += size_to_read;
@@ -354,6 +360,7 @@ SZDStatus
 SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
                         uint8_t writer) {
   if (writer > number_of_writers_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: Reset: Invalid writer\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = SZDStatus::Success;
@@ -364,7 +371,8 @@ SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
     for (uint64_t slba = begin; slba < end; slba += zone_cap_) {
       s = write_channel_[writer]->ResetZone(slba);
       if (s != SZDStatus::Success) {
-        printf("Error resetting fragmented zone at %lu\n", slba);
+        SZD_LOG_ERROR(
+            "SZD: Fragmented log: Reset: Could not reset zone at %lu\n", slba);
         return s;
       }
       zones_left_++;
@@ -384,6 +392,7 @@ SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
 
 SZDStatus SZDFragmentedLog::ResetAll(uint8_t writer) {
   if (writer > number_of_writers_) {
+    SZD_LOG_ERROR("SZD: Fragmented log: ResetAll: Not a valid writer\n");
     return SZDStatus::InvalidArguments;
   }
   SZDStatus s = SZDStatus::Success;
@@ -391,6 +400,7 @@ SZDStatus SZDFragmentedLog::ResetAll(uint8_t writer) {
        slba += zone_cap_) {
     s = write_channel_[writer]->ResetZone(slba);
     if (s != SZDStatus::Success) {
+      SZD_LOG_ERROR("SZD: Fragmented log: ResetAll: Could not reset zone\n");
       return s;
     }
   }

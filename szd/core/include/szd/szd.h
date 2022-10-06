@@ -316,6 +316,19 @@ void szd_print_zns_status(int status);
  */
 long int szd_spdk_strtol(const char *nptr, int base);
 
+#ifdef NDBEUG
+#define SZD_LOG_ERROR(...)  do {} while(0)
+#else
+#define SZD_LOG_ERROR(...)                                                     \
+  __szd_error_log(__FILE__, __LINE__, __func__, __VA_ARGS__)
+#endif
+
+// Taken from spdk/likely (no leakage)
+#define szd_unlikely(cond)	__builtin_expect((cond), 0)
+
+void __szd_error_log(const char *file, const int line, const char *func,
+                     const char *format, ...);
+
 bool __szd_probe_probe_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
                           t_spdk_nvme_ctrlr_opts *opts);
 
