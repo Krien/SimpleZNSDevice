@@ -35,6 +35,8 @@
 #include "szd/szd_status_code.h"
 
 #include <spdk/env.h>
+#include <spdk/likely.h>
+#include <spdk/log.h>
 #include <spdk/nvme.h>
 #include <spdk/nvme_spec.h>
 #include <spdk/nvme_zns.h>
@@ -72,12 +74,21 @@ static char *found_devices[MAX_DEVICE_COUNT];
 static size_t found_devices_len[MAX_DEVICE_COUNT];
 static size_t found_devices_number = 0;
 
+#ifdef NDEBUG
+// When no debugging, we require that no functions will use invalid nulled
+// params.
 #define RETURN_ERR_ON_NULL(x)                                                  \
   do {                                                                         \
-    if ((x) == NULL) {                                                         \
+  } while (0)
+#else
+// TODO: unlikely and do while worth it?
+#define RETURN_ERR_ON_NULL(x)                                                  \
+  do {                                                                         \
+    if (spdk_unlikely((x) == NULL)) {                                          \
       return (SZD_SC_NOT_ALLOCATED);                                           \
     }                                                                          \
   } while (0)
+#endif
 
 int szd_init(DeviceManager **manager, DeviceOptions *options) {
   RETURN_ERR_ON_NULL(options);
@@ -96,7 +107,7 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   RETURN_ERR_ON_NULL((*manager)->g_trid);
   spdk_nvme_trid_populate_transport((*manager)->g_trid,
                                     SPDK_NVME_TRANSPORT_PCIE);
-  if (spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0) {
+  if (spdk_unlikely(spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0)) {
     free(*manager);
     return SZD_SC_SPDK_ERROR_INIT;
   }
@@ -338,8 +349,8 @@ void __szd_probe_attach_cb(void *cb_ctx,
   // Very important lock! We probe concurrently and alter one struct.
   pthread_mutex_lock(prober->mut);
   if (prober->devices >= MAX_DEVICE_COUNT - 1) {
-    printf("At the moment no more than %x devices are supported \n",
-           MAX_DEVICE_COUNT);
+    SPDK_ERRLOG("SZD: At the moment no more than %x devices are supported \n",
+                MAX_DEVICE_COUNT);
   } else {
     prober->traddr[prober->devices] =
         (char *)calloc(strlen(trid->traddr) + 1, sizeof(char));
@@ -441,7 +452,7 @@ void *__reserve_dma(uint64_t size) {
 
 void *szd_calloc(uint64_t __allign, size_t __nmemb, size_t __size) {
   size_t expanded_size = __nmemb * __size;
-  if (expanded_size % __allign != 0 || __allign == 0) {
+  if (spdk_unlikely(expanded_size % __allign != 0 || __allign == 0)) {
     return NULL;
   }
   return spdk_zmalloc(expanded_size, __allign, NULL, SPDK_ENV_SOCKET_ID_ANY,
@@ -481,10 +492,8 @@ void __get_zone_head_complete(void *arg,
 
 #define POLL_QPAIR(qpair, target)                                              \
   do {                                                                         \
-    while (!(target)) {                                                        \
-      spdk_nvme_qpair_process_completions((qpair), 0);                         \
-    }                                                                          \
-  } while (0)
+    spdk_nvme_qpair_process_completions((qpair), 0);                           \
+  } while (!(target))
 
 int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
                        uint64_t *nr_reads) {
@@ -497,7 +506,7 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
   uint64_t slba = (lba / info.zone_size) * info.zone_size;
   uint64_t current_zone_end = slba + info.zone_cap;
   // Oops, let me fix this for you
-  if (lba >= current_zone_end) {
+  if (spdk_unlikely(lba >= current_zone_end)) {
     slba += info.zone_size;
     lba = slba + lba - current_zone_end;
     current_zone_end = slba + info.zone_cap;
@@ -515,8 +524,9 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
   // Otherwise we have an out of range.
   uint64_t number_of_zones_traversed =
       (lbas_to_process + (lba - slba)) / info.zone_cap;
-  if (lba < info.min_lba ||
-      slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
+  if (spdk_unlikely(lba < info.min_lba ||
+                    slba + number_of_zones_traversed * info.zone_size >
+                        info.max_lba)) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
@@ -543,12 +553,12 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
     if (nr_reads != NULL) {
       *nr_reads += 1;
     }
-    if (rc != 0) {
+    if (spdk_unlikely(rc != 0)) {
       return SZD_SC_SPDK_ERROR_READ;
     }
     // Synchronous reads, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
-    if (completion.err != 0) {
+    if (spdk_unlikely(completion.err != 0)) {
       return SZD_SC_SPDK_ERROR_READ;
     }
     lbas_processed += current_step_size;
@@ -578,7 +588,7 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   uint64_t slba = (*lba / info.zone_size) * info.zone_size;
   uint64_t current_zone_end = slba + info.zone_cap;
   // Oops, let me fix this for you
-  if (*lba >= current_zone_end) {
+  if (spdk_unlikely(*lba >= current_zone_end)) {
     slba += info.zone_size;
     *lba = slba + *lba - current_zone_end;
     current_zone_end = slba + info.zone_cap;
@@ -596,9 +606,10 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   // Error if we have an out of range.
   uint64_t number_of_zones_traversed =
       (lbas_to_process + (*lba - slba)) / info.zone_cap;
-  if (*lba < info.min_lba ||
-      slba + number_of_zones_traversed * info.zone_size > info.max_lba) {
-    printf("Out of range append\n");
+  if (spdk_unlikely(*lba < info.min_lba ||
+                    slba + number_of_zones_traversed * info.zone_size >
+                        info.max_lba)) {
+    SPDK_ERRLOG("SZD: Append is out of allowed range\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
 
@@ -626,21 +637,22 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
     if (nr_appends != NULL) {
       *nr_appends += 1;
     }
-    if (rc != 0) {
-      printf("Error creating append request\n");
+    if (spdk_unlikely(rc != 0)) {
+      SPDK_ERRLOG("SZD: Error creating append request\n");
       return SZD_SC_SPDK_ERROR_APPEND;
     }
     // Synchronous write, busy wait.
     POLL_QPAIR(qpair->qpair, completion.done);
-    if (completion.err != 0) {
-      printf("Error during append %x\n", completion.err);
+    if (spdk_unlikely(completion.err != 0)) {
+      SPDK_ERRLOG("SZD: Error during append %x\n", completion.err);
       for (uint64_t slba = info.min_lba; slba != info.max_lba;
            slba += info.zone_size) {
         uint64_t zone_head;
         szd_get_zone_head(qpair, slba, &zone_head);
         if (zone_head != slba && zone_head != slba + info.zone_size)
-          printf("Zone head %lu %lu %lu\n", slba / info.zone_size, zone_head,
-                 slba + info.zone_size);
+          SPDK_ERRLOG(
+              "SZD: Error during append - zone head= [%lu - %lu - %lu]\n",
+              slba / info.zone_size, zone_head, slba + info.zone_size);
       }
       return SZD_SC_SPDK_ERROR_APPEND;
     }
@@ -672,7 +684,7 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   uint64_t slba = (*lba / info.zone_size) * info.zone_size;
   uint64_t current_zone_end = slba + info.zone_cap;
   // Oops, let me fix this for you
-  if (*lba > current_zone_end) {
+  if (spdk_unlikely(*lba > current_zone_end)) {
     slba += info.zone_size;
     *lba = slba + *lba - current_zone_end;
     current_zone_end = slba + info.zone_cap;
@@ -684,10 +696,10 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   // Error if we have an out of range or we cross a zone border.
   uint64_t number_of_zones_traversed =
       (lbas_to_process + (*lba - slba)) / info.zone_cap;
-  if (*lba < info.min_lba || *lba > info.max_lba ||
-      number_of_zones_traversed > 1 ||
-      lbas_to_process > info.zasl / info.lba_size) {
-    printf("Illegal async append\n");
+  if (spdk_unlikely(*lba < info.min_lba || *lba > info.max_lba ||
+                    number_of_zones_traversed > 1 ||
+                    lbas_to_process > info.zasl / info.lba_size)) {
+    SPDK_ERRLOG("SZD: Async append out of range\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
 
@@ -700,8 +712,8 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
   if (nr_appends != NULL) {
     *nr_appends += 1;
   }
-  if (rc != 0) {
-    printf("Error creating append request\n");
+  if (spdk_unlikely(rc != 0)) {
+    SPDK_ERRLOG("SZD: Error creating append request\n");
     return SZD_SC_SPDK_ERROR_APPEND;
   }
   *lba = *lba + lbas_to_process;
@@ -715,8 +727,8 @@ int szd_append_async(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size,
 
 int szd_poll_async(QPair *qpair, Completion *completion) {
   POLL_QPAIR(qpair->qpair, completion->done);
-  if (completion->err != 0) {
-    printf("Error during polling %x\n", completion->err);
+  if (spdk_unlikely(completion->err != 0)) {
+    SPDK_ERRLOG("SZD: Error during polling - code:%x\n", completion->err);
     return SZD_SC_SPDK_ERROR_POLLING;
   }
   return SZD_SC_SUCCESS;
@@ -726,8 +738,8 @@ int szd_poll_once(QPair *qpair, Completion *completion) {
   if (!completion->done) {
     spdk_nvme_qpair_process_completions(qpair->qpair, 0);
   }
-  if (completion->err != 0) {
-    printf("Error during polling once %x\n", completion->err);
+  if (spdk_unlikely(completion->err != 0)) {
+    SPDK_ERRLOG("SZD: Error during polling once - code:%x\n", completion->err);
     return SZD_SC_SPDK_ERROR_POLLING;
   }
   return SZD_SC_SUCCESS;
@@ -741,7 +753,7 @@ int szd_reset(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (slba < info.min_lba || slba >= info.lba_cap) {
+  if (spdk_unlikely(slba < info.min_lba || slba >= info.lba_cap)) {
     return SZD_SC_SPDK_ERROR_READ;
   }
   Completion completion = Completion_default;
@@ -750,13 +762,13 @@ int szd_reset(QPair *qpair, uint64_t slba) {
                                slba,  /* starting LBA of the zone to reset */
                                false, /* don't reset all zones */
                                __reset_zone_complete, &completion);
-  if (rc != 0) {
+  if (spdk_unlikely(rc != 0)) {
     return SZD_SC_SPDK_ERROR_RESET;
   }
   // Busy wait
   POLL_QPAIR(qpair->qpair, completion.done);
-  if (completion.err != 0) {
-    printf("Reset err %x \n", completion.err);
+  if (spdk_unlikely(completion.err != 0)) {
+    SPDK_ERRLOG("SZD: Reset error - code:%x \n", completion.err);
     return SZD_SC_SPDK_ERROR_RESET;
   }
   return rc;
@@ -770,7 +782,7 @@ int szd_reset_all(QPair *qpair) {
   // We can not do full reset, if we only "own" a  part.
   if (info.min_lba > 0 || info.max_lba < info.lba_cap) {
     // What are you doing?
-    if (info.min_lba > info.max_lba) {
+    if (spdk_unlikely(info.min_lba > info.max_lba)) {
       return SZD_SC_SPDK_ERROR_RESET;
     }
     for (uint64_t slba = info.min_lba; slba < info.max_lba;
@@ -785,12 +797,12 @@ int szd_reset_all(QPair *qpair) {
                                   0,    /* starting LBA of the zone to reset */
                                   true, /* reset all zones */
                                   __reset_zone_complete, &completion);
-    if (rc != 0) {
+    if (spdk_unlikely(rc != 0)) {
       return SZD_SC_SPDK_ERROR_RESET;
     }
     // Busy wait
     POLL_QPAIR(qpair->qpair, completion.done);
-    if (completion.err != 0) {
+    if (spdk_unlikely(completion.err != 0)) {
       return SZD_SC_SPDK_ERROR_RESET;
     }
   }
@@ -801,7 +813,7 @@ int szd_finish_zone(QPair *qpair, uint64_t slba) {
   RETURN_ERR_ON_NULL(qpair);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (slba < info.min_lba || slba > info.lba_cap) {
+  if (spdk_unlikely(slba < info.min_lba || slba > info.lba_cap)) {
     return SZD_SC_SPDK_ERROR_FINISH;
   }
   Completion completion = Completion_default;
@@ -810,12 +822,12 @@ int szd_finish_zone(QPair *qpair, uint64_t slba) {
                                 slba,  /* starting LBA of the zone to finish */
                                 false, /* don't finish all zones */
                                 __finish_zone_complete, &completion);
-  if (rc != 0) {
+  if (spdk_unlikely(rc != 0)) {
     return SZD_SC_SPDK_ERROR_FINISH;
   }
   // Busy wait
   POLL_QPAIR(qpair->qpair, completion.done);
-  if (completion.err != 0) {
+  if (spdk_unlikely(completion.err != 0)) {
     return SZD_SC_SPDK_ERROR_FINISH;
   }
   return rc;
@@ -826,7 +838,7 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   RETURN_ERR_ON_NULL(qpair->man);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (slba < info.min_lba || slba > info.max_lba) {
+  if (spdk_unlikely(slba < info.min_lba || slba > info.max_lba)) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
@@ -839,13 +851,13 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
     rc = spdk_nvme_zns_report_zones(
         qpair->man->ns, qpair->qpair, report_buf, report_bufsize, slba,
         SPDK_NVME_ZRA_LIST_ALL, true, __get_zone_head_complete, &completion);
-    if (rc != 0) {
+    if (spdk_unlikely(rc != 0)) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
     // Busy wait for the head.
     POLL_QPAIR(qpair->qpair, completion.done);
-    if (completion.err != 0) {
+    if (spdk_unlikely(completion.err != 0)) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
@@ -855,7 +867,7 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
   struct spdk_nvme_zns_zone_desc *desc =
       (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
   *write_head = desc->wp;
-  if (*write_head < slba) {
+  if (spdk_unlikely(*write_head < slba)) {
     free(report_buf);
     return SZD_SC_SPDK_ERROR_REPORT_ZONES;
   }
@@ -871,7 +883,7 @@ int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {
   RETURN_ERR_ON_NULL(qpair->man);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (slba < info.min_lba || slba > info.max_lba) {
+  if (spdk_unlikely(slba < info.min_lba || slba > info.max_lba)) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
@@ -884,13 +896,13 @@ int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {
     rc = spdk_nvme_zns_report_zones(
         qpair->man->ns, qpair->qpair, report_buf, report_bufsize, slba,
         SPDK_NVME_ZRA_LIST_ALL, true, __get_zone_head_complete, &completion);
-    if (rc != 0) {
+    if (spdk_unlikely(rc != 0)) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
     // Busy wait for the head.
     POLL_QPAIR(qpair->qpair, completion.done);
-    if (completion.err != 0) {
+    if (spdk_unlikely(completion.err != 0)) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
@@ -905,7 +917,7 @@ int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {
 }
 
 void szd_print_zns_status(int status) {
-  printf("SZS STATUS: %s\n", szd_status_code_msg(status));
+  fprintf(stdout, "SZD: status = %s\n", szd_status_code_msg(status));
 }
 
 long int szd_spdk_strtol(const char *nptr, int base) {
