@@ -1,6 +1,6 @@
 # SimpleZNSDevice (SZD)
 SimpleZNSDevice is a simpler wrapper around SPDK that allows developing for ZNS devices without (much) effort.
-It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic that would otherwise be necessary and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [ZNSLSM](https://github.com/Krien/znslsm). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with both C and C++, known as `SZD`, see [./incude/core](./include/core), some simple debugging and utility tools that make use of the interface, see [./tools](tools) and a small C++-only library of extra ZNS-targeted functions and data structures, known as `SZD_extended`, in [./include/cpp](./include/cpp).
+It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic that would otherwise be necessary and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [TropoDB](https://github.com/Krien/TropoDB). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with both C and C++, known as `SZD`, see [./incude/core](./include/core), some simple debugging and utility tools that make use of the interface, see [./tools](tools) and a small C++-only library of extra ZNS-targeted functions and data structures, known as `SZD_extended`, in [./include/cpp](./include/cpp).
 
 # DISCLAIMER
 This code is in early stages of development and prone to change. Use at own risk, for more "risk-involved" information read the rest of this section.
@@ -14,7 +14,7 @@ It can at the moment be used as a:
 # How to use SZD_extended
 SZD_extended wrapps the SZD library in a more C++ like interface. This should make the development smoother and feel less out of place when used in C++. It also comes with a bigger set of functionalities. It has threadsafe QPair abstractions known as `SZDChannels` and various log structures (fitting for ZNS) such as `SZDOnceLog`, `SZDCircularLog` and `SZDFragmentedLog`. It can at the moment be used as a:
 
-* Static library called `szd_extended`. This also comes with C++ functionalities on top of the interface, so do not use with C projects. For examples on how to use this lib, see the tests or [ZNSLSM](https://github.com/Krien/znslsm).
+* Static library called `szd_extended`. This also comes with C++ functionalities on top of the interface, so do not use with C projects. For examples on how to use this lib, see the tests or [TropoDB](https://github.com/Krien/TropoDB).
 
 # How to build
 There are multiple ways to built this project.
