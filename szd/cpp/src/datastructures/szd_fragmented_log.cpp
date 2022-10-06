@@ -361,7 +361,6 @@ SZDFragmentedLog::Reset(std::vector<std::pair<uint64_t, uint64_t>> &regions,
   for (auto region : regions) {
     uint64_t begin = region.first * zone_cap_;
     uint64_t end = begin + region.second * zone_cap_;
-    printf("BEGIN %lu STEP %lu END %lu \n", begin, zone_cap_, end);
     for (uint64_t slba = begin; slba < end; slba += zone_cap_) {
       s = write_channel_[writer]->ResetZone(slba);
       if (s != SZDStatus::Success) {
