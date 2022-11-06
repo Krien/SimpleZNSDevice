@@ -119,7 +119,9 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
     return s;
   }
   // Diag
+#ifdef SZD_PERF_COUNTERS
   uint64_t append_ops = 0;
+#endif
   // We need two steps because it will not work with one buffer.
   if (alligned_size != size) {
     if (szd_unlikely(backed_memory_spill_ == nullptr)) {
@@ -294,12 +296,12 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     }
 #ifdef SZD_PERF_COUNTERS
     uint64_t append_ops = 0;
-    uint64_t prev_lba = new_lba;
     s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer, stepsize,
                                         &append_ops));
     bytes_written_.fetch_add(stepsize, std::memory_order_relaxed);
     append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
+    uint64_t prev_lba = new_lba;
     if ((prev_lba / zone_size_) * zone_size_ !=
         (new_lba / zone_size_) * zone_size_) {
       append_operations_[(prev_lba - min_lba_) / zone_size_] += 1;
