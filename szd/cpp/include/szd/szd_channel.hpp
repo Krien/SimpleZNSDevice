@@ -89,28 +89,16 @@ public:
   uint64_t TranslateLbaToPba(uint64_t lba);
   uint64_t TranslatePbaToLba(uint64_t lba);
 
-  // diagnostics counters
-  uint64_t GetBytesWritten() const {
-    return bytes_written_.load(std::memory_order_relaxed);
-  }
-  uint64_t GetAppendOperationsCounter() const {
-    return append_operations_counter_.load(std::memory_order_relaxed);
-  }
-  uint64_t GetBytesRead() const {
-    return bytes_read_.load(std::memory_order_relaxed);
-  }
-  uint64_t GetReadOperationsCounter() const {
-    return read_operations_.load(std::memory_order_relaxed);
-  }
-  uint64_t GetZonesResetCounter() const {
-    return zones_reset_counter_.load(std::memory_order_relaxed);
-  }
+  // diagnostics counters (will return empty values when disabled)
+  uint64_t GetBytesWritten() const;
+  uint64_t GetAppendOperationsCounter() const;
+  uint64_t GetBytesRead() const;
+  uint64_t GetReadOperationsCounter() const;
+  uint64_t GetZonesResetCounter() const;
 
-  // diagnostics for each zones
-  std::vector<uint64_t> GetZonesReset() const { return zones_reset_; }
-  std::vector<uint64_t> GetAppendOperations() const {
-    return append_operations_;
-  }
+  // diagnostics for each zone
+  std::vector<uint64_t> GetZonesReset() const;
+  std::vector<uint64_t> GetAppendOperations() const;
 
 private:
   QPair *qpair_;
@@ -131,14 +119,18 @@ private:
   bool keep_async_buffer_;
   size_t *async_buffer_size_;
   // diagnostics counters
+#ifdef SZD_PERF_COUNTERS
   std::atomic<uint64_t> bytes_written_;
   std::atomic<uint64_t> append_operations_counter_;
   std::atomic<uint64_t> bytes_read_;
   std::atomic<uint64_t> read_operations_;
   std::atomic<uint64_t> zones_reset_counter_;
+#endif
   // diagnostics for heat zones
+#ifdef SZD_PERF_PER_ZONE_COUNTERS
   std::vector<uint64_t> zones_reset_;
   std::vector<uint64_t> append_operations_;
+#endif
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

@@ -550,9 +550,11 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
                                lba,               /* LBA start */
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
+#ifdef SZD_PERF_COUNTERS
     if (nr_reads != NULL) {
       *nr_reads += 1;
     }
+#endif
     if (spdk_unlikely(rc != 0)) {
       return SZD_SC_SPDK_ERROR_READ;
     }
@@ -634,9 +636,11 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
         (char *)buffer + lbas_processed * info.lba_size, slba, /* LBA start */
         current_step_size, /* number of LBAs */
         __append_complete, &completion, 0);
+#ifdef SZD_PERF_COUNTERS
     if (nr_appends != NULL) {
       *nr_appends += 1;
     }
+#endif
     if (spdk_unlikely(rc != 0)) {
       SPDK_ERRLOG("SZD: Error creating append request\n");
       return SZD_SC_SPDK_ERROR_APPEND;
@@ -709,9 +713,11 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
                                  slba,            /* LBA start */
                                  lbas_to_process, /* number of LBAs */
                                  __append_complete, completion, 0);
+#ifdef SZD_PERF_COUNTERS
   if (nr_appends != NULL) {
     *nr_appends += 1;
   }
+#endif
   if (spdk_unlikely(rc != 0)) {
     SPDK_ERRLOG("SZD: Error creating append request\n");
     return SZD_SC_SPDK_ERROR_APPEND;

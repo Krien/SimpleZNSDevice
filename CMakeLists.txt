@@ -7,10 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 message("compiler is ${CMAKE_CXX_COMPILER_ID} and name is ${CMAKE_CXX_COMPILER}")
 
-set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_LIB_DIR ${CMAKE_SOURCE_DIR}/lib)
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
-set(LIBRARY_OUTPUT_PATH ${CMAKE_LIB_DIR})
+set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/bin")
+set(CMAKE_LIB_DIR "${CMAKE_SOURCE_DIR}/lib")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_LIB_DIR}")
 
 # Default to debug
 if(NOT CMAKE_BUILD_TYPE)
@@ -35,6 +35,26 @@ if (FSANITIZE)
         -fno-sanitize=alignment
     )
     message("fsanitize is turned on")
+endif()
+
+# Perf counters
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+    option(SZD_PERF_COUNTERS "Maintain performance counters" ON)
+    option(SZD_PERF_PER_ZONE_COUNTERS "Maintain per-zone performance counters" ON)
+else()
+    option(SZD_PERF_COUNTERS "Maintain performance counters" OFF)
+    option(SZD_PERF_PER_ZONE_COUNTERS "Maintain per-zone performance counters" OFF)
+endif()
+
+if(SZD_PERF_COUNTERS)
+  add_definitions(-DSZD_PERF_COUNTERS)
+endif()
+if(SZD_PERF_PER_ZONE_COUNTERS)
+  if (SZD_PERF_COUNTERS)
+    add_definitions(-DSZD_PERF_PER_ZONE_COUNTERS)
+  else()
+    message(FATAL_ERROR "You can not enable perf zone counters without enabling perf counterss")
+  endif()
 endif()
 
 # Sets up SPDK
