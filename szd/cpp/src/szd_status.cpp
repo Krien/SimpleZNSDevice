@@ -11,10 +11,27 @@ SZDStatus FromStatus(int status) {
     return SZDStatus::Success;
     break;
   case SZD_SC_NOT_ALLOCATED:
-    return SZDStatus::InvalidArguments;
+    return SZDStatus::NotAllocated;
+    break;
+  case SZD_SC_SPDK_ERROR_INIT:
+  case SZD_SC_SPDK_ERROR_OPEN:
+  case SZD_SC_SPDK_ERROR_CLOSE:
+  case SZD_SC_SPDK_ERROR_PROBE:
+    return SZDStatus::DeviceError;
+    break;
+  case SZD_SC_SPDK_ERROR_APPEND:
+  case SZD_SC_SPDK_ERROR_READ:
+  case SZD_SC_SPDK_ERROR_RESET:
+  case SZD_SC_SPDK_ERROR_REPORT_ZONES:
+  case SZD_SC_SPDK_ERROR_FINISH:
+  case SZD_SC_SPDK_ERROR_POLLING:
+    return SZDStatus::IOError;
+    break;
+  case SZD_SC_SPDK_ERROR_ZCALLOC:
+    return SZDStatus::MemoryError;
     break;
   default:
-    return SZDStatus::IOError;
+    return SZDStatus::Unknown;
     break;
   }
   // -Wreturn-type has no knowledge of switch default??

@@ -45,6 +45,7 @@ SZDCircularLog::~SZDCircularLog() {
 uint64_t SZDCircularLog::wrapped_addr(uint64_t addr) {
   // TODO: Should error
   if (addr < min_zone_head_) {
+    SZD_LOG_ERROR("SZD: Circular log: wrapped_addr OOB\n");
     return 0;
   }
   addr -= min_zone_head_;
@@ -83,17 +84,19 @@ SZDStatus SZDCircularLog::Append(const char *data, const size_t size,
                                      size - first_phase_size, alligned);
     if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Apppend: Wraparound (begin) failed\n");
+      return s;
     }
   } else {
     s = write_channel_->DirectAppend(&new_write_head, (void *)data, size,
                                      alligned);
     if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Apppend: Failed\n");
+      return s;
     }
   }
   space_left_ -= lbas * lba_size_;
   write_head_ = new_write_head; // atomic write
-  if (s == SZDStatus::Success && lbas_ != nullptr) {
+  if (lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;
@@ -135,17 +138,19 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, size_t addr,
     if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR(
           "SZD: Circular log: Append (buffered) wraparound (begin): Failed\n");
+      return s;
     }
   } else {
     s = write_channel_->FlushBufferSection(&new_write_head, buffer, addr, size,
                                            alligned);
     if (s != SZDStatus::Success) {
       SZD_LOG_ERROR("SZD: Circular log: Append (buffered): Failed\n");
+      return s;
     }
   }
   space_left_ -= lbas * lba_size_;
   write_head_ = new_write_head; // atomic write
-  if (s == SZDStatus::Success && lbas_ != nullptr) {
+  if (lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;
@@ -180,16 +185,18 @@ SZDStatus SZDCircularLog::Append(const SZDBuffer &buffer, uint64_t *lbas_) {
     if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR(
           "SZD: Circular log: Append (buffered) wraparound (begin): Failed\n");
+      return s;
     }
   } else {
     s = write_channel_->FlushBuffer(&new_write_head, buffer);
     if (szd_unlikely(s != SZDStatus::Success)) {
       SZD_LOG_ERROR("SZD: Circular log: Append (buffered): Failed\n");
+      return s;
     }
   }
   space_left_ -= lbas * lba_size_;
   write_head_ = new_write_head; // atomic write
-  if (s == SZDStatus::Success && lbas_ != nullptr) {
+  if (lbas_ != nullptr) {
     *lbas_ = lbas;
   }
   return s;

@@ -126,7 +126,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   if (alligned_size != size) {
     if (szd_unlikely(backed_memory_spill_ == nullptr)) {
       SZD_LOG_ERROR("SZD: Channel: FlushBufferSection: No spill buffer\n");
-      return SZDStatus::IOError;
+      return SZDStatus::MemoryError;
     }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
     alligned_size -= lba_size_;
@@ -212,7 +212,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   if (alligned_size != size) {
     if (szd_unlikely(backed_memory_spill_ == nullptr)) {
       SZD_LOG_ERROR("SZD: Channel: ReadIntoBuffer: No spill buffer\n");
-      return SZDStatus::IOError;
+      return SZDStatus::MemoryError;
     }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
     alligned_size -= lba_size_;
@@ -244,7 +244,6 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
       memcpy((char *)cbuffer + addr + alligned_size, backed_memory_spill_,
              postfix_size);
     }
-    return s;
   } else {
 #ifdef SZD_PERF_COUNTERS
     uint64_t read_ops = 0;
@@ -256,8 +255,8 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
     s = FromStatus(
         szd_read(qpair_, lba, (char *)cbuffer + addr, alligned_size));
 #endif
-    return s;
   }
+  return s;
 }
 
 SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
@@ -279,7 +278,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   void *dma_buffer = szd_calloc(lba_size_, 1, zasl_);
   if (szd_unlikely(dma_buffer == nullptr)) {
     SZD_LOG_ERROR("SZD: Channel: DirectAppend: No DMA buffer\n");
-    return SZDStatus::IOError;
+    return SZDStatus::MemoryError;
   }
   // Write in steps of ZASL
   uint64_t begin = 0;
@@ -342,7 +341,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   void *buffer_dma = szd_calloc(lba_size_, 1, mdts_);
   if (szd_unlikely(buffer_dma == nullptr)) {
     SZD_LOG_ERROR("SZD: Channel: DirectRead: OOM\n");
-    return SZDStatus::IOError;
+    return SZDStatus::MemoryError;
   }
   // Read in steps of MDTS
   uint64_t begin = 0;
@@ -420,7 +419,7 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   }
   if (szd_unlikely(async_buffer_[writer] == nullptr)) {
     SZD_LOG_ERROR("SZD: Channel: AsyncAppend: OOM\n");
-    return SZDStatus::IOError;
+    return SZDStatus::MemoryError;
   }
   memcpy(async_buffer_[writer], buffer, size);
   if (completion_[writer] != nullptr) {

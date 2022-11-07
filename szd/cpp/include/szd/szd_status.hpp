@@ -8,7 +8,7 @@
 #include "szd/szd_status_code.h"
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
-enum class SZDStatus { Success, InvalidArguments, IOError, Unknown };
+enum class SZDStatus { Success, InvalidArguments, IOError, DeviceError, MemoryError, NotAllocated, Unknown };
 struct SZDStatusDetailed {
   SZDStatus sc;
   const char *msg;
