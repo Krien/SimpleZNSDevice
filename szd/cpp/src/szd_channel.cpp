@@ -107,6 +107,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   uint64_t zones_needed =
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (szd_unlikely(addr + alligned_size > available_size ||
+                   slba < min_lba_ ||
                    slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     return SZDStatus::InvalidArguments;
@@ -197,6 +198,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
   if (addr + alligned_size > available_size ||
+      slba < min_lba_ ||
       slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
@@ -269,7 +271,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   uint64_t slba = (new_lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(slba + zones_needed * zone_size_ > max_lba_ ||
+  if (szd_unlikely(slba < min_lba_ || slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     SZD_LOG_ERROR("SZD: Channel: DirectAppend: OOB\n");
     return SZDStatus::InvalidArguments;
@@ -332,7 +334,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   uint64_t slba = (lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(slba + zones_needed * zone_size_ > max_lba_ ||
+  if (szd_unlikely(slba < min_lba_ || slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     SZD_LOG_ERROR("SZD: Channel: DirectRead: OOB\n");
     return SZDStatus::InvalidArguments;
