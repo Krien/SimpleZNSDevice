@@ -34,7 +34,7 @@ SZDStatus FromStatus(int status) {
     return SZDStatus::Unknown;
     break;
   }
-  // -Wreturn-type has no knowledge of switch default??
+  // -Wreturn-type has no knowledge of switch default
   return SZDStatus::Unknown;
 }
 

@@ -12,7 +12,7 @@ const char *szd_status_code_msg(int status) {
     return "Succes";
     break;
   case SZD_SC_NOT_ALLOCATED:
-    return "structure not allocated";
+    return "structure not be allocated";
     break;
   case SZD_SC_SPDK_ERROR_INIT:
     return "Could not init SPDK";
@@ -40,6 +40,12 @@ const char *szd_status_code_msg(int status) {
     break;
   case SZD_SC_SPDK_ERROR_QPAIR:
     return "Error when calling the Qpair";
+    break;
+  case SZD_SC_SPDK_ERROR_FINISH:
+    return "Could not finish zone to ZNS device";
+    break;
+  case SZD_SC_SPDK_ERROR_POLLING:
+    return "Error during polling outstanding I/O request";
     break;
   default:
     return "Unknown status";

@@ -108,6 +108,7 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   spdk_nvme_trid_populate_transport((*manager)->g_trid,
                                     SPDK_NVME_TRANSPORT_PCIE);
   if (spdk_unlikely(spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0)) {
+    free((*manager)->g_trid);
     free(*manager);
     return SZD_SC_SPDK_ERROR_INIT;
   }
