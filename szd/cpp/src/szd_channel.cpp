@@ -15,8 +15,9 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
       mdts_(info.mdts), zone_size_(info.zone_size), zone_cap_(info.zone_cap),
       min_lba_(min_lba), max_lba_(max_lba), can_access_all_(false),
       backed_memory_spill_(nullptr), lba_msb_(msb(info.lba_size)),
-      queue_depth_(queue_depth), completion_(nullptr), async_buffer_(nullptr),
-      keep_async_buffer_(keep_async_buffer), async_buffer_size_(0) {
+      queue_depth_(queue_depth), outstanding_requests_(0), completion_(nullptr),
+      async_buffer_(nullptr), keep_async_buffer_(keep_async_buffer),
+      async_buffer_size_(0) {
   assert(min_lba_ <= max_lba_);
   // If true, there is a creeping bug not catched during debug? block all IO.
   if (min_lba_ > max_lba) {
@@ -61,10 +62,19 @@ SZDChannel::SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
                  queue_depth) {}
 
 SZDChannel::~SZDChannel() {
+  if (outstanding_requests_ > 0) {
+    SZD_LOG_ERROR("SZD Channel: channel with outstanding request destroyed");
+  }
+  // WARNING: we do not free completion buffers. You NEED to ensure all requests
+  // completed before a delete. The destructor should not have to poll.
   if (keep_async_buffer_ && async_buffer_ != nullptr) {
     for (uint32_t i = 0; i < queue_depth_; i++) {
       if (async_buffer_[i] != nullptr) {
         szd_free(async_buffer_[i]);
+      }
+      if (completion_[i] != nullptr) {
+        SZD_LOG_ERROR(
+            "SZD Channel: queue %lu with outstanding request destroyed", i);
       }
     }
   }
@@ -98,7 +108,8 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
                                          uint64_t addr, uint64_t size,
                                          bool alligned) {
   // Translate lba
-  uint64_t new_lba = TranslateLbaToPba(*lba);
+  uint64_t old_lba = TranslateLbaToPba(*lba);
+  uint64_t new_lba = old_lba;
   // Allign
   uint64_t alligned_size = alligned ? size : allign_size(size);
   uint64_t available_size = buffer.GetBufferSize();
@@ -106,8 +117,7 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   uint64_t slba = (new_lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(addr + alligned_size > available_size ||
-                   slba < min_lba_ ||
+  if (szd_unlikely(addr + alligned_size > available_size || slba < min_lba_ ||
                    slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     return SZDStatus::InvalidArguments;
@@ -130,20 +140,20 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
       return SZDStatus::MemoryError;
     }
     uint64_t postfix_size = lba_size_ - (alligned_size - size);
-    alligned_size -= lba_size_;
+    uint64_t prefix_size = alligned_size - lba_size_;
     int rc = 0;
-    if (alligned_size > 0) {
+    if (prefix_size > 0) {
 #ifdef SZD_PERF_COUNTERS
       rc = szd_append_with_diag(qpair_, &new_lba, (char *)cbuffer + addr,
-                                alligned_size, &append_ops);
-      bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
+                                prefix_size, &append_ops);
+      bytes_written_.fetch_add(prefix_size, std::memory_order_relaxed);
 #else
-      rc = szd_append(qpair_, &new_lba, (char *)cbuffer + addr, alligned_size);
+      rc = szd_append(qpair_, &new_lba, (char *)cbuffer + addr, prefix_size);
 #endif
     }
     memset((char *)backed_memory_spill_ + postfix_size, 0,
            lba_size_ - postfix_size);
-    memcpy(backed_memory_spill_, (char *)cbuffer + addr + alligned_size,
+    memcpy(backed_memory_spill_, (char *)cbuffer + addr + prefix_size,
            postfix_size);
 #ifdef SZD_PERF_COUNTERS
     rc = rc | szd_append_with_diag(qpair_, &new_lba, backed_memory_spill_,
@@ -169,8 +179,8 @@ SZDStatus SZDChannel::FlushBufferSection(uint64_t *lba, const SZDBuffer &buffer,
   append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   uint64_t left = alligned_size / lba_size_;
-  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
-       slba += zone_size_) {
+  uint64_t step = 0;
+  for (slba = old_lba; left != 0 && slba <= new_lba; slba += step) {
     uint64_t step = left > zone_cap_ ? zone_cap_ : left;
     append_operations_[(slba - min_lba_) / zone_size_] +=
         ((step * lba_size_ + zasl_ - 1) / zasl_);
@@ -197,8 +207,7 @@ SZDStatus SZDChannel::ReadIntoBuffer(uint64_t lba, SZDBuffer *buffer,
   uint64_t slba = (lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (addr + alligned_size > available_size ||
-      slba < min_lba_ ||
+  if (addr + alligned_size > available_size || slba < min_lba_ ||
       slba + zones_needed * zone_size_ > max_lba_ ||
       (alligned && size != allign_size(size))) {
     return SZDStatus::InvalidArguments;
@@ -271,43 +280,50 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   uint64_t slba = (new_lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(slba < min_lba_ || slba + zones_needed * zone_size_ > max_lba_ ||
+  if (szd_unlikely(slba < min_lba_ ||
+                   slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     SZD_LOG_ERROR("SZD: Channel: DirectAppend: OOB\n");
     return SZDStatus::InvalidArguments;
   }
-  // Create temporary DMA buffer of ZASL size
-  void *dma_buffer = szd_calloc(lba_size_, 1, zasl_);
+  // Create temporary DMA buffer of maximum ZASL size
+  size_t dma_buffer_size = zasl_ > alligned_size ? alligned_size : zasl_;
+  void *dma_buffer = szd_calloc(lba_size_, dma_buffer_size, 1);
   if (szd_unlikely(dma_buffer == nullptr)) {
     SZD_LOG_ERROR("SZD: Channel: DirectAppend: No DMA buffer\n");
     return SZDStatus::MemoryError;
   }
   // Write in steps of ZASL
   uint64_t begin = 0;
-  uint64_t stepsize = zasl_;
+  uint64_t stepsize = dma_buffer_size;
   SZDStatus s;
   while (begin < size) {
-    if (begin + zasl_ > alligned_size) {
+    if (begin + dma_buffer_size >= alligned_size) {
       stepsize = alligned_size - begin;
-      memset(dma_buffer, 0, zasl_);
+      memset(dma_buffer, 0, dma_buffer_size);
       memcpy(dma_buffer, (char *)buffer + begin, size - begin);
     } else {
-      stepsize = zasl_;
+      stepsize = dma_buffer_size;
       memcpy(dma_buffer, (char *)buffer + begin, stepsize);
     }
 #ifdef SZD_PERF_COUNTERS
     uint64_t append_ops = 0;
+    uint64_t prev_lba = new_lba;
     s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer, stepsize,
                                         &append_ops));
-    bytes_written_.fetch_add(stepsize, std::memory_order_relaxed);
-    append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
+    if (s == SZDStatus::Success) {
+      bytes_written_.fetch_add(stepsize, std::memory_order_relaxed);
+      append_operations_counter_.fetch_add(append_ops,
+                                           std::memory_order_relaxed);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
-    uint64_t prev_lba = new_lba;
-    if ((prev_lba / zone_size_) * zone_size_ !=
-        (new_lba / zone_size_) * zone_size_) {
-      append_operations_[(prev_lba - min_lba_) / zone_size_] += 1;
+      if ((prev_lba / zone_size_) * zone_size_ !=
+          (new_lba / zone_size_) * zone_size_) {
+        append_operations_[(prev_lba - min_lba_) / zone_size_] += 1;
+      }
+      if (new_lba % zone_size_ != 0 && new_lba < max_lba_) {
+        append_operations_[(new_lba - min_lba_) / zone_size_] += 1;
+      }
     }
-    append_operations_[(new_lba - min_lba_) / zone_size_] += 1;
 #endif
 #else
     s = FromStatus(szd_append(qpair_, &new_lba, dma_buffer, stepsize));
@@ -334,13 +350,15 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   uint64_t slba = (lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
       (lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(slba < min_lba_ || slba + zones_needed * zone_size_ > max_lba_ ||
+  if (szd_unlikely(slba < min_lba_ ||
+                   slba + zones_needed * zone_size_ > max_lba_ ||
                    (alligned && size != allign_size(size)))) {
     SZD_LOG_ERROR("SZD: Channel: DirectRead: OOB\n");
     return SZDStatus::InvalidArguments;
   }
   // Create temporary DMA buffer to copy other DMA buffer data into.
-  void *buffer_dma = szd_calloc(lba_size_, 1, mdts_);
+  size_t dma_buffer_size = mdts_ > alligned_size ? alligned_size : mdts_;
+  void *buffer_dma = szd_calloc(lba_size_, 1, dma_buffer_size);
   if (szd_unlikely(buffer_dma == nullptr)) {
     SZD_LOG_ERROR("SZD: Channel: DirectRead: OOM\n");
     return SZDStatus::MemoryError;
@@ -350,16 +368,17 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   uint64_t lba_to_read = lba;
   slba = (lba_to_read / zone_size_) * zone_size_;
   uint64_t current_zone_end = slba + zone_cap_;
-  uint64_t stepsize = mdts_;
-  uint64_t alligned_step = mdts_;
+  uint64_t stepsize = dma_buffer_size;
+  uint64_t alligned_step = dma_buffer_size;
   SZDStatus s;
   while (begin < size) {
-    if (begin + mdts_ > alligned_size) {
+    if (begin + dma_buffer_size > alligned_size) {
       alligned_step = size - begin;
       stepsize = alligned_size - begin;
     } else {
-      stepsize = mdts_;
-      alligned_step = begin + mdts_ > size ? size - begin : mdts_;
+      stepsize = dma_buffer_size;
+      alligned_step =
+          begin + dma_buffer_size > size ? size - begin : dma_buffer_size;
     }
 #ifdef SZD_PERF_COUNTERS
     uint64_t read_ops = 0;
@@ -391,7 +410,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
 
 SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
                                   const uint64_t size, uint32_t writer) {
-  if (szd_unlikely(writer > queue_depth_)) {
+  if (szd_unlikely(writer >= queue_depth_)) {
     SZD_LOG_ERROR("SZD: Channel: AsyncAppend: Invalid writer\n");
     return SZDStatus::InvalidArguments;
   }
@@ -399,11 +418,16 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   uint64_t new_lba = TranslateLbaToPba(*lba);
   // Allign
   uint64_t alligned_size = allign_size(size);
+  if (alligned_size > zasl_) {
+    SZD_LOG_ERROR("SZD: Channel: AsyncAppend: Writes larger than ZASL not supported\n");
+    return SZDStatus::InvalidArguments; 
+  }
   // Check if in bounds...
   uint64_t slba = (new_lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
-      (new_lba - slba + (alligned_size / lba_size_)) / zone_cap_;
-  if (szd_unlikely(zones_needed > 1)) {
+      (new_lba - slba + (alligned_size / lba_size_) + zone_cap_ - 1) / zone_cap_;
+  if (szd_unlikely(zones_needed > 1 || slba < min_lba_ ||
+                   slba + zones_needed * zone_size_ > max_lba_)) {
     SZD_LOG_ERROR("SZD: Channel: AsyncAppend: OOB\n");
     return SZDStatus::InvalidArguments;
   }
@@ -434,23 +458,26 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   s = FromStatus(szd_append_async_with_diag(
       qpair_, &new_lba, async_buffer_[writer], alligned_size, &append_ops,
       completion_[writer]));
-  // Diag register
-  bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
-  append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
+  if (s == SZDStatus::Success) {
+    // Diag register
+    bytes_written_.fetch_add(alligned_size, std::memory_order_relaxed);
+    append_operations_counter_.fetch_add(append_ops, std::memory_order_relaxed);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
-  uint64_t left = alligned_size / lba_size_;
-  for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
-       slba += zone_size_) {
-    uint64_t step = left > zone_cap_ ? zone_cap_ : left;
-    append_operations_[(slba - min_lba_) / zone_size_] +=
-        ((step * lba_size_ + zasl_ - 1) / zasl_);
-    left -= step;
+    uint64_t left = alligned_size / lba_size_;
+    for (slba = TranslateLbaToPba(*lba); left != 0 && slba <= new_lba;
+         slba += zone_size_) {
+      uint64_t step = left > zone_cap_ ? zone_cap_ : left;
+      append_operations_[(slba - min_lba_) / zone_size_] +=
+          ((step * lba_size_ + zasl_ - 1) / zasl_);
+      left -= step;
+    }
   }
 #endif
 #else
   s = FromStatus(szd_append_async(qpair_, &new_lba, async_buffer_[writer],
                                   alligned_size, completion_[writer]));
 #endif
+  outstanding_requests_++;
 
   *lba = TranslatePbaToLba(new_lba);
   return s;
@@ -472,16 +499,17 @@ bool SZDChannel::PollOnce(uint32_t writer) {
     }
     delete completion_[writer];
     completion_[writer] = nullptr;
+    outstanding_requests_--;
     return true;
   }
   return false;
 }
 
-bool SZDChannel::PollOnce(uint32_t *writer) {
+bool SZDChannel::FindFreeWriter(uint32_t *any_writer) {
   szd_poll_once_raw(qpair_);
   for (uint32_t i = 0; i < queue_depth_; i++) {
     if (completion_[i] == nullptr) {
-      *writer = i;
+      *any_writer = i;
       return true;
     }
     if (completion_[i]->err != 0x0 || completion_[i]->done) {
@@ -492,7 +520,8 @@ bool SZDChannel::PollOnce(uint32_t *writer) {
       }
       delete completion_[i];
       completion_[i] = nullptr;
-      *writer = i;
+      *any_writer = i;
+      outstanding_requests_--;
       return true;
     }
   }
@@ -521,6 +550,7 @@ SZDStatus SZDChannel::Sync() {
     }
     delete completion_[i];
     completion_[i] = nullptr;
+    outstanding_requests_--;
   }
   return s;
 }

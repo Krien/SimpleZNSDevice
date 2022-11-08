@@ -75,9 +75,10 @@ public:
                         uint32_t writer);
   bool PollOnce(uint32_t writer);
   // Pick any writer, if available
-  bool PollOnce(uint32_t *writer);
+  bool FindFreeWriter(uint32_t *any_writer);
   SZDStatus Sync();
   inline uint32_t GetQueueDepth() { return queue_depth_; }
+  inline uint32_t GetOutstandingRequests() { return outstanding_requests_; }
 
   // Management of zones
   SZDStatus ResetZone(uint64_t slba);
@@ -114,6 +115,7 @@ private:
   uint64_t lba_msb_;
   // async IO
   uint32_t queue_depth_;
+  uint32_t outstanding_requests_;
   Completion **completion_;
   void **async_buffer_;
   bool keep_async_buffer_;
