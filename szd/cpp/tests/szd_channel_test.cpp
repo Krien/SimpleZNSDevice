@@ -62,7 +62,8 @@ bool equal_vectors(std::vector<uint64_t> &l, std::vector<uint64_t> &&r) {
   }
   for (size_t i = 0; i < l.size(); i++) {
     if (l[i] != r[i]) {
-      // printf("Vector not equal at %lu, l = %lu and r = %lu\n", i, l[i], r[i]);
+      // printf("Vector not equal at %lu, l = %lu and r = %lu\n", i, l[i],
+      // r[i]);
       return false;
     }
   }
@@ -738,7 +739,7 @@ TEST_F(SZDChannelTest, AsyncTest) {
   diag_bytes_written += 3 * range;
   diag_append_ops += 3;
   appends[0] += 3;
-  
+
   // Ensure that all three request completed with iterative polling
   int sum = 0;
   while (sum < 3) {
@@ -771,7 +772,8 @@ TEST_F(SZDChannelTest, AsyncTest) {
             SZD::SZDStatus::Success);
 
   // We can not write more than ZASL
-  ASSERT_NE(channel->AsyncAppend(&write_head, bufferw.buff_, info.zasl + info.lba_size, 0),
+  ASSERT_NE(channel->AsyncAppend(&write_head, bufferw.buff_,
+                                 info.zasl + info.lba_size, 0),
             SZD::SZDStatus::Success);
 
   // We can not write across borders
@@ -779,21 +781,25 @@ TEST_F(SZDChannelTest, AsyncTest) {
   diag_reset_ops += end_zone - begin_zone;
   resets = std::vector<uint64_t>(end_zone - begin_zone, 2);
   SZDTestUtil::RAIICharBuffer bufferw2((info.zone_cap - 1) * info.lba_size);
-  SZDTestUtil::CreateCyclicPattern(bufferw2.buff_, (info.zone_cap - 1) * info.lba_size, 0);
-  write_head = begin_zone * info.zone_cap;    
-  ASSERT_EQ(channel->DirectAppend(&write_head, bufferw2.buff_, (info.zone_cap - 1) * info.lba_size, true),
-              SZD::SZDStatus::Success);
+  SZDTestUtil::CreateCyclicPattern(bufferw2.buff_,
+                                   (info.zone_cap - 1) * info.lba_size, 0);
+  write_head = begin_zone * info.zone_cap;
+  ASSERT_EQ(channel->DirectAppend(&write_head, bufferw2.buff_,
+                                  (info.zone_cap - 1) * info.lba_size, true),
+            SZD::SZDStatus::Success);
   diag_bytes_written += (info.zone_cap - 1) * info.lba_size;
-  diag_append_ops += expected_steps(
-      begin_zone * info.zone_cap, begin_zone * info.zone_cap + info.zone_cap - 1,
-      info.zone_cap, info.zasl / info.lba_size);
-  expected_heat_distr(begin_zone * info.zone_cap, appends, begin_zone * info.zone_cap,
+  diag_append_ops +=
+      expected_steps(begin_zone * info.zone_cap,
+                     begin_zone * info.zone_cap + info.zone_cap - 1,
+                     info.zone_cap, info.zasl / info.lba_size);
+  expected_heat_distr(begin_zone * info.zone_cap, appends,
+                      begin_zone * info.zone_cap,
                       begin_zone * info.zone_cap + info.zone_cap - 1,
-                      info.zone_cap, info.zasl / info.lba_size);             
+                      info.zone_cap, info.zasl / info.lba_size);
   ASSERT_NE(channel->AsyncAppend(&write_head, bufferw.buff_, range, 0),
-              SZD::SZDStatus::Success);
+            SZD::SZDStatus::Success);
   ASSERT_EQ(channel->AsyncAppend(&write_head, bufferw.buff_, info.lba_size, 0),
-              SZD::SZDStatus::Success);
+            SZD::SZDStatus::Success);
   ASSERT_EQ(channel->Sync(), SZD::SZDStatus::Success);
   diag_bytes_written += info.lba_size;
   diag_append_ops += 1;

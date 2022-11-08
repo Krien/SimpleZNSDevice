@@ -419,13 +419,15 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
   // Allign
   uint64_t alligned_size = allign_size(size);
   if (alligned_size > zasl_) {
-    SZD_LOG_ERROR("SZD: Channel: AsyncAppend: Writes larger than ZASL not supported\n");
-    return SZDStatus::InvalidArguments; 
+    SZD_LOG_ERROR(
+        "SZD: Channel: AsyncAppend: Writes larger than ZASL not supported\n");
+    return SZDStatus::InvalidArguments;
   }
   // Check if in bounds...
   uint64_t slba = (new_lba / zone_size_) * zone_size_;
   uint64_t zones_needed =
-      (new_lba - slba + (alligned_size / lba_size_) + zone_cap_ - 1) / zone_cap_;
+      (new_lba - slba + (alligned_size / lba_size_) + zone_cap_ - 1) /
+      zone_cap_;
   if (szd_unlikely(zones_needed > 1 || slba < min_lba_ ||
                    slba + zones_needed * zone_size_ > max_lba_)) {
     SZD_LOG_ERROR("SZD: Channel: AsyncAppend: OOB\n");
