@@ -19,9 +19,11 @@ endif()
 # Set flags
 set(BUILD_FLAGS -Wall -Wextra -Werror)
 if (CMAKE_BUILD_TYPE MATCHES Debug)
+    message("Building SZD in Debug mode")
     list(APPEND BUILD_FLAGS -g2 -ggdb -O1)
 endif()
 if (CMAKE_BUILD_TYPE MATCHES Release)
+    message("Building SZD in Release mode")
     list(APPEND BUILD_FLAGS -O3)
 endif()
 option(FSANITIZE "Turn on fsanitize" OFF)
@@ -59,13 +61,6 @@ endif()
 
 # Sets up SPDK
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSPDK.cmake")
-link_directories("${SPDK_LIB_DIRS}")
-
-# Only set these vars, when it is included in another CMake. Helps with linking issues.
-if(${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME})
-else()
-    set(SPDK_LIB_DIRS "${SPDK_LIB_DIRS}" PARENT_SCOPE)
-endif()
 
 # Add your files here
 set(szd_core_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include/szd")
