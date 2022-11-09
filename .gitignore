@@ -60,4 +60,3 @@ _deps
 *.sw*
 .vscode
 .DS_Store
-implementation/rocksdb/initialtest
