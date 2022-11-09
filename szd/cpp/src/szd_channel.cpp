@@ -308,7 +308,9 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
     }
 #ifdef SZD_PERF_COUNTERS
     uint64_t append_ops = 0;
+#ifdef SZD_PERF_PER_ZONE_COUNTERS
     uint64_t prev_lba = new_lba;
+#endif
     s = FromStatus(szd_append_with_diag(qpair_, &new_lba, dma_buffer, stepsize,
                                         &append_ops));
     if (s == SZDStatus::Success) {
@@ -323,8 +325,8 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
       if (new_lba % zone_size_ != 0 && new_lba < max_lba_) {
         append_operations_[(new_lba - min_lba_) / zone_size_] += 1;
       }
-    }
 #endif
+    }
 #else
     s = FromStatus(szd_append(qpair_, &new_lba, dma_buffer, stepsize));
 #endif
@@ -473,8 +475,8 @@ SZDStatus SZDChannel::AsyncAppend(uint64_t *lba, void *buffer,
           ((step * lba_size_ + zasl_ - 1) / zasl_);
       left -= step;
     }
-  }
 #endif
+  }
 #else
   s = FromStatus(szd_append_async(qpair_, &new_lba, async_buffer_[writer],
                                   alligned_size, completion_[writer]));

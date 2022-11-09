@@ -216,11 +216,11 @@ TEST_F(SZDTest, MultipleWritersFragmentedLogFragmentingTest) {
 
   // Reset first
   ASSERT_EQ(log.ResetAll(0), SZD::SZDStatus::Success);
-  
+
   uint64_t range = info.lba_size * 2;
   SZDTestUtil::RAIICharBuffer bufferw(range + 1);
   SZDTestUtil::CreateCyclicPattern(bufferw.buff_, range, 0);
-        
+
   // Add some data
   std::vector<std::pair<uint64_t, uint64_t>> regions1, regions2;
   ASSERT_EQ(log.Append(bufferw.buff_, range, regions1, true, 0),
@@ -228,6 +228,5 @@ TEST_F(SZDTest, MultipleWritersFragmentedLogFragmentingTest) {
   ASSERT_EQ(log.Append(bufferw.buff_, range, regions2, true, 1),
             SZD::SZDStatus::Success);
 }
-
 
 } // namespace

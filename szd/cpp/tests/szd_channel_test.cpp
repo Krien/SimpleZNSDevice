@@ -56,7 +56,8 @@ void expected_heat_distr(uint64_t slba, std::vector<uint64_t> &heat,
   }
 }
 
-bool equal_vectors(std::vector<uint64_t> &l, std::vector<uint64_t> &&r) {
+#ifdef SZD_PERF_PER_ZONE_COUNTERS
+bool equal_vectors_diag(std::vector<uint64_t> &l, std::vector<uint64_t> &&r) {
   if (l.size() != r.size()) {
     return false;
   }
@@ -69,6 +70,7 @@ bool equal_vectors(std::vector<uint64_t> &l, std::vector<uint64_t> &&r) {
   }
   return true;
 }
+#endif
 
 TEST_F(SZDChannelTest, AllignmentTest) {
   SZD::SZDDevice dev("AllignmentTest");
@@ -268,9 +270,9 @@ TEST_F(SZDChannelTest, DirectIO) {
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   ASSERT_EQ(std::accumulate(appends.begin(), appends.end(), 0),
             diag_append_ops);
-  ASSERT_EQ(equal_vectors(appends, channel->GetAppendOperations()), true);
+  ASSERT_EQ(equal_vectors_diag(appends, channel->GetAppendOperations()), true);
   ASSERT_EQ(std::accumulate(resets.begin(), resets.end(), 0), diag_reset_ops);
-  ASSERT_EQ(equal_vectors(resets, channel->GetZonesReset()), true);
+  ASSERT_EQ(equal_vectors_diag(resets, channel->GetZonesReset()), true);
 #endif
 #endif
 
@@ -362,9 +364,9 @@ TEST_F(SZDChannelTest, DirectIONonAlligned) {
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   ASSERT_EQ(std::accumulate(appends.begin(), appends.end(), 0),
             diag_append_ops);
-  ASSERT_EQ(equal_vectors(appends, channel->GetAppendOperations()), true);
+  ASSERT_EQ(equal_vectors_diag(appends, channel->GetAppendOperations()), true);
   ASSERT_EQ(std::accumulate(resets.begin(), resets.end(), 0), diag_reset_ops);
-  ASSERT_EQ(equal_vectors(resets, channel->GetZonesReset()), true);
+  ASSERT_EQ(equal_vectors_diag(resets, channel->GetZonesReset()), true);
 #endif
 #endif
 
@@ -487,9 +489,9 @@ TEST_F(SZDChannelTest, BufferIO) {
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   ASSERT_EQ(std::accumulate(appends.begin(), appends.end(), 0),
             diag_append_ops);
-  ASSERT_EQ(equal_vectors(appends, channel->GetAppendOperations()), true);
+  ASSERT_EQ(equal_vectors_diag(appends, channel->GetAppendOperations()), true);
   ASSERT_EQ(std::accumulate(resets.begin(), resets.end(), 0), diag_reset_ops);
-  ASSERT_EQ(equal_vectors(resets, channel->GetZonesReset()), true);
+  ASSERT_EQ(equal_vectors_diag(resets, channel->GetZonesReset()), true);
 #endif
 #endif
 
@@ -507,8 +509,6 @@ TEST_F(SZDChannelTest, ResetZone) {
   uint64_t diag_bytes_written = 0;
   uint64_t diag_append_ops = 0;
   std::vector<uint64_t> appends(end_zone - begin_zone, 0);
-  uint64_t diag_bytes_read = 0;
-  uint64_t diag_read_ops = 0;
   uint64_t diag_reset_ops = 0;
   std::vector<uint64_t> resets(end_zone - begin_zone, 0);
 
@@ -561,15 +561,13 @@ TEST_F(SZDChannelTest, ResetZone) {
 #ifdef SZD_PERF_COUNTERS
   ASSERT_EQ(channel->GetBytesWritten(), diag_bytes_written);
   ASSERT_EQ(channel->GetAppendOperationsCounter(), diag_append_ops);
-  ASSERT_EQ(channel->GetBytesRead(), diag_bytes_read);
-  ASSERT_EQ(channel->GetReadOperationsCounter(), diag_read_ops);
   ASSERT_EQ(channel->GetZonesResetCounter(), diag_reset_ops);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   ASSERT_EQ(std::accumulate(appends.begin(), appends.end(), 0),
             diag_append_ops);
-  ASSERT_EQ(equal_vectors(appends, channel->GetAppendOperations()), true);
+  ASSERT_EQ(equal_vectors_diag(appends, channel->GetAppendOperations()), true);
   ASSERT_EQ(std::accumulate(resets.begin(), resets.end(), 0), diag_reset_ops);
-  ASSERT_EQ(equal_vectors(resets, channel->GetZonesReset()), true);
+  ASSERT_EQ(equal_vectors_diag(resets, channel->GetZonesReset()), true);
 #endif
 #endif
 
@@ -699,8 +697,6 @@ TEST_F(SZDChannelTest, AsyncTest) {
   uint64_t diag_bytes_written = 0;
   uint64_t diag_append_ops = 0;
   std::vector<uint64_t> appends(end_zone - begin_zone, 0);
-  uint64_t diag_bytes_read = 0;
-  uint64_t diag_read_ops = 0;
   std::vector<uint64_t> resets(end_zone - begin_zone, 0);
   uint64_t diag_reset_ops = 0;
 
@@ -809,15 +805,13 @@ TEST_F(SZDChannelTest, AsyncTest) {
 #ifdef SZD_PERF_COUNTERS
   ASSERT_EQ(channel->GetBytesWritten(), diag_bytes_written);
   ASSERT_EQ(channel->GetAppendOperationsCounter(), diag_append_ops);
-  ASSERT_EQ(channel->GetBytesRead(), diag_bytes_read);
-  ASSERT_EQ(channel->GetReadOperationsCounter(), diag_read_ops);
   ASSERT_EQ(channel->GetZonesResetCounter(), diag_reset_ops);
 #ifdef SZD_PERF_PER_ZONE_COUNTERS
   ASSERT_EQ(std::accumulate(appends.begin(), appends.end(), 0),
             diag_append_ops);
-  ASSERT_EQ(equal_vectors(appends, channel->GetAppendOperations()), true);
+  ASSERT_EQ(equal_vectors_diag(appends, channel->GetAppendOperations()), true);
   ASSERT_EQ(std::accumulate(resets.begin(), resets.end(), 0), diag_reset_ops);
-  ASSERT_EQ(equal_vectors(resets, channel->GetZonesReset()), true);
+  ASSERT_EQ(equal_vectors_diag(resets, channel->GetZonesReset()), true);
 #endif
 #endif
 
