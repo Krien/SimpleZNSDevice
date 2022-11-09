@@ -163,7 +163,7 @@ void *worker_thread(void *arg) {
   pthread_exit(NULL);
 }
 
-int main(int argc, char **argv) {
+int main(void) {
   int rc;
   printf("----------------------INIT----------------------\n");
   uint64_t min_zone = 2, max_zone = 10;
@@ -530,9 +530,6 @@ int main(int argc, char **argv) {
 
   free(qpair);
   free(manager);
-  // Werror-unused-parameter
-  (void)argc;
-  (void)argv;
 }
 
 #ifdef __cplusplus

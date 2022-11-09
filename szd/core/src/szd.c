@@ -289,7 +289,9 @@ int szd_open(DeviceManager *manager, const char *traddr,
 
 int szd_close(DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
-  RETURN_ERR_ON_NULL(manager->ctrlr);
+  if (spdk_unlikely(manager->ctrlr == NULL)) {
+    return SZD_SC_NOT_ALLOCATED;
+  }
   int rc = spdk_nvme_detach(manager->ctrlr);
   manager->ctrlr = NULL;
   manager->ns = NULL;
