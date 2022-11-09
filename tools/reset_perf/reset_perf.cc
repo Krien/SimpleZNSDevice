@@ -13,7 +13,7 @@
 
 int main(int argc, char **argv) {
   std::string device_to_use = argc <= 1 ? "" : argv[1];
-  bool fill = argc <= 2 ? false : argv[2] == "1";
+  bool fill = argc <= 2 ? false : std::string(argv[2]) == "1";
 
   // Setup SZD
   SZD::SZDDevice dev("ResetPerfTest");

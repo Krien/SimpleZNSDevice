@@ -13,9 +13,10 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
     : SZDLog(channel_factory, info, min_zone_nr, max_zone_nr),
       number_of_writers_(number_of_writers),
       block_range_((max_zone_nr - min_zone_nr) * info.zone_cap),
-      space_left_(block_range_ * info.lba_size), write_head_(min_zone_head_),
+      space_left_(block_range_ * info.lba_size), write_head_(0),
       zasl_(info.zasl), write_channel_(write_channel),
       write_channels_owned_(false) {
+  write_head_ = min_zone_head_;
   channel_factory_->Ref();
   if (write_channel_ == nullptr) {
     write_channel_ = new SZD::SZDChannel *[number_of_writers_];
@@ -148,7 +149,7 @@ SZDStatus SZDOnceLog::AsyncAppend(const char *data, const size_t size,
     // Spinlock-like, but over all queues one by one each time.
     uint64_t waiting = 0;
     while (true) {
-      if (write_channel_[0]->PollOnce(&claimed_nr)) {
+      if (write_channel_[0]->FindFreeWriter(&claimed_nr)) {
         break;
       }
       waiting++;
@@ -246,6 +247,8 @@ SZDStatus SZDOnceLog::ResetAll() {
   return s;
 }
 
+SZDStatus SZDOnceLog::ResetAllForce() { return read_channel_->ResetAllZones(); }
+
 SZDStatus SZDOnceLog::RecoverPointers() {
   SZDStatus s;
   uint64_t write_head = min_zone_head_;
@@ -273,8 +276,12 @@ SZDStatus SZDOnceLog::RecoverPointers() {
 
 SZDStatus SZDOnceLog::MarkInactive() {
   SZDStatus s = SZDStatus::Success;
-  if ((write_head_ / zone_size_) * zone_size_ != write_head_) {
-    s = read_channel_->FinishZone((write_head_ / zone_size_) * zone_size_);
+  if ((write_head_ / zone_cap_) * zone_cap_ != write_head_) {
+    uint64_t wasted_space =
+        (write_head_ / zone_cap_) * zone_cap_ + zone_cap_ - write_head_;
+    s = read_channel_->FinishZone((write_head_ / zone_cap_) * zone_cap_);
+    space_left_ -= wasted_space * lba_size_;
+    write_head_ += wasted_space;
   }
   return s;
 }

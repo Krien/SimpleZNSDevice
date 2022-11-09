@@ -349,7 +349,7 @@ void szd_print_zns_status(int status);
  */
 long int szd_spdk_strtol(const char *nptr, int base);
 
-#ifdef NDBEUG
+#ifdef NDEBUG
 #define SZD_LOG_ERROR(...)                                                     \
   do {                                                                         \
   } while (0)

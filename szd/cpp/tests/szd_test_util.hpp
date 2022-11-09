@@ -27,4 +27,15 @@ void CreateCyclicPattern(char *arr, size_t range, uint64_t jump) {
   }
 }
 
+struct RAIICharBuffer {
+  RAIICharBuffer(size_t size) {
+    buff_ = (char*)calloc(size, sizeof(char));
+  }
+
+  ~RAIICharBuffer() {
+    free(buff_);
+  }
+
+  char*  buff_; 
+};
 } // namespace SZDTestUtil

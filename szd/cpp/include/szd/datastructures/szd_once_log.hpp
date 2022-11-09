@@ -49,6 +49,7 @@ public:
   SZDStatus ReadAll(std::string &out);
 
   SZDStatus ResetAll() override;
+  SZDStatus ResetAllForce();
   SZDStatus RecoverPointers() override;
   SZDStatus MarkInactive();
 

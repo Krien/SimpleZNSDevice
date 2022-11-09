@@ -108,6 +108,7 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   spdk_nvme_trid_populate_transport((*manager)->g_trid,
                                     SPDK_NVME_TRANSPORT_PCIE);
   if (spdk_unlikely(spdk_env_init(!options->setup_spdk ? NULL : &opts) < 0)) {
+    free((*manager)->g_trid);
     free(*manager);
     return SZD_SC_SPDK_ERROR_INIT;
   }
@@ -288,7 +289,9 @@ int szd_open(DeviceManager *manager, const char *traddr,
 
 int szd_close(DeviceManager *manager) {
   RETURN_ERR_ON_NULL(manager);
-  RETURN_ERR_ON_NULL(manager->ctrlr);
+  if (spdk_unlikely(manager->ctrlr == NULL)) {
+    return SZD_SC_NOT_ALLOCATED;
+  }
   int rc = spdk_nvme_detach(manager->ctrlr);
   manager->ctrlr = NULL;
   manager->ns = NULL;
@@ -550,9 +553,13 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
                                lba,               /* LBA start */
                                current_step_size, /* number of LBAs */
                                __read_complete, &completion, 0);
+#ifdef SZD_PERF_COUNTERS
     if (nr_reads != NULL) {
       *nr_reads += 1;
     }
+#else
+    (void)nr_reads;
+#endif
     if (spdk_unlikely(rc != 0)) {
       return SZD_SC_SPDK_ERROR_READ;
     }
@@ -634,9 +641,13 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
         (char *)buffer + lbas_processed * info.lba_size, slba, /* LBA start */
         current_step_size, /* number of LBAs */
         __append_complete, &completion, 0);
+#ifdef SZD_PERF_COUNTERS
     if (nr_appends != NULL) {
       *nr_appends += 1;
     }
+#else
+    (void)nr_appends;
+#endif
     if (spdk_unlikely(rc != 0)) {
       SPDK_ERRLOG("SZD: Error creating append request\n");
       return SZD_SC_SPDK_ERROR_APPEND;
@@ -709,9 +720,13 @@ int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
                                  slba,            /* LBA start */
                                  lbas_to_process, /* number of LBAs */
                                  __append_complete, completion, 0);
+#ifdef SZD_PERF_COUNTERS
   if (nr_appends != NULL) {
     *nr_appends += 1;
   }
+#else
+  (void)nr_appends;
+#endif
   if (spdk_unlikely(rc != 0)) {
     SPDK_ERRLOG("SZD: Error creating append request\n");
     return SZD_SC_SPDK_ERROR_APPEND;
