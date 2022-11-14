@@ -19,7 +19,6 @@ pkg_search_module(DPDK REQUIRED IMPORTED_TARGET spdk_env_dpdk)
 pkg_search_module(SYS REQUIRED IMPORTED_TARGET spdk_syslibs)
 
 set(SPDK_INCLUDE_DIRS "${SPDK_INCLUDE_DIRS}")
-set(SPDK_LIBRARY_DIRS "${SPDK_LIBRARY_DIRS};${DPDK_LIBRARY_DIRS};${SYS_STATIC_LIBRARY_DIRS}")
 
 # TODO: Solve this once there is one sane CMake for SPDK somewhere
 # The following is what is done in the wiki of SPDK, but does not work as of 2022-11-09.

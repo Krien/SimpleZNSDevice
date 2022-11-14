@@ -24,7 +24,7 @@ TEST_F(SZDTest, OnceLogEphemeralTest) {
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
       dev.GetDeviceManager(), needed_channels_for_once_log);
-  SZD::SZDOnceLog log(factory, info, begin_zone_log, end_zone_log, 1);
+  SZD::SZDOnceLog log(factory, info, begin_zone_log, end_zone_log, 1U);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAllForce(), SZD::SZDStatus::Success);
@@ -113,7 +113,7 @@ TEST_F(SZDTest, OnceLogPersistenceTest) {
 
   // Cleanup first round
   {
-    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1);
+    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
     // We need to reset all data if it is there, as always.
     ASSERT_EQ(log.ResetAllForce(), SZD::SZDStatus::Success);
@@ -130,7 +130,7 @@ TEST_F(SZDTest, OnceLogPersistenceTest) {
   // the pointers still match up after recovery.
   for (uint64_t slba = begin_zone * info.zone_cap;
        slba < end_zone * info.zone_cap - 3; slba += 3) {
-    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1);
+    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
     ASSERT_EQ(log.RecoverPointers(), SZD::SZDStatus::Success);
     ASSERT_EQ(log.GetWriteHead(), slba);
     ASSERT_EQ(log.GetWriteTail(), begin_zone * info.zone_cap);
@@ -142,7 +142,7 @@ TEST_F(SZDTest, OnceLogPersistenceTest) {
   SZD::SZDBuffer buffer((end_zone - begin_zone) * info.zone_cap * info.lba_size,
                         info.lba_size);
   {
-    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1);
+    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
     ASSERT_EQ(log.RecoverPointers(), SZD::SZDStatus::Success);
     ASSERT_EQ(
@@ -169,7 +169,7 @@ TEST_F(SZDTest, OnceLogMarkInactiveTest) {
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
       dev.GetDeviceManager(), needed_channels_for_once_log);
   factory->Ref();
-  SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1);
+  SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAllForce(), SZD::SZDStatus::Success);
@@ -225,7 +225,7 @@ TEST_F(SZDTest, OnceLogReadAllTest) {
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
       dev.GetDeviceManager(), needed_channels_for_once_log);
   factory->Ref();
-  SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1);
+  SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
   // We need to reset all data if it is there, as always.
   ASSERT_EQ(log.ResetAllForce(), SZD::SZDStatus::Success);
@@ -258,9 +258,9 @@ TEST_F(SZDTest, OnceLogAsyncTest) {
       dev.GetDeviceManager(), needed_channels_for_once_log);
   factory->Ref();
   SZD::SZDChannel **channel = new SZD::SZDChannel *[1];
-  factory->register_channel(channel, true, 4);
+  factory->register_channel(&channel[0], true, 4);
   {
-    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1, channel);
+    SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, channel[0]);
     ASSERT_EQ(log.ResetAllForce(), SZD::SZDStatus::Success);
     ASSERT_EQ(log.RecoverPointers(), SZD::SZDStatus::Success);
 
@@ -277,11 +277,10 @@ TEST_F(SZDTest, OnceLogAsyncTest) {
       ASSERT_EQ(log.AsyncAppend(buffw.buff_, range, nullptr, true),
                 SZD::SZDStatus::Success);
     }
-
     // We can sync to ensure persistence
     ASSERT_EQ(log.Sync(), SZD::SZDStatus::Success);
   }
-  factory->unregister_channel(*channel);
+  factory->unregister_channel(channel[0]);
   factory->Unref();
   delete[] channel;
 }

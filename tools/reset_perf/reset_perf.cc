@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   // Logs make writes easier
   if (fill) {
     SZD::SZDOnceLog *log = new SZD::SZDOnceLog(
-        &factory, info, 0, info.max_lba / info.zone_size, 1, &channel);
+        &factory, info, 0, info.max_lba / info.zone_size, channel);
     // Create the write buffer
     size_t range_to_write = info.zasl;
     char fill_buff[range_to_write + 1];
