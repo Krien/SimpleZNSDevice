@@ -18,8 +18,16 @@ SZDOnceLog::SZDOnceLog(SZDChannelFactory *channel_factory,
   channel_factory_->Ref();
   if (std::holds_alternative<SZDChannel *>(channel_definition)) {
     write_channel_ = std::get<SZDChannel *>(channel_definition);
-    max_write_depth_ = write_channel_->GetQueueDepth();
-    write_channels_owned_ = false;
+    if (write_channel_ == nullptr) {
+      SZD_LOG_ERROR("SZD: Once log: Init: using no depth or a channel is UB\n");
+      max_write_depth_ = 1; 
+      channel_factory_->register_channel(&write_channel_, min_zone_nr,
+                                       max_zone_nr, true, max_write_depth_);
+      write_channels_owned_ = true;
+    } else {
+      max_write_depth_ = write_channel_->GetQueueDepth();
+      write_channels_owned_ = false;
+    }
   } else {
     max_write_depth_ = std::get<uint32_t>(channel_definition);
     channel_factory_->register_channel(&write_channel_, min_zone_nr,
