@@ -118,6 +118,7 @@ int szd_init(DeviceManager **manager, DeviceOptions *options) {
   (*manager)->ctrlr = NULL;
   (*manager)->ns = NULL;
   (*manager)->private_ = NULL;
+  SZD_DTRACE_PROBE(szd_init);
   return SZD_SC_SUCCESS;
 }
 
@@ -284,6 +285,7 @@ int szd_open(DeviceManager *manager, const char *traddr,
   DeviceManagerInternal *private_ = (DeviceManagerInternal *)manager->private_;
   manager->info.min_lba = private_->zone_min_ * manager->info.zone_size;
   manager->info.max_lba = private_->zone_max_ * manager->info.zone_size;
+  SZD_DTRACE_PROBE(szd_open);
   return rc;
 }
 
@@ -305,6 +307,7 @@ int szd_close(DeviceManager *manager) {
   if (manager->g_trid != NULL) {
     memset(manager->g_trid, 0, sizeof(*(manager->g_trid)));
   }
+  SZD_DTRACE_PROBE(szd_closed);
   return rc != 0 ? SZD_SC_SPDK_ERROR_CLOSE : SZD_SC_SUCCESS;
 }
 
@@ -320,6 +323,7 @@ int szd_destroy(DeviceManager *manager) {
   }
   free(manager);
   spdk_env_fini();
+  SZD_DTRACE_PROBE(szd_destroy);
   return rc;
 }
 
@@ -437,6 +441,7 @@ int szd_create_qpair(DeviceManager *man, QPair **qpair) {
   (*qpair)->qpair = spdk_nvme_ctrlr_alloc_io_qpair(man->ctrlr, NULL, 0);
   (*qpair)->man = man;
   RETURN_ERR_ON_NULL((*qpair)->qpair);
+  SZD_DTRACE_PROBE(szd_create_qpair);
   return SZD_SC_SUCCESS;
 }
 
@@ -446,6 +451,7 @@ int szd_destroy_qpair(QPair *qpair) {
   spdk_nvme_ctrlr_free_io_qpair(qpair->qpair);
   qpair->man = NULL;
   free(qpair);
+  SZD_DTRACE_PROBE(szd_destroy_qpair);
   return SZD_SC_SUCCESS;
 }
 

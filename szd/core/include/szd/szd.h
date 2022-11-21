@@ -43,6 +43,10 @@
 
 #include <pthread.h>
 
+#ifdef SZD_USDT
+#include <sys/sdt.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #include <cstdint>
@@ -361,6 +365,22 @@ long int szd_spdk_strtol(const char *nptr, int base);
 // Taken directly (renamed) from spdk/likely (no leakage)
 #define szd_unlikely(cond) __builtin_expect((cond), 0)
 #define szd_likely(cond) __builtin_expect(!!(cond), 1)
+
+#ifdef SZD_USDT
+#define SZD_DTRACE_PROBE(name) DTRACE_PROBE(szd, name)
+#define SZD_DTRACE_PROBE1(name, a1) DTRACE_PROBE1(szd, name, a1)
+#define SZD_DTRACE_PROBE2(name, a1, a2) DTRACE_PROBE2(szd, name, a1, a2)
+#else
+#define SZD_DTRACE_PROBE(...)                                                  \
+  do {                                                                         \
+  } while (0)
+#define SZD_DTRACE_PROBE1(...)                                                 \
+  do {                                                                         \
+  } while (0)
+#define SZD_DTRACE_PROBE2(...)                                                 \
+  do {                                                                         \
+  } while (0)
+#endif
 
 void __szd_error_log(const char *file, const int line, const char *func,
                      const char *format, ...);

@@ -120,6 +120,12 @@ function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     )
 endfunction()
 
+# USDT
+option(USE_USDT "Turn on USDT probes (DTRACE)" OFF)
+if (USE_USDT)
+    add_definitions(-DSZD_USDT)
+endif()
+
 # Libraries...
 add_library(szd STATIC
     "${szd_core_include_files}"
