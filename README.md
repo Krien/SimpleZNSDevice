@@ -80,6 +80,14 @@ SZD is the main interface between SPDK and this project. It should be minimalist
 ## SZD_extended
 SZD_extended wraps the interface of Core into a more C++-like interface. It also comes with some extra utilities on top of the interface. Such as some common data structures such as logs. Header files should be created with `.hpp` and stored in `./szd/cpp/include/szd`. Source files should be created with `.cpp` in `./szd/cpp/src`. Tests are created by using [Google Test](https://github.com/google/googletest). 
 
+## Tracing
+It is possible to trace a few calls in SZD. We might add more later, the current ones are mainly for debugging/insight. These are static trace USDT tracepoints. They can be easily found with `grep -r SZD_DTRACE_PROBE ./szd/*`.
+They are disabled by default, but can be enabled with `-DUSE_USDT=1`.
+Then it is as simple as using a tool such as BPFtrace and using scripts such as (with _EXE_ the path to the executable):
+```shell
+bpftrace -e 'usdt:_EXE_:szd_init { printf("Initialised device...\n"); @["Init"] = count(); }'
+```
+
 ## Formatting
 If submitting code, please format the code. This prevents spurious commit changes. We use `clang-format` with the config in `.clang-format`, based on `LLVM`. It is possible to automatically format with make or ninja (depending on what build tool is used). This requires clang-format to be either set in `/home/$USER/bin/clang-format` or requires setting the environmental variable `CLANG_FORMAT_PATH` directly (e.g. `export CLANG_FORMAT_PATH=...`). Then simply run:
 ```bash
