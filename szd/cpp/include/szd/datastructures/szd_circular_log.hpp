@@ -54,8 +54,12 @@ public:
     return alligned_size <= SpaceAvailable();
   }
 
-  inline uint64_t GetWriteHead() const override { return write_head_.load(std::memory_order_acquire); }
-  inline uint64_t GetWriteTail() const override { return write_tail_.load(std::memory_order_acquire); }
+  inline uint64_t GetWriteHead() const override {
+    return write_head_.load(std::memory_order_acquire);
+  }
+  inline uint64_t GetWriteTail() const override {
+    return write_tail_.load(std::memory_order_acquire);
+  }
   inline uint8_t GetNumberOfReaders() const override {
     return number_of_readers_;
   };
