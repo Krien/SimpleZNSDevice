@@ -1,6 +1,6 @@
 # SimpleZNSDevice (SZD)
 SimpleZNSDevice is a simpler wrapper around SPDK that allows developing for ZNS devices without (much) effort.
-It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic that would otherwise be necessary and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [TropoDB](https://github.com/Krien/TropoDB). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with both C and C++, known as `SZD`, see [./incude/core](./include/core), some simple debugging and utility tools that make use of the interface, see [./tools](tools) and a small C++-only library of extra ZNS-targeted functions and data structures, known as `SZD_extended`, in [./include/cpp](./include/cpp).
+It only uses a subset of what is currently possible with SPDK, but it greatly simplifies the logic that would otherwise be necessary and comes with some utility functions. It is mainly developed to be used in an alteration of RocksDB, [TropoDB](https://github.com/Krien/TropoDB). However, since the logic can also be used for other ZNS projects, it got its own repository. The project contains an interface that can be used with both C and C++, known as `SZD`, see [./szd/core/include](./szd/core/include), some simple debugging and utility tools that make use of the interface, see [./tools](tools) and a small C++-only library of extra ZNS-targeted functions and data structures, known as `SZD_extended`, in [./szd/cpp/include](./szd/cpp/include).
 
 # DISCLAIMER
 This code is in early stages of development and prone to change. Use at own risk, for more "risk-involved" information read the rest of this section.
@@ -57,17 +57,6 @@ cmake -j$(nproc) -GNinja .
 mold -run ninja build.ninja clean
 # Actual build, generally only this command needs to be run incrementally during development.
 mold -run ninja build.ninja <TARGET>
-```
-</details>
-
-<details>
-    <summary> What to do about linking errors? </summary>
-
-It is possible that even after the code is compiled without errors, the applications that use this project do not run and complain about missing SPDK libraries. This is at least true for our setup on Qemu.
-This has to do with the "LD_LIBRARY_PATH" not always properly transferring when using sudo. Mold as a linker automatically solved this issue, otherwise the following might work (at your own risk):
-```bash
-export LD_LIBRARY_PATH="LD_LIBRARY_PATH:/<installation_directory_of_spdk>/spdk/dpdk/build/lib"
-alias sudo='sudo PATH="$PATH" HOME="$HOME" LD_LIBRARY_PATH="$LD_LIBRARY_PATH"'
 ```
 </details>
 
