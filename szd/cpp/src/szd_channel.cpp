@@ -622,7 +622,7 @@ SZDStatus SZDChannel::ZoneHeads(uint64_t slba, uint64_t eslba,
                                 std::vector<uint64_t> *zone_heads) {
   slba = TranslateLbaToPba(slba);
   eslba = TranslateLbaToPba(eslba);
-  if (szd_unlikely(slba < min_lba_ || slba > max_lba_ || eslba > max_lba_ ||
+  if (szd_unlikely(slba < min_lba_ || slba >= max_lba_ || eslba >= max_lba_ ||
                    eslba < slba)) {
     SZD_LOG_ERROR("SZD: Channel: ZoneHeads: OOB\n");
     return SZDStatus::InvalidArguments;
@@ -635,6 +635,8 @@ SZDStatus SZDChannel::ZoneHeads(uint64_t slba, uint64_t eslba,
     for (uint64_t i = 0; i < head_size; i++) {
       zone_heads->push_back(TranslatePbaToLba(zone_heads_c[i]));
     }
+  } else {
+    SZD_LOG_ERROR("SZD: Channel: ZoneHeads: error in retrieving\n");
   }
   delete[] zone_heads_c;
   return s;

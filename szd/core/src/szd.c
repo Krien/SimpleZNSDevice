@@ -861,11 +861,11 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
   RETURN_ERR_ON_NULL(qpair->man);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (spdk_unlikely(slba < info.min_lba || slba > info.max_lba ||
-                    eslba < info.min_lba || eslba > info.max_lba ||
+  if (spdk_unlikely(slba < info.min_lba || slba >= info.max_lba ||
+                    eslba < info.min_lba || eslba >= info.max_lba ||
                     slba > eslba || slba % info.zone_size != 0 ||
                     eslba % info.zone_size != 0)) {
-    return SZD_SC_SPDK_ERROR_READ;
+    return SZD_SC_SPDK_ERROR_REPORT_ZONES;
   }
 
   int rc = SZD_SC_SUCCESS;
@@ -892,7 +892,7 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
           : (report_bufsize - zone_report_size) / zone_descriptor_size;
 
   // Get zone heads iteratively
-  while (reported_zones <= zones_to_report) {
+  do {
     memset(report_buf, 0, report_bufsize);
     // Get as much as we can from SPDK
     Completion completion = Completion_default;
@@ -911,6 +911,7 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
     }
 
     // retrieve nr_zones
+    // TODO: This scenario is not tested...
     uint64_t nr_zones = report_buf[0];
     if (nr_zones > max_zones_per_buf || nr_zones == 0) {
       free(report_buf);
@@ -936,7 +937,7 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
       slba += info.zone_size;
       reported_zones++;
     }
-  }
+  } while (reported_zones < zones_to_report);
   free(report_buf);
   return SZD_SC_SUCCESS;
 }
