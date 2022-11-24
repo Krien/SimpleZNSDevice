@@ -192,10 +192,6 @@ if (TESTING)
     list(APPEND szd_all_files "${szd_core_test_dir}/szd_full_path_test.c")
     target_link_libraries(szd_full_path_test PUBLIC szd)
     setup_szd_project_structure(szd_full_path_test)
-    add_test(
-        NAME szd_full_path_test_runner
-        COMMAND szd_full_path_test
-    )
     # Setup GTests
     include(GoogleTest)
     include(FetchContent)
