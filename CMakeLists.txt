@@ -235,7 +235,7 @@ else(DEFINED ENV{CLANG_FORMAT_PATH})
 endif()
 # format (DO NOT GLOB! instead let the formatter glob when necessary)
 add_custom_target(
-    format
+    szd_format
     COMMAND ${CLANG_FORMAT_PATH}
     -i
     "-style=file"
