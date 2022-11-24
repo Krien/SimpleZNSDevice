@@ -854,20 +854,47 @@ int szd_finish_zone(QPair *qpair, uint64_t slba) {
   return rc;
 }
 
-int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
+int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
+                       uint64_t *write_head) {
+  // Inspired by SPDK/nvme/identify.c
   RETURN_ERR_ON_NULL(qpair);
   RETURN_ERR_ON_NULL(qpair->man);
   // Otherwise we have an out of range.
   DeviceInfo info = qpair->man->info;
-  if (spdk_unlikely(slba < info.min_lba || slba > info.max_lba)) {
+  if (spdk_unlikely(slba < info.min_lba || slba > info.max_lba ||
+                    eslba < info.min_lba || eslba > info.max_lba ||
+                    slba > eslba || slba % info.zone_size != 0 ||
+                    eslba % info.zone_size != 0)) {
     return SZD_SC_SPDK_ERROR_READ;
   }
 
   int rc = SZD_SC_SUCCESS;
-  // Get information from a zone.
+
+  // Setup state variables
   size_t report_bufsize = spdk_nvme_ns_get_max_io_xfer_size(qpair->man->ns);
   uint8_t *report_buf = (uint8_t *)calloc(1, report_bufsize);
-  {
+  uint64_t reported_zones = 0;
+  uint64_t zones_to_report = (eslba - slba) / info.zone_size;
+
+  // Setup logical variables
+  const struct spdk_nvme_ns_data *nsdata =
+      spdk_nvme_ns_get_data(qpair->man->ns);
+  const struct spdk_nvme_zns_ns_data *nsdata_zns =
+      spdk_nvme_zns_ns_get_data(qpair->man->ns);
+  uint64_t zone_report_size = sizeof(struct spdk_nvme_zns_zone_report);
+  uint64_t zone_descriptor_size = sizeof(struct spdk_nvme_zns_zone_desc);
+  uint64_t zns_descriptor_size =
+      nsdata_zns->lbafe[nsdata->flbas.format].zdes * 64;
+  uint64_t max_zones_per_buf =
+      zns_descriptor_size
+          ? (report_bufsize - zone_report_size) /
+                (zone_descriptor_size + zns_descriptor_size)
+          : (report_bufsize - zone_report_size) / zone_descriptor_size;
+
+  // Get zone heads iteratively
+  while (reported_zones <= zones_to_report) {
+    memset(report_buf, 0, report_bufsize);
+    // Get as much as we can from SPDK
     Completion completion = Completion_default;
     rc = spdk_nvme_zns_report_zones(
         qpair->man->ns, qpair->qpair, report_buf, report_bufsize, slba,
@@ -882,21 +909,40 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
     }
-  }
-  // Retrieve write head from zone information.
-  uint32_t zd_index = sizeof(struct spdk_nvme_zns_zone_report);
-  struct spdk_nvme_zns_zone_desc *desc =
-      (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
-  *write_head = desc->wp;
-  if (spdk_unlikely(*write_head < slba)) {
-    free(report_buf);
-    return SZD_SC_SPDK_ERROR_REPORT_ZONES;
-  }
-  if (*write_head > slba + desc->zcap) {
-    *write_head = slba + info.zone_size;
+
+    // retrieve nr_zones
+    uint64_t nr_zones = report_buf[0];
+    if (nr_zones > max_zones_per_buf || nr_zones == 0) {
+      free(report_buf);
+      return SZD_SC_SPDK_ERROR_REPORT_ZONES;
+    }
+
+    // Retrieve write heads from zone information.
+    for (uint64_t i = 0; i < nr_zones && reported_zones <= zones_to_report;
+         i++) {
+      uint32_t zd_index =
+          zone_report_size + i * (zone_descriptor_size + zns_descriptor_size);
+      struct spdk_nvme_zns_zone_desc *desc =
+          (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
+      write_head[reported_zones] = desc->wp;
+      if (spdk_unlikely(write_head[reported_zones] < slba)) {
+        free(report_buf);
+        return SZD_SC_SPDK_ERROR_REPORT_ZONES;
+      }
+      if (write_head[reported_zones] > slba + desc->zcap) {
+        write_head[reported_zones] = slba + info.zone_size;
+      }
+      // progress
+      slba += info.zone_size;
+      reported_zones++;
+    }
   }
   free(report_buf);
   return SZD_SC_SUCCESS;
+}
+
+int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head) {
+  return szd_get_zone_heads(qpair, slba, slba, write_head);
 }
 
 int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap) {

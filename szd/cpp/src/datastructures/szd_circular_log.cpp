@@ -397,18 +397,26 @@ void SZDCircularLog::RecalculateSpaceLeft() {
 
 SZDStatus SZDCircularLog::RecoverPointers() {
   SZDStatus s;
+
+  // Retrieve zone heads from the device
+  std::vector<uint64_t> zone_heads;
+  s = reset_channel_->ZoneHeads(min_zone_head_, max_zone_head_, &zone_heads);
+  if (szd_unlikely(s != SZDStatus::Success)) {
+    SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
+    return s;
+  }
+  if (zone_heads.size() !=
+      ((max_zone_head_ - min_zone_head_) / zone_cap_) + 1) {
+    SZD_LOG_ERROR("SZD: Once log: ZoneHeads did not return all heads\n");
+    return SZDStatus::Unknown;
+  }
+
   uint64_t log_tail = min_zone_head_, log_head = min_zone_head_;
   // Scan for tail
   uint64_t slba;
   uint64_t zone_head = min_zone_head_, old_zone_head = min_zone_head_;
   for (slba = min_zone_head_; slba < max_zone_head_; slba += zone_cap_) {
-    if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
-        SZDStatus::Success) {
-      SZD_LOG_ERROR(
-          "SZD: Circular log: Failed recovering zone heads - step 1\n");
-
-      return s;
-    }
+    zone_head = zone_heads[(slba - min_zone_head_) / zone_cap_];
     old_zone_head = zone_head;
     // tail is at first zone that is not empty
     if (zone_head > slba) {
@@ -420,12 +428,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   }
   // Scan for head
   for (; slba < max_zone_head_; slba += zone_cap_) {
-    if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
-        SZDStatus::Success) {
-      SZD_LOG_ERROR(
-          "SZD: Circular log: Failed recovering zone heads - step 2\n");
-      return s;
-    }
+    zone_head = zone_heads[(slba - min_zone_head_) / zone_cap_];
     // The first zone with a head more than 0 and less than max_zone, holds the
     // head of the manifest.
     if (zone_head > slba && zone_head < slba + zone_cap_) {
@@ -444,13 +447,7 @@ SZDStatus SZDCircularLog::RecoverPointers() {
   // start AFTER head.
   if (log_head > min_zone_head_ && log_tail == min_zone_head_) {
     for (slba += zone_cap_; slba < max_zone_head_; slba += zone_cap_) {
-      if ((s = reset_channel_->ZoneHead(slba, &zone_head)) !=
-          SZDStatus::Success) {
-        SZD_LOG_ERROR(
-            "SZD: Circular log: Failed recovering zone heads - step 3\n");
-
-        return s;
-      }
+      zone_head = zone_heads[(slba - min_zone_head_) / zone_cap_];
       if (zone_head > slba) {
         log_tail = slba;
         break;

@@ -255,15 +255,25 @@ SZDStatus SZDOnceLog::ResetAllForce() {
 
 SZDStatus SZDOnceLog::RecoverPointers() {
   SZDStatus s;
+
+  // Retrieve zone heads from the device
+  std::vector<uint64_t> zone_heads;
+  s = read_reset_channel_->ZoneHeads(min_zone_head_, max_zone_head_,
+                                     &zone_heads);
+  if (szd_unlikely(s != SZDStatus::Success)) {
+    SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
+    return s;
+  }
+  if (zone_heads.size() !=
+      ((max_zone_head_ - min_zone_head_) / zone_cap_) + 1) {
+    SZD_LOG_ERROR("SZD: Once log: ZoneHeads did not return all heads\n");
+    return SZDStatus::Unknown;
+  }
+
+  // Set pointers according to returned zoneheads
   uint64_t write_head = min_zone_head_;
-  uint64_t zone_head = min_zone_head_;
-  for (uint64_t slba = min_zone_head_; slba < max_zone_head_;
-       slba += zone_cap_) {
-    s = read_reset_channel_->ZoneHead(slba, &zone_head);
-    if (szd_unlikely(s != SZDStatus::Success)) {
-      SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
-      return s;
-    }
+  uint64_t slba = min_zone_head_;
+  for (auto &zone_head : zone_heads) {
     // head is at last zone that is not empty
     if (zone_head > slba) {
       write_head = zone_head;
@@ -272,6 +282,7 @@ SZDStatus SZDOnceLog::RecoverPointers() {
     if (zone_head == slba) {
       break;
     }
+    slba += zone_cap_;
   }
   write_head_ = write_head;
   space_left_ = (max_zone_head_ - write_head_) * lba_size_;

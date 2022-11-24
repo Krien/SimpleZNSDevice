@@ -84,6 +84,8 @@ public:
   SZDStatus ResetZone(uint64_t slba);
   SZDStatus ResetAllZones();
   SZDStatus ZoneHead(uint64_t slba, uint64_t *zone_head);
+  SZDStatus ZoneHeads(uint64_t slba, uint64_t eslba,
+                      std::vector<uint64_t> *zone_heads);
   SZDStatus FinishZone(uint64_t slba);
 
   // Used to aid with the fact that zonecap != zonesize

@@ -336,6 +336,20 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head);
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to get the write head
  * from.
+ * @param eslba end logical block address of zone to get the write head
+ * from. Must still be the beginning of the zone can be equal to slba.
+ * @param write_head pointer to store the write heads in. Must be allocated
+ * before and must have at least (eslba - slba + 1) / zone_size.
+ */
+int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
+                       uint64_t *write_head);
+
+/**
+ * @brief Gets the write head of a zone synchronously as a logical block
+ * address (lba).
+ * @param qpair channel to use for I/O
+ * @param slba starting logical block address of zone to get the write head
+ * from.
  * @param zone_cap capacity of a zone.
  */
 int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap);
