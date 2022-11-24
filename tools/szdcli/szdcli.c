@@ -465,21 +465,25 @@ int parse_zones_zns(int argc, char **argv, CliContext *cli_context) {
   // Run command
   printf("Info: Printing zone writeheads for device %s:\n",
          cli_context->target_trid);
-  uint64_t zone_head;
-  for (uint64_t i = 0; i < info.lba_cap; i += info.zone_size) {
-    if ((szd_rc = szd_get_zone_head(*qpair, i, &zone_head))) {
-      fprintf(stderr, "Zones request: Error during getting zonehead %d\n",
-              szd_rc);
-      szd_destroy_qpair(*qpair);
-      free(qpair);
-      return ERROR_STATE;
-    }
-    printf("\tslba:%6lu - wp:%6lu - %lu/%lu\n", i, zone_head, zone_head - i,
-           info.zone_size);
+  uint64_t nzone_heads =
+      (info.lba_cap - info.zone_size - info.min_lba) / info.zone_size;
+  uint64_t *zone_heads = (uint64_t *)calloc(sizeof(uint64_t), nzone_heads + 1);
+  if ((szd_rc = szd_get_zone_heads(
+           *qpair, info.min_lba, info.max_lba - info.zone_size, zone_heads))) {
+    fprintf(stderr, "Zones request: Error during getting zonehead %d\n",
+            szd_rc);
+    szd_destroy_qpair(*qpair);
+    free(qpair);
+    free(zone_heads);
+    return ERROR_STATE;
   }
-
+  for (uint64_t i = 0; i < nzone_heads; i++) {
+    printf("\tslba:%6lu - wp:%6lu - %lu/%lu\n", i, zone_heads[i],
+           zone_heads[i] - (info.min_lba + i * info.zone_size), info.zone_size);
+  }
   szd_destroy_qpair(*qpair);
   free(qpair);
+  free(zone_heads);
   return 0;
 }
 

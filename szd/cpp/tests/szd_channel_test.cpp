@@ -818,4 +818,30 @@ TEST_F(SZDChannelTest, AsyncTest) {
   factory.unregister_channel(channel);
 }
 
+TEST_F(SZDChannelTest, MaxZoneHeads) {
+  SZD::SZDDevice dev("MaxZoneHeads");
+  SZD::DeviceInfo info;
+  SZDTestUtil::SZDSetupDevice(0, 0, &dev, &info);
+  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannel *channel;
+  factory.register_channel(&channel);
+
+  // Have to reset device for a clean state
+  ASSERT_EQ(channel->ResetAllZones(), SZD::SZDStatus::Success);
+
+  std::vector<uint64_t> zone_heads;
+  ASSERT_EQ(channel->ZoneHeads(
+                channel->TranslatePbaToLba(info.min_lba),
+                channel->TranslatePbaToLba(info.max_lba - info.zone_size),
+                &zone_heads),
+            SZD::SZDStatus::Success);
+  uint64_t slba = channel->TranslatePbaToLba(info.min_lba);
+  for (auto zone_head : zone_heads) {
+    ASSERT_EQ(slba, zone_head);
+    slba += info.zone_cap;
+  }
+
+  factory.unregister_channel(channel);
+}
+
 } // namespace
