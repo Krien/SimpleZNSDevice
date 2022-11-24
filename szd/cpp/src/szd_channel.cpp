@@ -296,7 +296,7 @@ SZDStatus SZDChannel::DirectAppend(uint64_t *lba, void *buffer,
   // Write in steps of ZASL
   uint64_t begin = 0;
   uint64_t stepsize = dma_buffer_size;
-  SZDStatus s;
+  SZDStatus s = SZDStatus::Success;
   while (begin < size) {
     if (begin + dma_buffer_size >= alligned_size) {
       stepsize = alligned_size - begin;
@@ -372,7 +372,7 @@ SZDStatus SZDChannel::DirectRead(uint64_t lba, void *buffer, uint64_t size,
   uint64_t current_zone_end = slba + zone_cap_;
   uint64_t stepsize = dma_buffer_size;
   uint64_t alligned_step = dma_buffer_size;
-  SZDStatus s;
+  SZDStatus s = SZDStatus::Success;
   while (begin < size) {
     if (begin + dma_buffer_size > alligned_size) {
       alligned_step = size - begin;
