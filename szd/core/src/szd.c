@@ -875,6 +875,7 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
   uint8_t *report_buf = (uint8_t *)calloc(1, report_bufsize);
   uint64_t reported_zones = 0;
   uint64_t zones_to_report = (eslba - slba) / info.zone_size;
+  struct spdk_nvme_zns_zone_report *zns_report;
 
   // Setup logical variables
   const struct spdk_nvme_ns_data *nsdata =
@@ -911,8 +912,8 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
     }
 
     // retrieve nr_zones
-    // TODO: This scenario is not tested...
-    uint64_t nr_zones = report_buf[0];
+    zns_report = (struct spdk_nvme_zns_zone_report *)report_buf;
+    uint64_t nr_zones = zns_report->nr_zones;
     if (nr_zones > max_zones_per_buf || nr_zones == 0) {
       free(report_buf);
       return SZD_SC_SPDK_ERROR_REPORT_ZONES;
@@ -921,10 +922,7 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
     // Retrieve write heads from zone information.
     for (uint64_t i = 0; i < nr_zones && reported_zones <= zones_to_report;
          i++) {
-      uint32_t zd_index =
-          zone_report_size + i * (zone_descriptor_size + zns_descriptor_size);
-      struct spdk_nvme_zns_zone_desc *desc =
-          (struct spdk_nvme_zns_zone_desc *)(report_buf + zd_index);
+      struct spdk_nvme_zns_zone_desc *desc = &zns_report->descs[i];
       write_head[reported_zones] = desc->wp;
       if (spdk_unlikely(write_head[reported_zones] < slba)) {
         free(report_buf);
