@@ -28,12 +28,12 @@ if (CMAKE_BUILD_TYPE MATCHES Release)
 endif()
 option(FSANITIZE "Turn on fsanitize" OFF)
 if (FSANITIZE)
-    list(APPEND BUILD_FLAGS 
+    list(APPEND BUILD_FLAGS
         -fsanitize=address #ASAN
         -fsanitize=undefined  #UBSAN
-        -fsanitize=float-divide-by-zero 
-        -fsanitize=float-cast-overflow  
-        -fno-sanitize-recover=all 
+        -fsanitize=float-divide-by-zero
+        -fsanitize=float-cast-overflow
+        -fno-sanitize-recover=all
         -fno-sanitize=alignment
     )
     message("fsanitize is turned on")
@@ -59,6 +59,11 @@ if(SZD_PERF_PER_ZONE_COUNTERS)
   endif()
 endif()
 
+# Sets up io_uring
+find_package(PkgConfig REQUIRED)
+pkg_search_module(IOURING REQUIRED IMPORTED_TARGET liburing)
+list(TRANSFORM IOURING_LINK_LIBRARIES REPLACE "[.]so$" ".a")
+
 # Sets up SPDK
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSPDK.cmake")
 
@@ -68,12 +73,18 @@ set(szd_core_include_files
     "${szd_core_include_dir}/szd_namespace.h"
     "${szd_core_include_dir}/szd_status_code.h"
     "${szd_core_include_dir}/szd.h"
+    "${szd_core_include_dir}/szd_spdk.h"
+    "${szd_core_include_dir}/szd_ioctl.h"
+    "${szd_core_include_dir}/szd_iouring.h"
 )
 list(APPEND szd_all_files "${szd_core_include_files}")
 set(szd_core_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/src")
 set(szd_core_src_files
     "${szd_core_src_dir}/szd_status_code.c"
     "${szd_core_src_dir}/szd.c"
+    "${szd_core_src_dir}/szd_spdk.c"
+    "${szd_core_src_dir}/szd_ioctl.c"
+    "${szd_core_src_dir}/szd_iouring.c"
 )
 list(APPEND szd_all_files "${szd_core_src_files}")
 
@@ -110,6 +121,7 @@ list(APPEND szd_all_files "${szd_cpp_src_files}")
 function(SETUP_SZD_PROJECT_STRUCTURE project_name)
     set_target_properties(${project_name} PROPERTIES LINKER_LANGUAGE CXX)
     set_property(TARGET ${project_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(${project_name} PRIVATE ${IOURING_LINK_LIBRARIES} nvme)
     target_compile_options(
         ${project_name}
         PRIVATE "${BUILD_FLAGS}"
@@ -133,7 +145,7 @@ add_library(szd STATIC
 )
 target_include_directories(szd PRIVATE "${SPDK_INCLUDE_DIRS}")
 target_link_libraries(szd PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
-target_include_directories(szd PUBLIC 
+target_include_directories(szd PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
     "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/szd/core/${CMAKE_INSTALL_INCLUDEDIR}>"
 )
@@ -147,7 +159,7 @@ add_library(szd_extended STATIC
 )
 target_include_directories(szd_extended PRIVATE "${SPDK_INCLUDE_DIRS}")
 target_link_libraries(szd_extended PUBLIC ${SPDK_LIBRARY_DEPENDENCIES})
-target_include_directories(szd_extended PUBLIC 
+target_include_directories(szd_extended PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include>"
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include>"
     "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/szd/core/${CMAKE_INSTALL_INCLUDEDIR}>"
@@ -192,6 +204,14 @@ if (TESTING)
     list(APPEND szd_all_files "${szd_core_test_dir}/szd_full_path_test.c")
     target_link_libraries(szd_full_path_test PUBLIC szd)
     setup_szd_project_structure(szd_full_path_test)
+
+    # add_executable(szd_full_path_test_writes
+    #     "${szd_core_test_dir}/szd_full_path_test_writes.c"
+    # )
+    # list(APPEND szd_all_files "${szd_core_test_dir}/szd_full_path_test_writes.c")
+    # target_link_libraries(szd_full_path_test_writes PUBLIC szd)
+    # setup_szd_project_structure(szd_full_path_test_writes)
+
     # Setup GTests
     include(GoogleTest)
     include(FetchContent)
@@ -255,7 +275,7 @@ if(DOXYGEN)
         set(DOCS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/docs)
         set(DOXYFILE_IN ${DOCS_DIR}/Doxyfile.in)
         set(DOXYFILE_OUT ${DOCS_DIR}/Doxyfile)
-            
+
         # request to configure the file
         configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)
         add_custom_target(docs

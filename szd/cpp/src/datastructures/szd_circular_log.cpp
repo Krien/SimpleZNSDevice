@@ -400,7 +400,8 @@ SZDStatus SZDCircularLog::RecoverPointers() {
 
   // Retrieve zone heads from the device
   std::vector<uint64_t> zone_heads;
-  s = reset_channel_->ZoneHeads(min_zone_head_, max_zone_head_ - zone_cap_, &zone_heads);
+  s = reset_channel_->ZoneHeads(min_zone_head_, max_zone_head_ - zone_cap_,
+                                &zone_heads);
   if (szd_unlikely(s != SZDStatus::Success)) {
     SZD_LOG_ERROR("SZD: Once log: Recover pointers\n");
     return s;

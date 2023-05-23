@@ -17,7 +17,7 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
  */
 class SZDChannelFactory {
 public:
-  SZDChannelFactory(DeviceManager *device_manager, size_t max_channel_count);
+  SZDChannelFactory(SZD::EngineManager *em, size_t max_channel_count);
   ~SZDChannelFactory();
   // No copying or implicits
   SZDChannelFactory(const SZDChannelFactory &) = delete;
@@ -45,7 +45,7 @@ public:
 private:
   size_t max_channel_count_;
   size_t channel_count_;
-  DeviceManager *device_manager_;
+  EngineManager *em_;
   size_t refs_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
