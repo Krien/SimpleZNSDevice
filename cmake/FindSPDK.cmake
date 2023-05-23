@@ -2,23 +2,26 @@
 if(DEFINED $ENV{SPDK_DIR})
     set(SPDK_DIR "$ENV{SPDK_DIR}")
 else()
-    set(SPDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/spdk")
+    set(SPDK_DIR "${CMAKE_SOURCE_DIR}/dependencies/spdk")
 endif()
 message("looking for SPDK in ${SPDK_DIR}")
 
+set(TMP_PKG_CONFIG_LIBDIR "$ENV{PKG_CONFIG_PATH}")
+set(ENV{PKG_CONFIG_LIBDIR} "${SPDK_DIR}/build/lib/pkgconfig/")
 find_package(PkgConfig REQUIRED)
 if(NOT PKG_CONFIG_FOUND)
     message(FATAL_ERROR "pkg-config command not found!" )
 endif()
 
 # Needed to ensure that PKG_CONFIG also looks at our SPDK installation.
-set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${SPDK_DIR}/build/lib/pkgconfig/")
 message("Looking for SPDK packages...")
 pkg_search_module(SPDK REQUIRED IMPORTED_TARGET spdk_nvme)
 pkg_search_module(DPDK REQUIRED IMPORTED_TARGET spdk_env_dpdk)
 pkg_search_module(SYS REQUIRED IMPORTED_TARGET spdk_syslibs)
+set(ENV{PKG_CONFIG_LIBDIR} "${TMP_PKG_CONFIG_LIBDIR}")
 
 set(SPDK_INCLUDE_DIRS "${SPDK_INCLUDE_DIRS}")
+message("Found SPDK include dirs at ${SPDK_INCLUDE_DIRS} ${TMP_PKG_CONFIG}")
 
 # TODO: Solve this once there is one sane CMake for SPDK somewhere
 # The following is what is done in the wiki of SPDK, but does not work as of 2022-11-09.
