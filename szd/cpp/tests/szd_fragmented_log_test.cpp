@@ -22,7 +22,7 @@ TEST_F(SZDTest, FillingFragmentedLogSimpleTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_fragmented_log);
+      dev.GetEngineManager(), needed_channels_for_fragmented_log);
   SZD::SZDFragmentedLog log(factory, info, begin_zone, end_zone, 1, 1);
 
   // We need to reset all data if it is there, as always.
@@ -89,7 +89,7 @@ TEST_F(SZDTest, FillingFragmentedLogFragmentingTest) {
   static constexpr uint64_t further_end_zone = 19;
   SZDTestUtil::SZDSetupDevice(begin_zone, further_end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_fragmented_log);
+      dev.GetEngineManager(), needed_channels_for_fragmented_log);
   SZD::SZDFragmentedLog log(factory, info, begin_zone, further_end_zone, 1, 1);
 
   // We need to reset all data if it is there, as always.
@@ -211,7 +211,7 @@ TEST_F(SZDTest, MultipleWritersFragmentedLogFragmentingTest) {
   static constexpr uint64_t further_end_zone = 19;
   SZDTestUtil::SZDSetupDevice(begin_zone, further_end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_fragmented_log + 1);
+      dev.GetEngineManager(), needed_channels_for_fragmented_log + 1);
   SZD::SZDFragmentedLog log(factory, info, begin_zone, further_end_zone, 1, 2);
 
   // Reset first

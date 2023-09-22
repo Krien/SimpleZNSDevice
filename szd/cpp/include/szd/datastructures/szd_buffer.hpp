@@ -13,7 +13,7 @@
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 class SZDBuffer {
 public:
-  SZDBuffer(size_t size, uint64_t lba_size);
+  SZDBuffer(EngineManager* em, size_t size, uint64_t lba_size);
   // No copying or implicits
   SZDBuffer(const SZDBuffer &) = delete;
   SZDBuffer &operator=(const SZDBuffer &) = delete;
@@ -49,6 +49,7 @@ private:
   uint64_t lba_size_;
   void *backed_memory_;
   size_t backed_memory_size_;
+  EngineManager* em_;
 };
 } // namespace SIMPLE_ZNS_DEVICE_NAMESPACE
 

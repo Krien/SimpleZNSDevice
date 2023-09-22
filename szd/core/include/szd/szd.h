@@ -1,36 +1,3 @@
-/*-
- *   BSD LICENSE
- *
- *   Copyright (c) Intel Corporation. All rights reserved.
- *   Copyright (c) 2019 Mellanox Technologies LTD. All rights reserved.
- *
- *   Redistribution and use in source and binary forms, with or without
- *   modification, are permitted provided that the following conditions
- *   are met:
- *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in
- *       the documentation and/or other materials provided with the
- *       distribution.
- *     * Neither the name of Intel Corporation nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
- *
- *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- *   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- *   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 /** \file
  * Main SZD interface.
  */
@@ -40,13 +7,10 @@
 
 #include "szd/szd_namespace.h"
 #include "szd/szd_status_code.h"
-
 #include <pthread.h>
-
 #ifdef SZD_USDT
 #include <sys/sdt.h>
 #endif
-
 #ifdef __cplusplus
 extern "C" {
 #include <cstdint>
@@ -56,25 +20,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 #endif
-
-// "Forward declare" SPDK structs to prevent pollution.
-typedef struct spdk_nvme_transport_id t_spdk_nvme_transport_id;
-typedef struct spdk_nvme_ctrlr t_spdk_nvme_ctrlr;
-typedef struct spdk_nvme_ctrlr_opts t_spdk_nvme_ctrlr_opts;
-typedef struct spdk_nvme_ns t_spdk_nvme_ns;
-typedef struct spdk_nvme_qpair t_spdk_nvme_qpair;
-typedef struct spdk_nvme_cpl t_spdk_nvme_cpl;
-typedef struct spdk_nvme_zns_ns_data t_spdk_nvme_zns_ns_data;
-typedef struct spdk_nvme_ns_data t_spdk_nvme_ns_data;
-typedef struct spdk_nvme_zns_ctrlr_data t_spdk_nvme_zns_ctrlr_data;
-typedef struct spdk_nvme_ctrlr_data t_spdk_nvme_ctrlr_data;
-
 #ifdef __cplusplus
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 #endif
-
-#define MAX_TRADDR_LENGTH 0x100
-#define MAX_DEVICE_COUNT 0x100
 
 /**
  * @brief Options to pass to the ZNS device on initialisation.
@@ -82,6 +30,8 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 typedef struct {
   const char *name;      /**< Name used by SPDK to identify application. */
   const bool setup_spdk; /**< Set to false during reset. */
+  const bool iouring_sqthread; /**< Set to false during reset. */
+  const bool iouring_fixed;    /**< Set to false during reset. */
 } DeviceOptions;
 extern const DeviceOptions DeviceOptions_default;
 
@@ -101,14 +51,16 @@ extern const DeviceOpenOptions DeviceOpenOptions_default;
 typedef struct {
   uint64_t
       lba_size; /**< Size of one block, also known as logical block address.*/
-  uint64_t zone_size; /**<  Size of one zone in lbas.*/
-  uint64_t zone_cap;  /**< Size of user availabe space in one zone. */
-  uint64_t mdts;      /**<  Maximum data transfer size in bytes.*/
-  uint64_t zasl;      /**<  Maximum size of one append command in bytes.*/
-  uint64_t lba_cap;   /**<  Amount of lbas available on the device.*/
-  uint64_t min_lba;   /**< Minimum lba that is allowed to be written to.*/
-  uint64_t max_lba;   /**< Maximum lba that is allowed to be written to.*/
-  const char *name;   /**< Name used by SPDK to identify device.*/
+  uint64_t zone_size;     /**<  Size of one zone in lbas.*/
+  uint64_t zone_cap;      /**< Size of user availabe space in one zone. */
+  uint64_t min_page_size; /** minimum cap page size */
+  uint64_t mdts;          /**<  Maximum data transfer size in bytes.*/
+  uint64_t zasl;          /**<  Maximum size of one append command in bytes.*/
+  uint64_t lba_cap;       /**<  Amount of lbas available on the device.*/
+  uint64_t min_lba;       /**< Minimum lba that is allowed to be written to.*/
+  uint64_t max_lba;       /**< Maximum lba that is allowed to be written to.*/
+  const char *name;       /**< Name used by SZD to identify device.*/
+  uint32_t nsid;          /**< nsid*/
 } DeviceInfo;
 extern const DeviceInfo DeviceInfo_default;
 
@@ -126,12 +78,8 @@ extern const DeviceManagerInternal DeviceManagerInternal_default;
  * The core structure in SimpleZnsDevice.
  */
 typedef struct {
-  t_spdk_nvme_transport_id
-      *g_trid;              /**< transport id used to communicate with SSD*/
-  t_spdk_nvme_ctrlr *ctrlr; /**< Controller of the selected SSD*/
-  t_spdk_nvme_ns *ns;       /**< Selected namespace of the selected SSD*/
-  DeviceInfo info;          /**< Information of selected SSD*/
-  void *private_;           /**< To be used by SZD only */
+  DeviceInfo info; /**< Information of selected SSD*/
+  void *private_;  /**< To be used by backend only */
 } DeviceManager;
 
 /**
@@ -139,8 +87,8 @@ typedef struct {
  * Can be used for writing and reading of data.
  */
 typedef struct {
-  t_spdk_nvme_qpair *qpair; /**< internal I/O channel */
-  DeviceManager *man;       /**< Manager of the channel*/
+  void *qpair;        /**< internal I/O channel */
+  DeviceManager *man; /**< Manager of the channel*/
 } QPair;
 
 /**
@@ -150,102 +98,136 @@ typedef struct {
 typedef struct {
   bool done;    /**< Synchronous call is done.*/
   uint16_t err; /**< return code after call is done.*/
+  uint32_t id; /**<Used for debugging*/
 } Completion;
 extern const Completion Completion_default;
 
 /**
- * @brief Structure used for identifying devices.
+ * @brief used for adding backends
  */
 typedef struct {
-  char **traddr; /**< transport ids of all probed devices.*/
-  bool *zns;     /**< Foreach probed device, is it a ZNS device?*/
-  struct spdk_nvme_ctrlr **ctrlr; /**< The controller(s) of the devices.*/
-  uint8_t devices;                /**< Used to identify global device count.*/
-  pthread_mutex_t *mut; /**< Ensures that probe information is thread safe.*/
-} ProbeInformation;
+  /* Status */
+  int (*init)(DeviceManager **dm, DeviceOptions *opt);
+  int (*destroy)(DeviceManager *dm);
+  int (*reinit)(DeviceManager **dm);
+  int (*probe)(DeviceManager *dm, void **probe_info);
+  void (*free_probe)(DeviceManager *dm, void *probe_info);
+  int (*open)(DeviceManager *manager, const char *traddr,
+              DeviceOpenOptions *options);
+  int (*close)(DeviceManager *manager);
+  int (*get_device_info)(DeviceInfo *info, DeviceManager *dm);
+  /* Handling */
+  int (*create_qpair)(DeviceManager *dm, QPair **qpair);
+  int (*destroy_qpair)(DeviceManager *dm, QPair *qpair);
+  void *(*buf_calloc)(uint64_t __allign, size_t __nmemb, size_t __size);
+  void (*free)(void *buf);
+  /* I/O */
+  int (*read)(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+              uint64_t blocks);
+  int (*write)(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+               uint64_t blocks);
+
+  int (*append)(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+                uint64_t blocks);
+  int (*append_async)(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
+                      uint64_t blocks, Completion *completion);
+  int (*poll_async)(QPair *qpair, Completion *completion);
+  int (*poll_once)(QPair *qpair, Completion *completion);
+  void (*poll_once_raw)(QPair *qpair);
+  /* zone management */
+  int (*reset_zone)(QPair *qpair, uint64_t slba);
+  int (*reset_all_zones)(QPair *qpair);
+  int (*finish_zone)(QPair *qpair, uint64_t slba);
+  int (*get_zone_head)(QPair *qpair, uint64_t slba, uint64_t *write_head);
+  int (*get_zone_heads)(QPair *qpair, uint64_t slba, uint64_t eslba,
+                        uint64_t *write_head);
+  int (*get_zone_cap)(QPair *qpair, uint64_t slba, uint64_t *zone_cap);
+} ioengine_backend;
+enum szd_io_backend { SZD_IO_BACKEND_SPDK = 0, SZD_IO_BACKEND_IO_URING = 2 };
 
 /**
- * @brief Structure that is used when looking for a device by trid.
+ * @brief General structure that aids in managing one ZNS namespace.
+ * The core structure in SimpleZnsDevice.
  */
 typedef struct {
-  DeviceManager *manager; /**< The manager associated with the probing.*/
-  const char *traddr; /**< The transport id of the device that is targeted.*/
-  const size_t traddr_len; /**< Length in bytes to check for the target id
-                              (long ids).*/
-  bool found;              /**< Whether the device is found or not.*/
-} DeviceTarget;
+  ioengine_backend backend;
+  DeviceManager *manager_;          /**< To be used by SZD only */
+  DeviceManagerInternal *internal_; /**< To be used by SZD only */
+} EngineManager;
 
 /**
  * @brief inits SPDK and the general device manager, always call ONCE before
  * ANY other function is called.
  * @param manager pointer to manager that will be initialised.
  */
-int szd_init(DeviceManager **manager, DeviceOptions *options);
+int szd_init(EngineManager **manager, DeviceOptions *options,
+             enum szd_io_backend backend);
 
 /**
  * @brief Closes the device if open and destroys the manager.
  * @param manager non-null manager to destroy.
  */
-int szd_destroy(DeviceManager *manager);
+int szd_destroy(EngineManager *manager);
 
 /**
  * @brief Only works when device is not NULL, it recreates the device context.
  * @param manager akready existing manager to recreate.
  */
-int szd_reinit(DeviceManager **manager);
+int szd_reinit(EngineManager **manager);
 
 /**
  * @brief probes all devices that can be attached by SPDK and set probing
  * information for them.
  * @param probe sets to be a list of information on all attachable devices.
  */
-int szd_probe(DeviceManager *manager, ProbeInformation **probe_info);
+int szd_probe(EngineManager *manager, void **probe_info);
 
 /**
  * @brief Frees information from probe information.
  */
-void szd_free_probe_information(ProbeInformation *probe_info);
+void szd_free_probe_information(EngineManager *manager, void *probe_info);
 
 /**
  * @brief Opens a ZNS device, provided it exists and is a ZNS device.
  * This device is then set as the current device in the manager.
  */
-int szd_open(DeviceManager *manager, const char *traddr,
+int szd_open(EngineManager *manager, const char *traddr,
              DeviceOpenOptions *options);
 
 /**
  * @brief  If the manager holds a device, shut it down and free associated
  * data.
  */
-int szd_close(DeviceManager *man);
+int szd_close(EngineManager *man);
 
 /**
  * @brief If a device is attached to manager, gets its information and store
  * it in info.
  */
-int szd_get_device_info(DeviceInfo *info, DeviceManager *manager);
+int szd_get_device_info(EngineManager *manager, DeviceInfo *info);
 
 /**
  * @brief Creates a Qpair to be used for I/O oprations
  * @param qpair, pointer to unallocated qpair pointer to be created.
  */
-int szd_create_qpair(DeviceManager *man, QPair **qpair);
+int szd_create_qpair(EngineManager *man, QPair **qpair);
 
 /**
  * @brief Destroys the qpair if it is still valid.
  */
-int szd_destroy_qpair(QPair *qpair);
+int szd_destroy_qpair(EngineManager *man, QPair *qpair);
 
 /**
  * @brief Custom calloc that uses DMA logic necessary for SPDK.
  * Must be alligned with the device lba_size (see DeviceInfo).
  */
-void *szd_calloc(uint64_t __allign, size_t __nmemb, size_t __size);
+void *szd_calloc(EngineManager *dm, uint64_t __allign, size_t __nmemb,
+                 size_t __size);
 
 /**
  * @brief Custom free that can free memory from z_calloc.
  */
-void szd_free(void *buffer);
+void szd_free(EngineManager *dm, void *buffer);
 
 /**
  * @brief Reads n bytes synchronously from the ZNS device.
@@ -257,9 +239,15 @@ void szd_free(void *buffer);
  * @param nr_reads ptr to variable that can be used for diagnostics, can be
  * set to NULL.
  */
-int szd_read(QPair *qpair, uint64_t lba, void *buffer, uint64_t size);
-int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
-                       uint64_t *nr_reads);
+int szd_read(EngineManager *manager, QPair *qpair, uint64_t lba, void *buffer,
+             uint64_t size);
+int szd_read_with_diag(EngineManager *manager, QPair *qpair, uint64_t lba,
+                       void *buffer, uint64_t size, uint64_t *nr_reads);
+
+int szd_write(EngineManager *manager, QPair *qpair, uint64_t *lba, void *buffer,
+              uint64_t size);
+int szd_write_with_diag(EngineManager *manager, QPair *qpair, uint64_t *lba,
+                        void *buffer, uint64_t size, uint64_t *nr_writes);
 
 /**
  * @brief Append z_calloced data synchronously to a zone.
@@ -271,9 +259,10 @@ int szd_read_with_diag(QPair *qpair, uint64_t lba, void *buffer, uint64_t size,
  * @param nr_appends ptr to variable that can be used for diagnostics, can be
  * set to NULL.
  */
-int szd_append(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size);
-int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
-                         uint64_t size, uint64_t *nr_appends);
+int szd_append(EngineManager *manager, QPair *qpair, uint64_t *lba,
+               void *buffer, uint64_t size);
+int szd_append_with_diag(EngineManager *manager, QPair *qpair, uint64_t *lba,
+                         void *buffer, uint64_t size, uint64_t *nr_appends);
 
 /**
  * @brief Append z_calloced data asynchronously to a zone.
@@ -286,39 +275,40 @@ int szd_append_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
  * set to NULL.
  * @param completion can be used to poll for completion later on (sync)
  */
-int szd_append_async(QPair *qpair, uint64_t *lba, void *buffer, uint64_t size,
-                     Completion *completion);
-int szd_append_async_with_diag(QPair *qpair, uint64_t *lba, void *buffer,
-                               uint64_t size, uint64_t *nr_appends,
-                               Completion *completion);
+int szd_append_async(EngineManager *manager, QPair *qpair, uint64_t *lba,
+                     void *buffer, uint64_t size, Completion *completion);
+int szd_append_async_with_diag(EngineManager *manager, QPair *qpair,
+                               uint64_t *lba, void *buffer, uint64_t size,
+                               uint64_t *nr_appends, Completion *completion);
 /**
  * @brief
  * Can be used on an asynchronously function to ensure that is synced to the
  * storage.
  */
-int szd_poll_async(QPair *qpair, Completion *completion);
-int szd_poll_once(QPair *qpair, Completion *completion);
+int szd_poll_async(EngineManager *manager, QPair *qpair,
+                   Completion *completion);
+int szd_poll_once(EngineManager *manager, QPair *qpair, Completion *completion);
 // Rawest poll, no error handling or finish checks
-void szd_poll_once_raw(QPair *qpair);
+void szd_poll_once_raw(EngineManager *manager, QPair *qpair);
 
 /**
  * @brief Resets a zone synchronously, allowing it to be reused.
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to reset
  */
-int szd_reset(QPair *qpair, uint64_t slba);
+int szd_reset(EngineManager *manager, QPair *qpair, uint64_t slba);
 
 /**
  * @brief Resets all zones within min and max lba.
  */
-int szd_reset_all(QPair *qpair);
+int szd_reset_all(EngineManager *manager, QPair *qpair);
 
 /**
  * @brief Finishes a zone synchronously, preventing too many active zones.
  * @param qpair channel to use for I/O
  * @param slba starting logical block address of zone to reset
  */
-int szd_finish_zone(QPair *qpair, uint64_t slba);
+int szd_finish_zone(EngineManager *manager, QPair *qpair, uint64_t slba);
 
 /**
  * @brief Gets the write head of a zone synchronously as a logical block
@@ -328,7 +318,8 @@ int szd_finish_zone(QPair *qpair, uint64_t slba);
  * from.
  * @param write_head pointer to store the write head in.
  */
-int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head);
+int szd_get_zone_head(EngineManager *manager, QPair *qpair, uint64_t slba,
+                      uint64_t *write_head);
 
 /**
  * @brief Gets the write head of a zone synchronously as a logical block
@@ -341,8 +332,8 @@ int szd_get_zone_head(QPair *qpair, uint64_t slba, uint64_t *write_head);
  * @param write_head pointer to store the write heads in. Must be allocated
  * before and must have at least (eslba - slba + 1) / zone_size.
  */
-int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
-                       uint64_t *write_head);
+int szd_get_zone_heads(EngineManager *manager, QPair *qpair, uint64_t slba,
+                       uint64_t eslba, uint64_t *write_head);
 
 /**
  * @brief Gets the write head of a zone synchronously as a logical block
@@ -352,7 +343,8 @@ int szd_get_zone_heads(QPair *qpair, uint64_t slba, uint64_t eslba,
  * from.
  * @param zone_cap capacity of a zone.
  */
-int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap);
+int szd_get_zone_cap(EngineManager *manager, QPair *qpair, uint64_t slba,
+                     uint64_t *zone_cap);
 
 /**
  * @brief Converts status code of SZD to human readable messages.
@@ -360,12 +352,6 @@ int szd_get_zone_cap(QPair *qpair, uint64_t slba, uint64_t *zone_cap);
  * message.
  */
 void szd_print_zns_status(int status);
-
-/**
- * @brief Passthrough function that directly calls spdk_strtol, which is a
- * helper for strings to unsigned longs.
- */
-long int szd_spdk_strtol(const char *nptr, int base);
 
 #ifdef NDEBUG
 #define SZD_LOG_ERROR(...)                                                     \
@@ -396,41 +382,10 @@ long int szd_spdk_strtol(const char *nptr, int base);
   } while (0)
 #endif
 
+int __szd_register_backend(EngineManager *dm, enum szd_io_backend backend);
+
 void __szd_error_log(const char *file, const int line, const char *func,
                      const char *format, ...);
-
-bool __szd_probe_probe_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
-                          t_spdk_nvme_ctrlr_opts *opts);
-
-void __szd_probe_attach_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
-                           struct spdk_nvme_ctrlr *ctrlr,
-                           const struct spdk_nvme_ctrlr_opts *opts);
-
-int __szd_open_create_private(DeviceManager *manager,
-                              DeviceOpenOptions *options);
-
-bool __szd_open_probe_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
-                         t_spdk_nvme_ctrlr_opts *opts);
-
-void __szd_open_attach_cb(void *cb_ctx, const t_spdk_nvme_transport_id *trid,
-                          t_spdk_nvme_ctrlr *ctrlr,
-                          const t_spdk_nvme_ctrlr_opts *opts);
-
-void __szd_open_remove_cb(void *cb_ctx, t_spdk_nvme_ctrlr *ctrlr);
-
-void *__reserve_dma(uint64_t size);
-
-void __operation_complete(void *arg, const t_spdk_nvme_cpl *completion);
-
-void __read_complete(void *arg, const t_spdk_nvme_cpl *completion);
-
-void __append_complete(void *arg, const t_spdk_nvme_cpl *completion);
-
-void __reset_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
-
-void __finish_zone_complete(void *arg, const t_spdk_nvme_cpl *completion);
-
-void __get_zone_head_complete(void *arg, const t_spdk_nvme_cpl *completion);
 
 #ifdef __cplusplus
 }
