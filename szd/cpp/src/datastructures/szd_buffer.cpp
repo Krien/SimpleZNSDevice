@@ -8,12 +8,12 @@
 
 namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
 
-SZDBuffer::SZDBuffer(size_t size, uint64_t lba_size)
-    : lba_size_(lba_size), backed_memory_(nullptr), backed_memory_size_(size) {
+SZDBuffer::SZDBuffer(SZD::EngineManager *em, size_t size, uint64_t lba_size)
+    : lba_size_(lba_size), backed_memory_(nullptr), backed_memory_size_(size), em_(em) {
   backed_memory_size_ =
       ((backed_memory_size_ + lba_size_ - 1) / lba_size_) * lba_size_;
   if (backed_memory_size_ != 0) {
-    backed_memory_ = szd_calloc(lba_size_, 1, backed_memory_size_);
+    backed_memory_ = szd_calloc(em_, lba_size_, 1, backed_memory_size_);
   }
   // idle state (can also be because of bad malloc!)
   if (backed_memory_ == nullptr) {
@@ -22,7 +22,7 @@ SZDBuffer::SZDBuffer(size_t size, uint64_t lba_size)
 }
 SZDBuffer::~SZDBuffer() {
   if (backed_memory_ != nullptr && backed_memory_size_ > 0) {
-    szd_free(backed_memory_);
+    szd_free(em_, backed_memory_);
   }
 }
 
@@ -81,7 +81,7 @@ SZDStatus SZDBuffer::ReallocBuffer(uint64_t size) {
       return s;
     }
   }
-  backed_memory_ = szd_calloc(lba_size_, alligned_size, sizeof(char));
+  backed_memory_ = szd_calloc(em_, lba_size_, alligned_size, sizeof(char));
   if (szd_unlikely(backed_memory_ == nullptr)) {
     backed_memory_size_ = 0;
     SZD_LOG_ERROR("SZD: Buffer: ReallocBuffer: Failed allocating memory\n");
@@ -98,7 +98,7 @@ SZDStatus SZDBuffer::FreeBuffer() {
   if (backed_memory_size_ == 0) {
     return SZDStatus::Success;
   }
-  szd_free(backed_memory_);
+  szd_free(em_, backed_memory_);
   backed_memory_ = nullptr;
   backed_memory_size_ = 0;
   return SZDStatus::Success;

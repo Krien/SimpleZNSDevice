@@ -12,7 +12,7 @@ static bool dpdk_initialised = false;
 
 SZDDevice::SZDDevice(const std::string &application_name)
     : application_name_(application_name), initialised_device_(false),
-      device_opened_(false), manager_(new DeviceManager *), opened_device_() {}
+      device_opened_(false), manager_(new EngineManager *), opened_device_() {}
 
 SZDDevice::~SZDDevice() {
   if (initialised_device_ || device_opened_) {
@@ -23,8 +23,11 @@ SZDDevice::~SZDDevice() {
 
 SZDStatus SZDDevice::Init() {
   DeviceOptions opts = {.name = application_name_.data(),
-                        .setup_spdk = !dpdk_initialised};
-  SZDStatus s = FromStatus(szd_init(manager_, &opts));
+                        .setup_spdk = !dpdk_initialised, 
+                        .iouring_sqthread = false,
+                        .iouring_fixed = false,
+  };
+  SZDStatus s = FromStatus(szd_init(manager_, &opts, SZD::SZD_IO_BACKEND_IO_URING));
   if (s == SZDStatus::Success) {
     initialised_device_ = true;
     dpdk_initialised = true;
@@ -44,13 +47,21 @@ SZDStatus SZDDevice::Reinit() {
   return s;
 }
 
+typedef struct {
+  char **traddr; /**< transport ids of all probed devices.*/
+  bool *zns;     /**< Foreach probed device, is it a ZNS device?*/
+  struct spdk_nvme_ctrlr **ctrlr; /**< The controller(s) of the devices.*/
+  uint8_t devices;                /**< Used to identify global device count.*/
+  pthread_mutex_t *mut; /**< Ensures that probe information is thread safe.*/
+} ProbeInformation;
+
 SZDStatus SZDDevice::Probe(std::vector<DeviceOpenInfo> &info) {
   if (!initialised_device_) {
     SZD_LOG_ERROR("SZD: Device: Probe: Invalid args\n");
     return SZDStatus::InvalidArguments;
   }
   ProbeInformation **prober = new ProbeInformation *;
-  SZDStatus s = FromStatus(szd_probe(*manager_, prober));
+  SZDStatus s = FromStatus(szd_probe(*manager_, (void**)prober));
   if (s != SZDStatus::Success) {
     SZD_LOG_ERROR("SZD: Device: Probe: Failed probing\n");
     return s;
@@ -61,7 +72,7 @@ SZDStatus SZDDevice::Probe(std::vector<DeviceOpenInfo> &info) {
     info.push_back(
         DeviceOpenInfo{.traddr = trid, .is_zns = (*prober)->zns[dev]});
   }
-  szd_free_probe_information(*prober);
+  szd_free_probe_information(*manager_, *prober);
   delete prober;
   // Probe can leave SZD in a weird attached state (zombie devices).
   s = Reinit();
@@ -101,7 +112,7 @@ SZDStatus SZDDevice::GetInfo(DeviceInfo *info) const {
     SZD_LOG_ERROR("SZD: Device: GetInfo: Not initialised\n");
     return SZDStatus::InvalidArguments;
   }
-  *info = (*manager_)->info;
+  *info = (*manager_)->manager_->info;
   return SZDStatus::Success;
 }
 

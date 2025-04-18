@@ -76,7 +76,7 @@ TEST_F(SZDChannelTest, AllignmentTest) {
   SZD::SZDDevice dev("AllignmentTest");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
   // 0 bytes
@@ -100,7 +100,7 @@ TEST_F(SZDChannelTest, TranslateAddress) {
   SZD::SZDDevice dev("TranslateAddress");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
 
   // Mock translations
@@ -108,7 +108,7 @@ TEST_F(SZDChannelTest, TranslateAddress) {
   //  1. EQ (zone_sze = zone_cap)
   //  2. PowerOfTwo (zone_sze = zone_cap * 2)
   //  3. NotAPowerOfTwo (zone_sze = zone_cap + 10)
-  dev.GetDeviceManager()->info.zone_size = 4096;
+  dev.GetEngineManager()->manager_->info.zone_size = 4096;
 
   const auto testallignment = [](SZD::SZDChannel *channel, uint64_t l,
                                  uint64_t r) -> void {
@@ -119,7 +119,7 @@ TEST_F(SZDChannelTest, TranslateAddress) {
     ASSERT_EQ(channel->TranslatePbaToLba(channel->TranslateLbaToPba(l)), l);
   };
 
-  dev.GetDeviceManager()->info.zone_cap = 4096;
+  dev.GetEngineManager()->manager_->info.zone_cap = 4096;
   factory.register_channel(&channel);
   testallignment(channel, 0, 0);
   testallignment(channel, 3, 3);
@@ -128,7 +128,7 @@ TEST_F(SZDChannelTest, TranslateAddress) {
   testallignment(channel, 1UL << 63, 1UL << 63);
   factory.unregister_channel(channel);
 
-  dev.GetDeviceManager()->info.zone_cap = 4096 >> 1;
+  dev.GetEngineManager()->manager_->info.zone_cap = 4096 >> 1;
   factory.register_channel(&channel);
   testallignment(channel, 0, 0);
   testallignment(channel, 3, 3);
@@ -140,7 +140,7 @@ TEST_F(SZDChannelTest, TranslateAddress) {
   testallignment(channel, 1UL << 62, 1UL << 63);
   factory.unregister_channel(channel);
 
-  dev.GetDeviceManager()->info.zone_cap = 4096 - 10;
+  dev.GetEngineManager()->manager_->info.zone_cap = 4096 - 10;
   factory.register_channel(&channel);
   testallignment(channel, 0, 0);
   testallignment(channel, 3, 3);
@@ -156,7 +156,7 @@ TEST_F(SZDChannelTest, DirectIO) {
   SZD::SZDDevice dev("DirectIO");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 
@@ -283,7 +283,7 @@ TEST_F(SZDChannelTest, DirectIONonAlligned) {
   SZD::SZDDevice dev("DirectIONonAlligned");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 
@@ -377,7 +377,7 @@ TEST_F(SZDChannelTest, BufferIO) {
   SZD::SZDDevice dev("BufferIO");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 
@@ -397,7 +397,7 @@ TEST_F(SZDChannelTest, BufferIO) {
   // Setup. We will create 3 equal sized parts. We flush the middle part.
   // Read it into the last, then flush a non-alligned area around the last 2
   // parts and read it into the first.
-  SZD::SZDBuffer buffer(info.lba_size * 3, info.lba_size);
+  SZD::SZDBuffer buffer(dev.GetEngineManager(), info.lba_size * 3, info.lba_size);
   char *raw_buffer = nullptr;
   ASSERT_EQ(buffer.GetBuffer((void **)&raw_buffer), SZD::SZDStatus::Success);
   ASSERT_NE(raw_buffer, nullptr);
@@ -466,7 +466,7 @@ TEST_F(SZDChannelTest, BufferIO) {
                       start_head + buffer.GetBufferSize() / info.lba_size,
                       info.zone_cap, info.zasl / info.lba_size);
 
-  SZD::SZDBuffer shadow_buffer(info.lba_size * 3, info.lba_size);
+  SZD::SZDBuffer shadow_buffer(dev.GetEngineManager(), info.lba_size * 3, info.lba_size);
   char *raw_shadow_buffer;
   ASSERT_EQ(shadow_buffer.GetBuffer((void **)&raw_shadow_buffer),
             SZD::SZDStatus::Success);
@@ -502,7 +502,7 @@ TEST_F(SZDChannelTest, ResetZone) {
   SZD::SZDDevice dev("ResetZone");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 4);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 4);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 
@@ -578,7 +578,7 @@ TEST_F(SZDChannelTest, ResetAndWriteRespectsRange) {
   SZD::SZDDevice dev("ResetAndWriteRespectsRange");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 4);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 4);
   SZD::SZDChannel *channel, *channel1, *channel2, *channel3;
   factory.register_channel(&channel);
   factory.register_channel(&channel1, begin_zone, begin_zone + 1, false, 1);
@@ -640,7 +640,7 @@ TEST_F(SZDChannelTest, FinishZone) {
   SZD::SZDDevice dev("FinishZone");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 4);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 4);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 
@@ -690,7 +690,7 @@ TEST_F(SZDChannelTest, AsyncTest) {
   SZD::SZDDevice dev("AsyncTest");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel, true, 8);
 
@@ -822,7 +822,7 @@ TEST_F(SZDChannelTest, MaxZoneHeads) {
   SZD::SZDDevice dev("MaxZoneHeads");
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(0, 0, &dev, &info);
-  SZD::SZDChannelFactory factory(dev.GetDeviceManager(), 1);
+  SZD::SZDChannelFactory factory(dev.GetEngineManager(), 1);
   SZD::SZDChannel *channel;
   factory.register_channel(&channel);
 

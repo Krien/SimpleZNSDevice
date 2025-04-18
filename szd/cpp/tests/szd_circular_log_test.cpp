@@ -23,7 +23,7 @@ TEST_F(SZDTest, FillingACircularLogEphemerallyTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_circular_log);
+      dev.GetEngineManager(), needed_channels_for_circular_log);
   SZD::SZDCircularLog log(factory, info, begin_zone_log, end_zone_log, 1);
 
   // We need to reset all data if it is there, as always.
@@ -110,7 +110,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_circular_log);
+      dev.GetEngineManager(), needed_channels_for_circular_log);
   factory->Ref();
 
   // Cleanup first round
@@ -142,7 +142,7 @@ TEST_F(SZDTest, TestFillingACircularPersistently) {
   }
 
   // last round, get and verify the data
-  SZD::SZDBuffer buffer((end_zone - begin_zone) * info.zone_cap * info.lba_size,
+  SZD::SZDBuffer buffer(dev.GetEngineManager(), (end_zone - begin_zone) * info.zone_cap * info.lba_size,
                         info.lba_size);
   {
     SZD::SZDCircularLog log(factory, info, begin_zone, end_zone, 1);
@@ -170,7 +170,7 @@ TEST_F(SZDTest, CircularLogCircularPatternTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_circular_log * 2);
+      dev.GetEngineManager(), needed_channels_for_circular_log * 2);
   SZD::SZDCircularLog log(factory, info, begin_zone, end_zone, 1);
 
   // We need to reset all data if it is there, as always.
@@ -268,7 +268,7 @@ TEST_F(SZDTest, CircularLogMultipleReaderTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(),
+      dev.GetEngineManager(),
       needed_channels_for_circular_log + /* 1 reader extra */ 1);
   SZD::SZDCircularLog log(factory, info, begin_zone, end_zone, 2);
   ASSERT_EQ(log.GetNumberOfReaders(), 2);

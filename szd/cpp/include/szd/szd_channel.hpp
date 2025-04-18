@@ -21,10 +21,10 @@ namespace SIMPLE_ZNS_DEVICE_NAMESPACE {
  */
 class SZDChannel {
 public:
-  SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
+  SZDChannel(SZD::EngineManager *em, std::unique_ptr<QPair> qpair, const DeviceInfo &info,
              uint64_t min_lba, uint64_t max_lba, bool keep_async_buffer = false,
              uint32_t queue_depth = 1);
-  SZDChannel(std::unique_ptr<QPair> qpair, const DeviceInfo &info,
+  SZDChannel(SZD::EngineManager *em, std::unique_ptr<QPair> qpair, const DeviceInfo &info,
              bool keep_async_buffer = false, uint32_t queue_depth = 1);
   // No copying or implicits
   SZDChannel(const SZDChannel &) = delete;
@@ -105,6 +105,7 @@ public:
 
 private:
   QPair *qpair_;
+  SZD::EngineManager *em_;
   uint64_t lba_size_;
   uint64_t zasl_;
   uint64_t mdts_;

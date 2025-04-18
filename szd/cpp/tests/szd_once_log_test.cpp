@@ -23,7 +23,7 @@ TEST_F(SZDTest, OnceLogEphemeralTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_once_log);
+      dev.GetEngineManager(), needed_channels_for_once_log);
   SZD::SZDOnceLog log(factory, info, begin_zone_log, end_zone_log, 1U);
 
   // We need to reset all data if it is there, as always.
@@ -108,7 +108,7 @@ TEST_F(SZDTest, OnceLogPersistenceTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_once_log);
+      dev.GetEngineManager(), needed_channels_for_once_log);
   factory->Ref();
 
   // Cleanup first round
@@ -139,7 +139,7 @@ TEST_F(SZDTest, OnceLogPersistenceTest) {
   }
 
   // last round, get and verify the data
-  SZD::SZDBuffer buffer((end_zone - begin_zone) * info.zone_cap * info.lba_size,
+  SZD::SZDBuffer buffer(dev.GetEngineManager(), (end_zone - begin_zone) * info.zone_cap * info.lba_size,
                         info.lba_size);
   {
     SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
@@ -167,7 +167,7 @@ TEST_F(SZDTest, OnceLogMarkInactiveTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_once_log);
+      dev.GetEngineManager(), needed_channels_for_once_log);
   factory->Ref();
   SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
@@ -223,7 +223,7 @@ TEST_F(SZDTest, OnceLogReadAllTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_once_log);
+      dev.GetEngineManager(), needed_channels_for_once_log);
   factory->Ref();
   SZD::SZDOnceLog log(factory, info, begin_zone, end_zone, 1U);
 
@@ -255,7 +255,7 @@ TEST_F(SZDTest, OnceLogAsyncTest) {
   SZD::DeviceInfo info;
   SZDTestUtil::SZDSetupDevice(begin_zone, end_zone, &dev, &info);
   SZD::SZDChannelFactory *factory = new SZD::SZDChannelFactory(
-      dev.GetDeviceManager(), needed_channels_for_once_log);
+      dev.GetEngineManager(), needed_channels_for_once_log);
   factory->Ref();
   SZD::SZDChannel **channel = new SZD::SZDChannel *[1];
   factory->register_channel(&channel[0], true, 4);
