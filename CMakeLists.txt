@@ -173,6 +173,34 @@ setup_szd_project_structure(szd_extended)
 # )
 #setup_spdk_project_structure(szd_lib_shared)
 
+
+# Change install dir
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        # Change default installation prefix on Linux to /usr
+        set(CMAKE_INSTALL_PREFIX /usr CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
+    endif()
+endif()
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Install
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/szd/core/include/szd" COMPONENT runtime DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/szd/cpp/include/szd" COMPONENT runtime DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(
+    TARGETS szd_extended
+    COMPONENT runtime
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+install(
+    TARGETS szd
+    COMPONENT runtime
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+
 # Tooling....
 set(tool_files)
 if (SZD_TOOLS)
